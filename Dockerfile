@@ -11,7 +11,7 @@ RUN npm ci --ignore-scripts
 
 # Build
 COPY . .
-RUN npx prisma generate --schema=./prisma/schema.prisma
+RUN npx prisma generate
 RUN npm run build
 
 # ---- 2) Runtime + scanners (optimized) ----
