@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: 'standalone',
   outputFileTracingRoot: process.cwd(),
-  
+  hostname: '0.0.0.0',
   // Optimize for production builds
   productionBrowserSourceMaps: false, // Disable source maps to reduce size
   compress: true, // Enable gzip compression
