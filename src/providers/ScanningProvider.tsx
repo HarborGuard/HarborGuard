@@ -151,7 +151,7 @@ interface ScanningContextType {
   refreshJobs: () => Promise<void>;
   clearCompletedJobs: () => void;
   getJobByRequestId: (requestId: string) => ScanJob | undefined;
-  setOnScanComplete: (callback: (scanId: string) => void) => void;
+  setOnScanComplete: (callback: (job: ScanJob) => void) => void;
 }
 
 const ScanningContext = createContext<ScanningContextType | undefined>(undefined);
@@ -162,7 +162,7 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
     sseClients: new Map()
   });
 
-  const onScanCompleteRef = useRef<((scanId: string) => void) | null>(null);
+  const onScanCompleteRef = useRef<((job: ScanJob) => void) | null>(null);
   const previousJobsRef = useRef<Map<string, ScanJob>>(new Map());
 
   // Monitor for scan completions
@@ -177,7 +177,7 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
         // This job just completed successfully
         if (onScanCompleteRef.current) {
           console.log(`Scan completed successfully: ${job.scanId}`);
-          onScanCompleteRef.current(job.scanId);
+          onScanCompleteRef.current(job);
         }
       }
     });
@@ -275,7 +275,7 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
     return state.jobs.get(requestId);
   }, [state.jobs]);
 
-  const setOnScanComplete = useCallback((callback: (scanId: string) => void) => {
+  const setOnScanComplete = useCallback((callback: (job: ScanJob) => void) => {
     onScanCompleteRef.current = callback;
   }, []);
 

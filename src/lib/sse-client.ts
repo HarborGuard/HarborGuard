@@ -1,14 +1,8 @@
 "use client"
 
-export interface ScanProgressEvent {
-  requestId: string;
-  scanId: string;
-  status: 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
-  progress: number;
-  step?: string;
-  error?: string;
-  timestamp: string;
-}
+import { ScanProgressEvent } from '@/lib/scanner/types';
+
+export type { ScanProgressEvent };
 
 export interface SSEEvent {
   type: 'connected' | 'progress' | 'heartbeat';

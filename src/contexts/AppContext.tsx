@@ -1,6 +1,8 @@
 "use client"
 
 import React, { createContext, useContext, useReducer, useEffect, ReactNode, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import type { LegacyScan, ScanWithImage } from '@/types'
 import { 
   aggregateVulnerabilities,
@@ -290,7 +292,7 @@ interface AppContextType {
   state: AppState
   dispatch: React.Dispatch<AppAction>
   refreshData: () => Promise<void>
-  handleScanComplete: (scanId: string) => Promise<void>
+  handleScanComplete: (job: any) => Promise<void>
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -298,6 +300,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined)
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState)
   const refreshPromiseRef = useRef<Promise<void> | null>(null)
+  const router = useRouter()
 
   const loadData = async () => {
     try {
@@ -360,9 +363,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return refreshPromiseRef.current;
   }
 
-  const handleScanComplete = async (scanId: string) => {
-    console.log(`Refreshing data due to scan completion: ${scanId}`);
+  const handleScanComplete = async (job: any) => {
+    console.log(`Refreshing data due to scan completion: ${job.scanId}`);
     await refreshData();
+    
+    // Extract image name from job.imageName or fallback to parsing from scan data
+    const imageName = job.imageName || 'unknown';
+    const scanId = job.scanId;
+    
+    // Show success toast notification with navigation action
+    toast.success("Scan completed successfully!", {
+      description: `Scan ${scanId} has finished processing`,
+      action: {
+        label: "View Results",
+        onClick: () => {
+          router.push(`/image/${encodeURIComponent(imageName)}/scan/${scanId}`);
+        }
+      }
+    });
   }
 
   useEffect(() => {
