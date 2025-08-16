@@ -176,7 +176,6 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
       if (job.status === 'SUCCESS' && previousJob && previousJob.status !== 'SUCCESS') {
         // This job just completed successfully
         if (onScanCompleteRef.current) {
-          console.log(`Scan completed successfully: ${job.scanId}`);
           onScanCompleteRef.current(job);
         }
       }
@@ -197,11 +196,9 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
   const subscribeTo = useCallback((requestId: string) => {
     // Don't create duplicate SSE clients
     if (state.sseClients.has(requestId)) {
-      console.log(`Already subscribed to scan progress: ${requestId}`);
       return;
     }
 
-    console.log(`Subscribing to scan progress via SSE: ${requestId}`);
     const sseClient = new SSEClient(requestId);
     
     // Set up progress listener
@@ -217,16 +214,14 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
     // Connect and add to state
     sseClient.connect();
     dispatch({ type: 'ADD_SSE_CLIENT', payload: { requestId, client: sseClient } });
-  }, [state.sseClients]);
+  }, []); // Remove state.sseClients dependency - the check inside will handle duplicates
 
   const unsubscribeFrom = useCallback((requestId: string) => {
-    console.log(`Unsubscribing from scan progress: ${requestId}`);
     dispatch({ type: 'REMOVE_SSE_CLIENT', payload: requestId });
   }, []);
 
   const refreshJobs = useCallback(async () => {
     try {
-      console.log('Refreshing scan jobs...');
       const response = await fetch('/api/scans/jobs');
       if (response.ok) {
         const data = await response.json();
@@ -236,15 +231,19 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
           lastUpdate: new Date().toISOString()
         }));
         
-        console.log(`Found ${jobs.length} scan jobs, ${jobs.filter(j => j.status === 'RUNNING').length} running`);
+        const runningJobsCount = jobs.filter(j => j.status === 'RUNNING').length;
+        
+        // Only log when there are changes or running jobs
+        if (runningJobsCount > 0) {
+          console.log(`Scan jobs: ${jobs.length} total, ${runningJobsCount} running`);
+        }
+        
         dispatch({ type: 'SET_JOBS', payload: jobs });
         
         // Subscribe to all running jobs
         const runningJobs = jobs.filter(job => job.status === 'RUNNING');
         if (runningJobs.length > 0) {
-          console.log(`Subscribing to ${runningJobs.length} running jobs...`);
           runningJobs.forEach(job => {
-            console.log(`Subscribing to running job: ${job.requestId}`);
             subscribeTo(job.requestId);
           });
         }
@@ -252,13 +251,12 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Error fetching scan jobs:', error);
     }
-  }, [subscribeTo]);
+  }, []); // Remove subscribeTo dependency to prevent infinite re-renders
 
   const addScanJob = useCallback((job: Omit<ScanJob, 'startTime' | 'lastUpdate'>) => {
     dispatch({ type: 'ADD_SCAN_JOB', payload: job });
     
     // Automatically subscribe to this job's progress via SSE
-    console.log(`Auto-subscribing to new scan: ${job.requestId}`);
     subscribeTo(job.requestId);
   }, [subscribeTo]);
 
@@ -279,12 +277,40 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
     onScanCompleteRef.current = callback;
   }, []);
 
-  // Auto-refresh jobs periodically - less frequent to avoid multiple connections
+  // Auto-refresh jobs periodically - adaptive polling based on active scans
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingFrequencyRef = useRef<number>(30000); // Default to 30 seconds
+  
   useEffect(() => {
+    // Initial fetch
     refreshJobs();
-    const interval = setInterval(refreshJobs, 60000); // Every 60 seconds (reduced from 30)
-    return () => clearInterval(interval);
+    
+    // Set up initial polling at 30 second intervals
+    intervalRef.current = setInterval(refreshJobs, 30000);
+    
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
   }, [refreshJobs]);
+  
+  // Separate effect to adjust polling frequency based on running jobs
+  useEffect(() => {
+    const hasRunningJobs = Array.from(state.jobs.values()).some(job => job.status === 'RUNNING');
+    const newFrequency = hasRunningJobs ? 3000 : 30000; // 3 seconds if active scans, 30 seconds otherwise
+    
+    // Only update if frequency needs to change
+    if (newFrequency !== pollingFrequencyRef.current) {
+      pollingFrequencyRef.current = newFrequency;
+      
+      // Clear existing interval and start with new frequency
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      intervalRef.current = setInterval(refreshJobs, newFrequency);
+    }
+  }, [state.jobs, refreshJobs]);
 
   // Auto-cleanup completed jobs
   useEffect(() => {

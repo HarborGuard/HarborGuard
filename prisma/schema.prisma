@@ -23,6 +23,7 @@ model Image {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   scans       Scan[]
+  bulkScanItems BulkScanItem[]
 
   @@index([name, tag])
   @@index([registry, name, tag])
@@ -63,6 +64,9 @@ model Scan {
   
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  
+  scheduledExecutions ScheduledScanExecution[]
+  bulkScanItems BulkScanItem[]
 
   @@index([requestId])
   @@index([status])
@@ -77,4 +81,89 @@ enum ScanStatus {
   PARTIAL
   FAILED
   CANCELLED
+}
+
+model ScanSchedule {
+  id             String   @id @default(cuid())
+  name           String
+  cronExpression String   // e.g. "0 2 * * *" for daily at 2 AM
+  scanRequest    Json     // Store the ScanRequest configuration
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  lastRunAt      DateTime?
+  nextRunAt      DateTime?
+  createdBy      String?
+
+  executions ScheduledScanExecution[]
+
+  @@index([isActive])
+  @@index([nextRunAt])
+  @@map("scan_schedules")
+}
+
+model ScheduledScanExecution {
+  id            String        @id @default(cuid())
+  scheduleId    String
+  schedule      ScanSchedule  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  scanId        String?
+  scan          Scan?         @relation(fields: [scanId], references: [id], onDelete: SetNull)
+  executionTime DateTime      @default(now())
+  status        String        // 'SUCCESS', 'FAILED', 'SKIPPED'
+  errorMessage  String?
+
+  @@index([scheduleId])
+  @@index([executionTime])
+  @@map("scheduled_scan_executions")
+}
+
+model ScanTemplate {
+  id                 String   @id @default(cuid())
+  name               String
+  description        String?
+  environment        String   // 'production', 'staging', 'development', 'any'
+  scannerConfig      Json     // Which scanners to run, their settings
+  policyConfig       Json?    // Risk thresholds, compliance requirements
+  notificationConfig Json?    // Who to notify, when
+  isDefault          Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  createdBy          String?
+
+  @@index([environment])
+  @@index([isDefault])
+  @@map("scan_templates")
+}
+
+model BulkScanBatch {
+  id           String   @id @default(cuid())
+  name         String?  // Optional name for the bulk scan
+  totalImages  Int
+  status       String   // 'RUNNING', 'COMPLETED', 'FAILED'
+  patterns     Json     // Store the search patterns used
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  completedAt  DateTime?
+  errorMessage String?
+
+  items BulkScanItem[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("bulk_scan_batches")
+}
+
+model BulkScanItem {
+  id      String        @id @default(cuid())
+  batchId String
+  batch   BulkScanBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  scanId  String
+  scan    Scan          @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  imageId String
+  image   Image         @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  status  String        // 'RUNNING', 'SUCCESS', 'FAILED'
+
+  @@index([batchId])
+  @@index([status])
+  @@map("bulk_scan_items")
 }

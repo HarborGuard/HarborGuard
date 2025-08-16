@@ -1,0 +1,425 @@
+import { prisma } from '@/lib/prisma';
+import { scannerService } from '@/lib/scanner';
+import type { BulkScanRequest } from '../scheduler/types';
+import type { ScanRequest } from '@/types';
+
+export interface BulkScanResult {
+  batchId: string;
+  totalImages: number;
+  scanIds: string[];
+  skipped: number;
+}
+
+export interface BulkScanRequestWithName extends BulkScanRequest {
+  name?: string;
+}
+
+export class BulkScanService {
+  async executeBulkScan(request: BulkScanRequestWithName): Promise<BulkScanResult> {
+    const batchId = this.generateBatchId();
+    
+    console.log(`Starting bulk scan with batch ID: ${batchId}`);
+
+    try {
+      // Find matching images
+      const matchingImages = await this.findMatchingImages(
+        request.patterns, 
+        request.excludePatterns
+      );
+      
+      console.log(`Found ${matchingImages.length} images matching bulk scan criteria`);
+
+      if (matchingImages.length === 0) {
+        throw new Error('No images found matching the specified patterns');
+      }
+
+      // Create batch record
+      await prisma.bulkScanBatch.create({
+        data: {
+          id: batchId,
+          name: request.name,
+          totalImages: matchingImages.length,
+          status: 'RUNNING',
+          patterns: request.patterns as any,
+        }
+      });
+
+      // Execute scans with concurrency control
+      const result = await this.executeConcurrentScans(
+        matchingImages, 
+        request.maxConcurrent || 3,
+        batchId,
+        request.scanTemplate
+      );
+
+      // Update batch status
+      await prisma.bulkScanBatch.update({
+        where: { id: batchId },
+        data: { 
+          status: 'COMPLETED',
+          completedAt: new Date()
+        }
+      });
+
+      console.log(`Bulk scan batch ${batchId} completed. ${result.successful} successful, ${result.failed} failed`);
+
+      return {
+        batchId,
+        totalImages: matchingImages.length,
+        scanIds: result.scanIds,
+        skipped: result.failed
+      };
+
+    } catch (error) {
+      console.error(`Bulk scan batch ${batchId} failed:`, error);
+      
+      // Update batch status to failed
+      await prisma.bulkScanBatch.update({
+        where: { id: batchId },
+        data: { 
+          status: 'FAILED',
+          errorMessage: error instanceof Error ? error.message : String(error),
+          completedAt: new Date()
+        }
+      }).catch(console.error);
+
+      throw error;
+    }
+  }
+
+  async getBulkScanStatus(batchId: string) {
+    const batch = await prisma.bulkScanBatch.findUnique({
+      where: { id: batchId },
+      include: {
+        items: {
+          include: {
+            scan: {
+              select: {
+                id: true,
+                status: true,
+                startedAt: true,
+                finishedAt: true
+              }
+            },
+            image: {
+              select: {
+                id: true,
+                name: true,
+                tag: true,
+                registry: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!batch) {
+      throw new Error(`Bulk scan batch ${batchId} not found`);
+    }
+
+    const summary = {
+      running: batch.items.filter(item => item.status === 'RUNNING').length,
+      completed: batch.items.filter(item => item.status === 'SUCCESS').length,
+      failed: batch.items.filter(item => item.status === 'FAILED').length,
+    };
+
+    return {
+      ...batch,
+      summary
+    };
+  }
+
+  async cancelBulkScan(batchId: string): Promise<void> {
+    const batch = await prisma.bulkScanBatch.findUnique({
+      where: { id: batchId },
+      include: {
+        items: {
+          where: { status: 'RUNNING' },
+          include: { scan: true }
+        }
+      }
+    });
+
+    if (!batch) {
+      throw new Error(`Bulk scan batch ${batchId} not found`);
+    }
+
+    if (batch.status !== 'RUNNING') {
+      throw new Error(`Bulk scan batch ${batchId} is not running`);
+    }
+
+    // Cancel running scans
+    for (const item of batch.items) {
+      try {
+        await scannerService.cancelScan(item.scan.requestId);
+      } catch (error) {
+        console.warn(`Failed to cancel scan ${item.scanId}:`, error);
+      }
+    }
+
+    // Update batch status
+    await prisma.bulkScanBatch.update({
+      where: { id: batchId },
+      data: { 
+        status: 'FAILED',
+        errorMessage: 'Cancelled by user',
+        completedAt: new Date()
+      }
+    });
+  }
+
+  private async findMatchingImages(
+    patterns: BulkScanRequest['patterns'], 
+    excludePatterns?: string[]
+  ) {
+    const whereConditions: any[] = [];
+
+    // Build dynamic where conditions based on patterns
+    if (patterns.imagePattern) {
+      const imagePattern = patterns.imagePattern.replace(/\*/g, '%');
+      whereConditions.push({
+        name: {
+          contains: imagePattern.replace(/%/g, '') // SQLite LIKE equivalent
+        }
+      });
+    }
+
+    if (patterns.tagPattern) {
+      const tagPattern = patterns.tagPattern.replace(/\*/g, '%');
+      whereConditions.push({
+        tag: {
+          contains: tagPattern.replace(/%/g, '')
+        }
+      });
+    }
+
+    if (patterns.registryPattern) {
+      const registryPattern = patterns.registryPattern.replace(/\*/g, '%');
+      whereConditions.push({
+        registry: {
+          contains: registryPattern.replace(/%/g, '')
+        }
+      });
+    }
+
+    const images = await prisma.image.findMany({
+      where: whereConditions.length > 0 ? {
+        AND: whereConditions
+      } : {},
+      select: {
+        id: true,
+        name: true,
+        tag: true,
+        registry: true,
+        digest: true
+      },
+      orderBy: [
+        { name: 'asc' },
+        { tag: 'asc' }
+      ]
+    });
+
+    // Apply exclude patterns (client-side filtering)
+    return this.applyExcludePatterns(images, excludePatterns);
+  }
+
+  private applyExcludePatterns(images: any[], excludePatterns?: string[]): any[] {
+    if (!excludePatterns || excludePatterns.length === 0) {
+      return images;
+    }
+
+    return images.filter(image => {
+      const fullName = image.registry 
+        ? `${image.registry}/${image.name}:${image.tag}`
+        : `${image.name}:${image.tag}`;
+
+      return !excludePatterns.some(pattern => {
+        const regexPattern = pattern
+          .replace(/\*/g, '.*')
+          .replace(/\?/g, '.');
+        const regex = new RegExp(`^${regexPattern}$`);
+        return regex.test(fullName);
+      });
+    });
+  }
+
+  private async executeConcurrentScans(
+    images: any[], 
+    maxConcurrent: number,
+    batchId: string,
+    scanTemplate?: string
+  ): Promise<{ scanIds: string[]; successful: number; failed: number }> {
+    const results: string[] = [];
+    let successful = 0;
+    let failed = 0;
+    
+    // Process in chunks to control concurrency
+    for (let i = 0; i < images.length; i += maxConcurrent) {
+      const chunk = images.slice(i, i + maxConcurrent);
+      
+      const chunkPromises = chunk.map(async (image) => {
+        try {
+          const scanRequest: ScanRequest = {
+            image: image.name,
+            tag: image.tag,
+            registry: image.registry,
+            source: 'registry'
+          };
+
+          // TODO: Apply scan template if provided
+          
+          const { scanId } = await scannerService.startScan(scanRequest);
+
+          // Link scan to batch
+          await prisma.bulkScanItem.create({
+            data: {
+              batchId,
+              scanId,
+              imageId: image.id,
+              status: 'RUNNING'
+            }
+          });
+
+          // Monitor scan completion in background
+          this.monitorScanCompletion(batchId, scanId, image.id);
+
+          successful++;
+          return scanId;
+
+        } catch (error) {
+          console.error(`Failed to start scan for ${image.name}:${image.tag}`, error);
+          
+          // Create failed bulk scan item
+          await prisma.bulkScanItem.create({
+            data: {
+              batchId,
+              scanId: '', // No scan created
+              imageId: image.id,
+              status: 'FAILED'
+            }
+          }).catch(console.error);
+          
+          failed++;
+          return null;
+        }
+      });
+
+      const chunkResults = await Promise.all(chunkPromises);
+      results.push(...chunkResults.filter((id): id is string => id !== null));
+
+      // Small delay between chunks to avoid overwhelming the system
+      if (i + maxConcurrent < images.length) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    return { scanIds: results, successful, failed };
+  }
+
+  private async monitorScanCompletion(batchId: string, scanId: string, imageId: string): Promise<void> {
+    // This would typically be handled by a background job or webhook
+    // For now, we'll use a simple polling mechanism
+    const pollInterval = setInterval(async () => {
+      try {
+        const scan = await prisma.scan.findUnique({
+          where: { id: scanId },
+          select: { status: true }
+        });
+
+        if (!scan) {
+          clearInterval(pollInterval);
+          return;
+        }
+
+        if (scan.status === 'SUCCESS' || scan.status === 'FAILED' || scan.status === 'CANCELLED') {
+          // Update bulk scan item status
+          await prisma.bulkScanItem.updateMany({
+            where: {
+              batchId,
+              scanId,
+              imageId
+            },
+            data: {
+              status: scan.status === 'SUCCESS' ? 'SUCCESS' : 'FAILED'
+            }
+          });
+
+          clearInterval(pollInterval);
+        }
+      } catch (error) {
+        console.error('Error monitoring scan completion:', error);
+        clearInterval(pollInterval);
+      }
+    }, 10000); // Poll every 10 seconds
+
+    // Clean up after 1 hour to prevent memory leaks
+    setTimeout(() => {
+      clearInterval(pollInterval);
+    }, 60 * 60 * 1000);
+  }
+
+  private generateBatchId(): string {
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');
+    const randomHex = Math.random().toString(16).slice(2, 10);
+    return `bulk-${timestamp}-${randomHex}`;
+  }
+
+  async getBulkScanHistory(limit = 20) {
+    const batches = await prisma.bulkScanBatch.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: {
+        _count: {
+          select: {
+            items: true
+          }
+        },
+        items: {
+          select: {
+            status: true
+          }
+        }
+      }
+    });
+
+    // Add summary statistics for each batch
+    return batches.map(batch => {
+      const items = batch.items;
+      const summary = {
+        completed: items.filter(item => item.status === 'SUCCESS').length,
+        failed: items.filter(item => item.status === 'FAILED').length,
+        running: items.filter(item => item.status === 'RUNNING').length,
+      };
+
+      return {
+        ...batch,
+        summary
+      };
+    });
+  }
+
+  async getActiveScans() {
+    return prisma.bulkScanBatch.findMany({
+      where: { status: 'RUNNING' },
+      include: {
+        items: {
+          include: {
+            image: {
+              select: {
+                name: true,
+                tag: true,
+                registry: true
+              }
+            },
+            scan: {
+              select: {
+                status: true
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+}

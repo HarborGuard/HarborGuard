@@ -15,6 +15,10 @@ const ScanStartSchema = z.object({
   tag: z.string().min(1).optional(),
   source: z.enum(['registry', 'local']).optional(),
   dockerImageId: z.string().optional(),
+  
+  // Template support
+  templateId: z.string().optional(),
+  environment: z.enum(['production', 'staging', 'development']).optional(),
 }).refine(
   (data) => 
     // Either legacy format or new format must be provided
@@ -46,8 +50,12 @@ export async function POST(request: NextRequest) {
       dockerImageId: validatedData.dockerImageId,
     }
     
-    // Start scan
-    const result = await scannerService.startScan(scanRequest)
+    // Start scan with template support
+    const result = await scannerService.startScanWithTemplate(
+      scanRequest,
+      validatedData.templateId,
+      validatedData.environment
+    )
     
     return NextResponse.json({
       success: true,

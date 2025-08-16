@@ -5,6 +5,7 @@ import { MockDataGenerator } from './MockDataGenerator';
 import { ScanExecutor } from './ScanExecutor';
 import { getScannerVersions } from './scanners';
 import type { ScanRequest, ScanJob } from '@/types';
+import type { AppliedScanRequest } from '../templates/types';
 
 export class ScannerService {
   private jobs = new Map<string, ScanJob>();
@@ -24,11 +25,52 @@ export class ScannerService {
   }
 
   async startScan(request: ScanRequest): Promise<{ requestId: string; scanId: string }> {
+    return this.startScanWithTemplate(request);
+  }
+
+  async startScanWithTemplate(
+    request: ScanRequest, 
+    templateId?: string,
+    environment?: string
+  ): Promise<{ requestId: string; scanId: string }> {
     const requestId = this.generateRequestId();
+    
+    // Apply template if specified
+    let enhancedRequest: AppliedScanRequest = request as AppliedScanRequest;
+    
+    if (templateId || environment) {
+      try {
+        const { scanTemplateService } = await import('../templates/ScanTemplateService');
+        
+        if (templateId) {
+          enhancedRequest = await scanTemplateService.applyScanTemplate(request, templateId);
+        } else if (environment) {
+          enhancedRequest = await scanTemplateService.applyScanTemplateByEnvironment(request, environment);
+        }
+        
+        if (enhancedRequest.template) {
+          console.log(`Starting scan for ${request.image}:${request.tag} with template: ${enhancedRequest.template.name}`);
+        }
+      } catch (error) {
+        console.warn('Failed to apply scan template, proceeding with default scan:', error);
+      }
+    }
     
     console.log(`Starting scan for ${request.image}:${request.tag} with requestId: ${requestId}`);
 
     const { scanId, imageId } = await this.databaseAdapter.initializeScanRecord(requestId, request);
+
+    // Store template information in scan record if available
+    if (enhancedRequest.template) {
+      await this.databaseAdapter.updateScanRecord(scanId, {
+        scanConfig: {
+          templateId: enhancedRequest.template.id,
+          templateName: enhancedRequest.template.name,
+          scannerConfig: enhancedRequest.scannerConfig,
+          policyConfig: enhancedRequest.policyConfig
+        } as any
+      });
+    }
 
     this.jobs.set(requestId, {
       requestId,
@@ -38,7 +80,7 @@ export class ScannerService {
       progress: 0
     });
 
-    this.executeScan(requestId, request, scanId, imageId).catch(error => {
+    this.executeScan(requestId, enhancedRequest, scanId, imageId).catch(error => {
       console.error(`Scan ${requestId} failed:`, error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.updateJobStatus(requestId, 'FAILED', undefined, errorMessage);
@@ -53,12 +95,12 @@ export class ScannerService {
     return `${timestamp}-${randomHex}`;
   }
 
-  private async executeScan(requestId: string, request: ScanRequest, scanId: string, imageId: string) {
+  private async executeScan(requestId: string, request: ScanRequest | AppliedScanRequest, scanId: string, imageId: string) {
     try {
       if (this.isDevelopmentMode) {
         await this.executeMockScan(requestId, request, scanId, imageId);
       } else if (this.isLocalDockerScan(request)) {
-        await this.scanExecutor.executeLocalDockerScan(requestId, request, scanId, imageId);
+        await this.scanExecutor.executeLocalDockerScan(requestId, request as ScanRequest, scanId, imageId);
         await this.finalizeScan(requestId, scanId, request);
       } else {
         if (this.shouldSimulateDownload(request)) {
@@ -67,7 +109,7 @@ export class ScannerService {
         
         this.progressTracker.simulateScanningProgress(requestId);
         
-        await this.scanExecutor.executeRegistryScan(requestId, request, scanId, imageId);
+        await this.scanExecutor.executeRegistryScan(requestId, request as ScanRequest, scanId, imageId);
         await this.finalizeScan(requestId, scanId, request);
       }
     } catch (error) {
@@ -86,11 +128,11 @@ export class ScannerService {
     }
   }
 
-  private async executeMockScan(requestId: string, request: ScanRequest, scanId: string, imageId: string) {
+  private async executeMockScan(requestId: string, request: ScanRequest | AppliedScanRequest, scanId: string, imageId: string) {
     try {
-      await this.scanExecutor.executeMockScan(requestId, request, scanId, imageId);
+      await this.scanExecutor.executeMockScan(requestId, request as ScanRequest, scanId, imageId);
       
-      const mockReports = await this.mockDataGenerator.generateMockScanData(request);
+      const mockReports = await this.mockDataGenerator.generateMockScanData(request as ScanRequest);
       
       await this.databaseAdapter.updateScanRecord(scanId, {
         trivy: mockReports.trivy || null,
@@ -123,7 +165,7 @@ export class ScannerService {
     }
   }
 
-  private async finalizeScan(requestId: string, scanId: string, request: ScanRequest) {
+  private async finalizeScan(requestId: string, scanId: string, request: ScanRequest | AppliedScanRequest) {
     this.updateJobStatus(requestId, 'RUNNING', 90, undefined, 'Processing scan results');
 
     const reports = await this.scanExecutor.loadScanResults(requestId);
@@ -138,11 +180,11 @@ export class ScannerService {
     this.updateJobStatus(requestId, 'SUCCESS', 100, undefined, 'Scan completed successfully');
   }
 
-  private isLocalDockerScan(request: ScanRequest): boolean {
+  private isLocalDockerScan(request: ScanRequest | AppliedScanRequest): boolean {
     return request.source === 'local' && !!request.dockerImageId;
   }
 
-  private shouldSimulateDownload(request: ScanRequest): boolean {
+  private shouldSimulateDownload(request: ScanRequest | AppliedScanRequest): boolean {
     return !this.isLocalDockerScan(request);
   }
 

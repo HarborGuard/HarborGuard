@@ -20,6 +20,9 @@ import {
   IconActivity,
   IconLibrary,
   IconBook,
+  IconTemplate,
+  IconCalendar,
+  IconStack,
 } from "@tabler/icons-react"
 
 import { NavDocuments } from "@/components/nav-documents"
@@ -58,6 +61,21 @@ const data = {
       title: "Scanned Libs",
       url: "/library",
       icon: IconBook,
+    },
+    {
+      title: "Templates",
+      url: "/templates",
+      icon: IconTemplate,
+    },
+    {
+      title: "Schedules",
+      url: "/schedules",
+      icon: IconCalendar,
+    },
+    {
+      title: "Bulk Scan",
+      url: "/bulk-scan",
+      icon: IconStack,
     }
   ]
 }

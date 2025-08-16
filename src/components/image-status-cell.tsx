@@ -11,17 +11,19 @@ interface ImageStatusCellProps {
   status: string;
 }
 
-export function ImageStatusCell({ imageName, imageId, status }: ImageStatusCellProps) {
+export function ImageStatusCell({ imageName: _imageName, imageId, status }: ImageStatusCellProps) {
   const { runningJobs } = useScanning();
   
-  // Check if there's a running scan for this image (by name or imageId)
-  const runningJob = runningJobs.find(job => 
-    job.imageId === imageId || 
-    job.imageId === imageName ||
-    // Also check if the job's imageId matches the displayed image name
-    imageName.includes(job.imageId) ||
-    job.imageId.includes(imageName)
-  );
+  // Check if there's a running scan for this image
+  const runningJob = runningJobs.find(job => {
+    // Only match if imageId is provided and matches exactly
+    // This should be the most reliable since imageId should be unique
+    if (imageId && imageId === job.imageId) {
+      return true;
+    }
+    
+    return false;
+  });
 
   // If there's a running scan, show progress bar instead of status badge
   if (runningJob) {

@@ -178,6 +178,10 @@ export const schema = z.object({
   type: z.string().optional(),
   target: z.string().optional(),
   limit: z.string().optional(),
+  
+  // Metadata for grouped images
+  _tagCount: z.number().optional(),
+  _allTags: z.string().optional(),
 }).strict();
 
 export type ScanRow = z.infer<typeof schema>;
@@ -240,10 +244,20 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     accessorKey: "image",
     header: "Image",
     cell: ({ row }) => {
-      // Extract just the image name without tag for display
-      const imageParts = row.original.image.split(':');
-      const imageName = imageParts[0];
-      return imageName;
+      const imageName = row.original.image;
+      const tagCount = (row.original as any)._tagCount || 1;
+      const allTags = (row.original as any)._allTags || '';
+      
+      return (
+        <div className="flex flex-col">
+          <span className="font-medium">{imageName}</span>
+          {tagCount > 1 && (
+            <span className="text-xs text-muted-foreground" title={`Tags: ${allTags}`}>
+              {tagCount} tags: {allTags.length > 30 ? allTags.substring(0, 30) + '...' : allTags}
+            </span>
+          )}
+        </div>
+      );
     },
     enableHiding: false,
   },
@@ -531,10 +545,78 @@ export function DataTable({
   isFullPage?: boolean
 }) {
   const router = useRouter()
-  const [data, setData] = React.useState(() => initialData)
-  React.useEffect(() => {
-    setData(initialData)
+  
+  // Group data by image name (without tag)
+  const groupedData = React.useMemo(() => {
+    const grouped = new Map<string, z.infer<typeof schema>[]>()
+    
+    initialData.forEach(item => {
+      const imageName = item.image.split(':')[0] // Remove tag part
+      if (!grouped.has(imageName)) {
+        grouped.set(imageName, [])
+      }
+      grouped.get(imageName)!.push(item)
+    })
+    
+    // Convert to array and merge data for same image names
+    return Array.from(grouped.entries()).map(([imageName, items]) => {
+      // Use the most recent scan as the base item
+      const baseItem = items.reduce((latest, current) => 
+        new Date(current.lastScan) > new Date(latest.lastScan) ? current : latest
+      )
+      
+      // Aggregate vulnerability counts across all tags
+      const aggregatedSeverities = items.reduce((acc, item) => ({
+        crit: acc.crit + item.severities.crit,
+        high: acc.high + item.severities.high,
+        med: acc.med + item.severities.med,
+        low: acc.low + item.severities.low,
+      }), { crit: 0, high: 0, med: 0, low: 0 })
+      
+      // Calculate aggregated risk score (average weighted by severity)
+      const totalVulns = items.reduce((sum, item) => 
+        sum + item.severities.crit + item.severities.high + item.severities.med + item.severities.low, 0
+      )
+      const weightedRiskScore = totalVulns > 0 
+        ? Math.round(items.reduce((sum, item) => {
+            const itemTotal = item.severities.crit + item.severities.high + item.severities.med + item.severities.low
+            return sum + (item.riskScore * itemTotal)
+          }, 0) / totalVulns)
+        : baseItem.riskScore
+      
+      // Aggregate other metrics
+      const totalFixable = items.reduce((sum, item) => sum + item.fixable.count, 0)
+      const totalVulnerabilities = aggregatedSeverities.crit + aggregatedSeverities.high + aggregatedSeverities.med + aggregatedSeverities.low
+      const aggregatedFixable = {
+        count: totalFixable,
+        percent: totalVulnerabilities > 0 ? Math.round((totalFixable / totalVulnerabilities) * 100) : 0
+      }
+      
+      return {
+        ...baseItem,
+        id: baseItem.id, // Keep original ID for key purposes
+        image: imageName, // Show just the image name without tag
+        imageName, // For navigation
+        severities: aggregatedSeverities,
+        riskScore: weightedRiskScore,
+        fixable: aggregatedFixable,
+        misconfigs: items.reduce((sum, item) => sum + item.misconfigs, 0),
+        secrets: items.reduce((sum, item) => sum + item.secrets, 0),
+        // Keep the most recent scan date
+        lastScan: items.reduce((latest, current) => 
+          new Date(current.lastScan) > new Date(latest) ? current.lastScan : latest
+        , baseItem.lastScan),
+        // Add metadata about multiple tags (deduplicated)
+        _tagCount: [...new Set(items.map(item => item.image.split(':')[1] || 'latest'))].length,
+        _allTags: [...new Set(items.map(item => item.image.split(':')[1] || 'latest'))].join(', ')
+      }
+    })
   }, [initialData])
+  
+  const [data, setData] = React.useState(() => groupedData)
+  React.useEffect(() => {
+    setData(groupedData)
+  }, [groupedData])
 
 
 
