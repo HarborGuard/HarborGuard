@@ -186,3 +186,24 @@ model CveClassification {
   @@index([isFalsePositive])
   @@map("cve_classifications")
 }
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  eventType   String   // 'page_view', 'scan_start', 'scan_complete', 'cve_classification', 'image_delete', etc.
+  category    String   // 'informative', 'action', 'security', 'error'
+  userIp      String   // IP address of the user
+  userAgent   String?  // Browser user agent
+  userId      String?  // User ID if authenticated
+  resource    String?  // Resource affected (e.g., image name, CVE ID)
+  action      String   // Human readable action description
+  details     Json?    // Additional structured data about the event
+  metadata    Json?    // Request metadata, headers, etc.
+  timestamp   DateTime @default(now())
+  
+  @@index([eventType])
+  @@index([category])
+  @@index([userIp])
+  @@index([timestamp])
+  @@index([resource])
+  @@map("audit_logs")
+}

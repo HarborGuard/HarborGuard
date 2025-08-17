@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   IconCamera,
   IconChartBar,
@@ -20,12 +20,13 @@ import {
   IconActivity,
   IconLibrary,
   IconBook,
-} from "@tabler/icons-react"
+  IconClipboardList,
+} from "@tabler/icons-react";
 
-import { NavDocuments } from "@/components/nav-documents"
-import { NavMain } from "@/components/nav-main"
-import { NavSecondary } from "@/components/nav-secondary"
-import { NavUser } from "@/components/nav-user"
+import { NavDocuments } from "@/components/nav-documents";
+import { NavMain } from "@/components/nav-main";
+import { NavSecondary } from "@/components/nav-secondary";
+import { NavUser } from "@/components/nav-user";
 import {
   Sidebar,
   SidebarContent,
@@ -34,8 +35,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import { AnchorIcon } from "lucide-react"
+} from "@/components/ui/sidebar";
+import { AnchorIcon } from "lucide-react";
+import { Button } from "./ui/button";
 
 const data = {
   user: {
@@ -63,9 +65,9 @@ const data = {
       title: "Scan Setup",
       url: "/scan-setup",
       icon: IconSettings,
-    }
-  ]
-}
+    },
+  ],
+};
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
@@ -73,15 +75,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              className="data-[slot=sidebar-menu-button]:!p-1.5"
-            >
-              <a href="/">
-                <AnchorIcon className="!size-5.5 border-2 border-[#000] rounded-xl p-[1px]" />
-                <span className="text-base font-semibold">Harbor Guard</span>
+            <div className="flex items-center justify-between w-full">
+              <SidebarMenuButton
+                asChild
+                className="data-[slot=sidebar-menu-button]:!p-1.5 flex-1"
+              >
+                <a href="/">
+                  <AnchorIcon className="!size-5.5 border-2 border-[#000] rounded-xl p-[1px]" />
+                  <span className="text-base font-semibold">Harbor Guard</span>
+                </a>
+              </SidebarMenuButton>
+              <a href="/audit-logs">
+                <SidebarMenuButton
+                  tooltip="Bulk Scan"
+                  className=" text-primary hover:bg-blue-500/70 hover:text-primary-foreground active:bg-blue-600/90 active:text-primary-foreground min-w-8 w-8 h-8 duration-200 ease-linear cursor-pointer p-0 flex items-center justify-center border-1 border-[#888]"
+                >
+                  <IconClipboardList />
+                </SidebarMenuButton>
               </a>
-            </SidebarMenuButton>
+            </div>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
@@ -89,5 +101,5 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={data.navMain} />
       </SidebarContent>
     </Sidebar>
-  )
+  );
 }

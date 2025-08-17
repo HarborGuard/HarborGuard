@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auditLogger } from '@/lib/audit-logger'
 
 export async function GET(
   request: NextRequest,
@@ -142,6 +143,9 @@ export async function DELETE(
         name: decodedName
       }
     })
+    
+    // Log the image deletion action
+    await auditLogger.imageDelete(request, decodedName);
     
     return NextResponse.json({
       success: true,

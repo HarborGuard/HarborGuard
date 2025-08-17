@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { scannerService } from '@/lib/scanner'
 import { z } from 'zod'
 import type { ScanRequest } from '@/types'
+import { auditLogger } from '@/lib/audit-logger'
 
 // Validation schema for scan start request - supports both old and new format
 const ScanStartSchema = z.object({
@@ -56,6 +57,13 @@ export async function POST(request: NextRequest) {
       validatedData.templateId,
       validatedData.environment
     )
+    
+    // Log the scan start action
+    await auditLogger.scanStart(
+      request, 
+      `${imageName}:${imageTag}`, 
+      validatedData.source || 'registry'
+    );
     
     return NextResponse.json({
       success: true,

@@ -307,43 +307,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'SET_LOADING', payload: true })
       dispatch({ type: 'SET_ERROR', payload: null })
 
-      // Fetch real scan data from API and fallback static data for others
-      const [scansRes, reposRes, vulnsRes, policiesRes, usersRes] = await Promise.all([
-        fetch('/api/scans?limit=100'),  // Fetch from database API
-        fetch('/data/repositories.json'),
-        fetch('/data/vulnerabilities.json'),
-        fetch('/data/policies.json'),
-        fetch('/data/users.json')
-      ])
+      // Fetch real scan data from API
+      const scansRes = await fetch('/api/scans?limit=100')
 
-      if (!scansRes.ok || !reposRes.ok || !vulnsRes.ok || !policiesRes.ok || !usersRes.ok) {
-        const errors = []
-        if (!scansRes.ok) errors.push(`scans: ${scansRes.status}`)
-        if (!reposRes.ok) errors.push(`repos: ${reposRes.status}`)
-        if (!vulnsRes.ok) errors.push(`vulns: ${vulnsRes.status}`)
-        if (!policiesRes.ok) errors.push(`policies: ${policiesRes.status}`)
-        if (!usersRes.ok) errors.push(`users: ${usersRes.status}`)
-        throw new Error(`Failed to fetch data: ${errors.join(', ')}`)
+      if (!scansRes.ok) {
+        throw new Error(`Failed to fetch scans: ${scansRes.status}`)
       }
 
-      const [scansData, repositories, vulnerabilities, policies, users] = await Promise.all([
-        scansRes.json(),
-        reposRes.json(),
-        vulnsRes.json(),
-        policiesRes.json(),
-        usersRes.json()
-      ])
+      const scansData = await scansRes.json()
 
       // Transform database scans to legacy format for UI compatibility
       const transformedScans = transformScansForUI(scansData.scans || [])
 
       dispatch({ type: 'SET_SCANS', payload: transformedScans })
-      dispatch({ type: 'SET_REPOSITORIES', payload: repositories })
-      dispatch({ type: 'SET_VULNERABILITIES', payload: vulnerabilities })
-      dispatch({ type: 'SET_POLICIES', payload: policies })
-      dispatch({ type: 'SET_USERS', payload: users })
       
-      dispatch({ type: 'SET_CURRENT_USER', payload: users[0] })
+      // Set empty arrays for template data that's no longer needed
+      dispatch({ type: 'SET_REPOSITORIES', payload: [] })
+      dispatch({ type: 'SET_VULNERABILITIES', payload: [] })
+      dispatch({ type: 'SET_POLICIES', payload: [] })
+      dispatch({ type: 'SET_USERS', payload: [] })
+      
+      dispatch({ type: 'SET_CURRENT_USER', payload: null })
     } catch (error) {
       console.error('Failed to load data:', error)
       dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' })
@@ -370,6 +354,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Extract image name from job.imageName or fallback to parsing from scan data
     const imageName = job.imageName || 'unknown';
     const scanId = job.scanId;
+    
+    // Log the scan completion via API call
+    try {
+      await fetch('/api/audit-logs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventType: 'scan_complete',
+          category: 'informative',
+          userIp: 'system',
+          action: `Completed scan for ${imageName}`,
+          resource: imageName,
+          details: { scanId, imageName }
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to log scan completion:', error);
+    }
     
     // Show success toast notification with navigation action
     toast.success("Scan completed successfully!", {
