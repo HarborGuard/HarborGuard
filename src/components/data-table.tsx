@@ -27,13 +27,12 @@ import {
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
-  IconCircleCheckFilled,
   IconDotsVertical,
   IconGripVertical,
   IconLayoutColumns,
-  IconLoader,
-  IconPlus,
   IconTrendingUp,
+  IconRefresh,
+  IconTrash,
 } from "@tabler/icons-react"
 import {
   ColumnDef,
@@ -59,6 +58,15 @@ import { Badge } from "@/components/ui/badge"
 import { ImageStatusCell } from "@/components/image-status-cell"
 import { Button } from "@/components/ui/button"
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
+import { DeleteImageDialog } from "@/components/delete-image-dialog"
+import { useScanning } from "@/providers/ScanningProvider"
+import {
   ChartConfig,
   ChartContainer,
   ChartTooltip,
@@ -80,7 +88,6 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
@@ -104,8 +111,6 @@ import {
 import {
   Tabs,
   TabsContent,
-  TabsList,
-  TabsTrigger,
 } from "@/components/ui/tabs"
 import {
   ToggleGroup,
@@ -130,6 +135,7 @@ export const schema = z.object({
   imageId: z.string(),                             // Image ID for navigation
   imageName: z.string(),                           // Image name for new navigation
   image: z.string(),                                // e.g., ghcr.io/acme/api:1.4.2
+  source: z.string().optional(),                   // Image source: 'local' or 'registry'
   digestShort: z.string().regex(/^sha256:[a-f0-9]{6,}$/).optional(),
   platform: z.string().optional(),                     // e.g., linux/amd64
   sizeMb: z.number().int().nonnegative().optional(),
@@ -503,7 +509,17 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
 ]
 
-function DraggableRow({ row, onRowClick }: { row: Row<z.infer<typeof schema>>, onRowClick: (imageName: string) => void }) {
+function DraggableRow({ 
+  row, 
+  onRowClick, 
+  onRescan, 
+  onDelete 
+}: { 
+  row: Row<z.infer<typeof schema>>, 
+  onRowClick: (imageName: string) => void,
+  onRescan: (imageName: string, source?: string) => void,
+  onDelete: (imageName: string) => void
+}) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
   })
@@ -516,24 +532,47 @@ function DraggableRow({ row, onRowClick }: { row: Row<z.infer<typeof schema>>, o
     onRowClick(row.original.imageName)
   }
 
+  const handleRescan = () => {
+    onRescan(row.original.imageName, row.original.source)
+  }
+
+  const handleDelete = () => {
+    onDelete(row.original.imageName)
+  }
+
   return (
-    <TableRow
-      data-state={row.getIsSelected() && "selected"}
-      data-dragging={isDragging}
-      ref={setNodeRef}
-      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80 cursor-pointer hover:bg-muted/50"
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition: transition,
-      }}
-      onClick={handleRowClick}
-    >
-      {row.getVisibleCells().map((cell) => (
-        <TableCell key={cell.id}>
-          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-        </TableCell>
-      ))}
-    </TableRow>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <TableRow
+          data-state={row.getIsSelected() && "selected"}
+          data-dragging={isDragging}
+          ref={setNodeRef}
+          className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80 cursor-pointer hover:bg-muted/50"
+          style={{
+            transform: CSS.Transform.toString(transform),
+            transition: transition,
+          }}
+          onClick={handleRowClick}
+        >
+          {row.getVisibleCells().map((cell) => (
+            <TableCell key={cell.id}>
+              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+            </TableCell>
+          ))}
+        </TableRow>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onSelect={handleRescan}>
+          <IconRefresh className="mr-2 h-4 w-4" />
+          Rescan Image
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={handleDelete} className="text-red-600 focus:text-red-600">
+          <IconTrash className="mr-2 h-4 w-4" />
+          Delete Image
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }
 
@@ -545,6 +584,11 @@ export function DataTable({
   isFullPage?: boolean
 }) {
   const router = useRouter()
+  const { addScanJob } = useScanning()
+  
+  // State for delete dialog
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
+  const [imageToDelete, setImageToDelete] = React.useState<string>("")
   
   // Group data by image name (without tag)
   const groupedData = React.useMemo(() => {
@@ -706,6 +750,98 @@ export function DataTable({
     router.push(`/image/${encodeURIComponent(imageName)}`)
   }
 
+  const handleRescan = async (imageName: string, source?: string) => {
+    // Determine the source - default to 'registry' if not specified
+    const scanSource = source || 'registry'
+    const loadingToastId = toast.loading(`Starting ${scanSource} rescan for ${imageName}...`)
+    
+    try {
+      // Use the correct API endpoint for starting scans
+      const response = await fetch('/api/scans/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          image: imageName,
+          tag: 'latest', // You might want to handle tags differently
+          source: scanSource
+        }),
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        
+        // Dismiss loading toast and show success
+        toast.dismiss(loadingToastId)
+        toast.success(`${scanSource.charAt(0).toUpperCase() + scanSource.slice(1)} rescan started for ${imageName}`)
+        
+        // Add the scan job to the scanning context so it shows in the monitor
+        if (result.requestId && result.scanId) {
+          addScanJob({
+            requestId: result.requestId,
+            scanId: result.scanId,
+            imageId: '', // We don't have imageId from this context
+            imageName: imageName,
+            status: 'RUNNING',
+            progress: 0,
+            step: 'Initializing...'
+          })
+        }
+        
+        console.log('Scan started:', result)
+      } else {
+        const result = await response.json().catch(() => ({ error: 'Unknown error' }))
+        
+        // Dismiss loading toast and show error
+        toast.dismiss(loadingToastId)
+        toast.error(result.error || 'Failed to start rescan')
+      }
+    } catch (error) {
+      console.error('Error starting rescan:', error)
+      
+      // Dismiss loading toast and show error
+      toast.dismiss(loadingToastId)
+      toast.error('Failed to start rescan')
+    }
+  }
+
+  const handleDeleteClick = (imageName: string) => {
+    setImageToDelete(imageName)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    const loadingToastId = toast.loading(`Deleting ${imageToDelete}...`)
+    
+    try {
+      const response = await fetch(`/api/images/name/${encodeURIComponent(imageToDelete)}`, {
+        method: 'DELETE',
+      })
+      
+      if (response.ok) {
+        // Dismiss loading toast and show success
+        toast.dismiss(loadingToastId)
+        toast.success(`${imageToDelete} deleted successfully`)
+        
+        // Refresh the page to update the data
+        window.location.reload()
+      } else {
+        const result = await response.json().catch(() => ({ error: 'Unknown error' }))
+        
+        // Dismiss loading toast and show error
+        toast.dismiss(loadingToastId)
+        toast.error(result.error || 'Failed to delete image')
+      }
+    } catch (error) {
+      console.error('Error deleting image:', error)
+      
+      // Dismiss loading toast and show error
+      toast.dismiss(loadingToastId)
+      toast.error('Failed to delete image')
+    }
+  }
+
   return (
     <Tabs
       defaultValue="outline"
@@ -793,7 +929,13 @@ export function DataTable({
                     strategy={verticalListSortingStrategy}
                   >
                     {table.getRowModel().rows.map((row) => (
-                      <DraggableRow key={row.id} row={row} onRowClick={handleRowClick} />
+                      <DraggableRow 
+                        key={row.id} 
+                        row={row} 
+                        onRowClick={handleRowClick}
+                        onRescan={handleRescan}
+                        onDelete={handleDeleteClick}
+                      />
                     ))}
                   </SortableContext>
                 ) : (
@@ -903,6 +1045,14 @@ export function DataTable({
       >
         <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
       </TabsContent>
+      
+      {/* Delete Image Dialog */}
+      <DeleteImageDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        imageName={imageToDelete}
+        onConfirm={handleDeleteConfirm}
+      />
     </Tabs>
   )
 }

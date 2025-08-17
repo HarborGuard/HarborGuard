@@ -3,6 +3,7 @@
 import { AppSidebar } from "@/components/app-sidebar"
 import { DataTable } from "@/components/data-table"
 import { SiteHeader } from "@/components/site-header"
+import { ScanJobsMonitor } from "@/components/scan-jobs-monitor"
 import {
   SidebarInset,
   SidebarProvider,
@@ -35,6 +36,7 @@ export default function ImageRepositoryPage() {
         <div className="flex flex-1 flex-col">
           <div className="@container/main flex flex-1 flex-col gap-2 overflow-auto">
             <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+              <ScanJobsMonitor />
               <DataTable data={scans} isFullPage={true} />
             </div>
           </div>

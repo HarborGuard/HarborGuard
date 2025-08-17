@@ -60,12 +60,14 @@ export class DatabaseAdapter implements IDatabaseAdapter {
   }
 
   private isLocalDockerScan(request: ScanRequest): boolean {
-    return request.source === 'local' && !!request.dockerImageId;
+    return request.source === 'local';
   }
 
   private async initializeLocalDockerScanRecord(requestId: string, request: ScanRequest) {
     try {
-      const imageData = await inspectDockerImage(request.dockerImageId!);
+      // Use dockerImageId if provided, otherwise use image:tag format
+      const imageRef = request.dockerImageId || `${request.image}:${request.tag}`;
+      const imageData = await inspectDockerImage(imageRef);
       const digest = imageData.Id;
       
       let image = await prisma.image.findUnique({ where: { digest } });
@@ -97,7 +99,8 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     } catch (error) {
       console.error('Failed to initialize local Docker scan record:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to inspect local Docker image ${request.dockerImageId}: ${errorMessage}`);
+      const imageRef = request.dockerImageId || `${request.image}:${request.tag}`;
+      throw new Error(`Failed to inspect local Docker image ${imageRef}: ${errorMessage}`);
     }
   }
 

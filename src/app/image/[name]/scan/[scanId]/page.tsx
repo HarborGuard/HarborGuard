@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { useParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import * as React from "react";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   IconBug,
   IconPackage,
@@ -10,32 +10,29 @@ import {
   IconSettings,
   IconDownload,
   IconExternalLink,
-  IconAlertTriangle,
   IconInfoCircle,
   IconClock,
   IconStack,
-  IconFileText,
   IconSearch,
   IconSortAscending,
   IconSortDescending,
   IconChevronDown,
-} from "@tabler/icons-react"
+  IconMessage,
+  IconX,
+} from "@tabler/icons-react";
 
-import { AppSidebar } from "@/components/app-sidebar"
-import { SiteHeader } from "@/components/site-header"
-import { Button } from "@/components/ui/button"
+import { AppSidebar } from "@/components/app-sidebar";
+import { SiteHeader } from "@/components/site-header";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import {
-  SidebarInset,
-  SidebarProvider,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import {
   Table,
   TableBody,
@@ -43,237 +40,343 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
-import { Separator } from "@/components/ui/separator"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "components/components/ui/collapsible"
-import { Input } from "components/components/ui/input"
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "components/components/ui/dropdown-menu"
-import { GrypeReport, SyftReport, TrivyReport, DockleReport, OSVReport, DiveReport } from "@/types"
-
+} from "@/components/ui/dropdown-menu";
+import {
+  GrypeReport,
+  SyftReport,
+  TrivyReport,
+  DockleReport,
+  OSVReport,
+  DiveReport,
+} from "@/types";
+import { CveClassificationDialog } from "@/components/cve-classification-dialog";
+import { useCveClassifications } from "@/hooks/useCveClassifications";
 
 export default function ScanResultsPage() {
-  const params = useParams()
-  const imageName = params.name as string
-  const scanId = params.scanId as string
-  
+  const params = useParams();
+  const imageName = params.name as string;
+  const scanId = params.scanId as string;
+
   // All useState hooks must be at the top before any conditional returns
-  const [scanData, setScanData] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [trivySearch, setTrivySearch] = React.useState("")
-  const [dockleSearch, setDockleSearch] = React.useState("")
-  const [trivySortField, setTrivySortField] = React.useState<string>("severity")
-  const [trivySortOrder, setTrivySortOrder] = React.useState<"asc" | "desc">("desc")
-  const [dockleSortField, setDockleSortField] = React.useState<string>("level")
-  const [dockleSortOrder, setDockleSortOrder] = React.useState<"asc" | "desc">("desc")
-  const [syftCurrentPage, setSyftCurrentPage] = React.useState(1)
-  const [syftItemsPerPage, setSyftItemsPerPage] = React.useState(20)
-  const [selectedLayer, setSelectedLayer] = React.useState<string>("0")
+  const [scanData, setScanData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [trivySearch, setTrivySearch] = React.useState("");
+  const [grypeSearch, setGrypeSearch] = React.useState("");
+  const [dockleSearch, setDockleSearch] = React.useState("");
+  const [trivySortField, setTrivySortField] =
+    React.useState<string>("severity");
+  const [trivySortOrder, setTrivySortOrder] = React.useState<"asc" | "desc">(
+    "desc"
+  );
+  const [dockleSortField, setDockleSortField] = React.useState<string>("level");
+  const [dockleSortOrder, setDockleSortOrder] = React.useState<"asc" | "desc">(
+    "desc"
+  );
+  const [syftCurrentPage, setSyftCurrentPage] = React.useState(1);
+  const [syftItemsPerPage, setSyftItemsPerPage] = React.useState(20);
+  const [selectedLayer, setSelectedLayer] = React.useState<string>("0");
+  const [classificationDialogOpen, setClassificationDialogOpen] =
+    React.useState(false);
+  const [selectedCveId, setSelectedCveId] = React.useState<string>("");
+  const [showFalsePositives, setShowFalsePositives] = React.useState(true);
 
   // Decode the image name in case it has special characters
-  const decodedImageName = decodeURIComponent(imageName)
+  const decodedImageName = decodeURIComponent(imageName);
+
+  // CVE Classifications hook - only initialize if we have scanData.image?.id
+  const {
+    saveClassification,
+    deleteClassification,
+    getClassification,
+    isFalsePositive,
+    getComment,
+  } = useCveClassifications(scanData?.image?.id || "");
 
   useEffect(() => {
     async function fetchScanData() {
       try {
-        const response = await fetch(`/api/scans/${scanId}`)
+        const response = await fetch(`/api/scans/${scanId}`);
         if (!response.ok) {
           if (response.status === 404) {
-            setError('Scan not found')
+            setError("Scan not found");
           } else {
-            setError('Failed to load scan data')
+            setError("Failed to load scan data");
           }
-          return
+          return;
         }
-        const data = await response.json()
-        setScanData(data)
+        const data = await response.json();
+        setScanData(data);
       } catch (err) {
-        setError('Failed to load scan data')
-        console.error('Error fetching scan data:', err)
+        setError("Failed to load scan data");
+        console.error("Error fetching scan data:", err);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
 
-    fetchScanData()
-  }, [scanId])
+    fetchScanData();
+  }, [scanId]);
 
+  const trivyResults: TrivyReport | null =
+    scanData?.scannerReports?.trivy || scanData?.trivy || null;
+  const grypResults: GrypeReport | null =
+    scanData?.scannerReports?.grype || scanData?.grype || null;
+  const syftResults: SyftReport | null =
+    scanData?.scannerReports?.syft || scanData?.syft || null;
+  const dockleResults: DockleReport | null =
+    scanData?.scannerReports?.dockle || scanData?.dockle || null;
+  const osvResults: OSVReport | null =
+    scanData?.scannerReports?.osv || scanData?.osv || null;
+  const diveResults: DiveReport | null =
+    scanData?.scannerReports?.dive || scanData?.dive || null;
 
-  const trivyResults: TrivyReport | null = scanData?.scannerReports?.trivy || scanData?.trivy || null
-  const grypResults: GrypeReport | null = scanData?.scannerReports?.grype || scanData?.grype || null  
-  const syftResults: SyftReport | null = scanData?.scannerReports?.syft || scanData?.syft || null
-  const dockleResults: DockleReport | null = scanData?.scannerReports?.dockle || scanData?.dockle || null
-  const osvResults: OSVReport | null = scanData?.scannerReports?.osv || scanData?.osv || null
-  const diveResults: DiveReport | null = scanData?.scannerReports?.dive || scanData?.dive || null
-  
   // Debug: Log scanner results to console
-  console.log('OSV Results:', osvResults)
-  console.log('Dive Results:', diveResults)
-
+  console.log("OSV Results:", osvResults);
+  console.log("Dive Results:", diveResults);
 
   const breadcrumbs = [
     { label: "Dashboard", href: "/" },
-    { label: decodedImageName, href: `/image/${encodeURIComponent(decodedImageName)}` },
-    { label: `Scan ${scanData?.requestId}` }
-  ]
-
+    {
+      label: decodedImageName,
+      href: `/image/${encodeURIComponent(decodedImageName)}`,
+    },
+    { label: `Scan ${scanData?.requestId}` },
+  ];
 
   // Search and filter states are now declared at the top
+
+  // CVE Classification handlers
+  const handleOpenClassificationDialog = (cveId: string) => {
+    setSelectedCveId(cveId);
+    setClassificationDialogOpen(true);
+  };
+
+  const handleCloseClassificationDialog = () => {
+    setClassificationDialogOpen(false);
+    setSelectedCveId("");
+  };
 
   const getSeverityColor = (severity: string) => {
     switch (severity.toLowerCase()) {
       case "critical":
-        return "destructive"
+        return "destructive";
       case "high":
-        return "destructive"
+        return "destructive";
       case "medium":
-        return "secondary"
+        return "secondary";
       case "low":
-        return "outline"
+        return "outline";
       default:
-        return "outline"
+        return "outline";
     }
-  }
+  };
 
   const getSeverityWeight = (severity: string) => {
     switch (severity.toLowerCase()) {
-      case "critical": return 4
-      case "high": return 3
-      case "medium": return 2
-      case "low": return 1
-      default: return 0
+      case "critical":
+        return 4;
+      case "high":
+        return 3;
+      case "medium":
+        return 2;
+      case "low":
+        return 1;
+      default:
+        return 0;
     }
-  }
+  };
 
   const getLevelWeight = (level: string) => {
     switch (level.toUpperCase()) {
-      case "FATAL": return 3
-      case "WARN": return 2
-      case "INFO": return 1
-      default: return 0
+      case "FATAL":
+        return 3;
+      case "WARN":
+        return 2;
+      case "INFO":
+        return 1;
+      default:
+        return 0;
     }
-  }
+  };
 
   // Filter and sort Trivy vulnerabilities
   const filteredTrivyVulns = React.useMemo(() => {
-    if (!trivyResults?.Results) return []
-    
+    if (!trivyResults?.Results) return [];
+
     // Extract vulnerabilities from all results
-    const allVulns = trivyResults.Results.flatMap(result => 
-      result.Vulnerabilities || []
-    )
-    
-    let filtered = allVulns.filter(vuln =>
-      (vuln.VulnerabilityID || '').toLowerCase().includes(trivySearch.toLowerCase()) ||
-      (vuln.PkgName || '').toLowerCase().includes(trivySearch.toLowerCase()) ||
-      (vuln.Title || '').toLowerCase().includes(trivySearch.toLowerCase()) ||
-      (vuln.Severity || '').toLowerCase().includes(trivySearch.toLowerCase())
-    )
+    const allVulns = trivyResults.Results.flatMap(
+      (result) => result.Vulnerabilities || []
+    );
+
+    let filtered = allVulns.filter((vuln) => {
+      // Search filter
+      const matchesSearch =
+        (vuln.VulnerabilityID || "")
+          .toLowerCase()
+          .includes(trivySearch.toLowerCase()) ||
+        (vuln.PkgName || "")
+          .toLowerCase()
+          .includes(trivySearch.toLowerCase()) ||
+        (vuln.Title || "").toLowerCase().includes(trivySearch.toLowerCase()) ||
+        (vuln.Severity || "").toLowerCase().includes(trivySearch.toLowerCase());
+
+      // False positive filter
+      const isMarkedFalsePositive = isFalsePositive(vuln.VulnerabilityID);
+      const passesClassificationFilter =
+        showFalsePositives || !isMarkedFalsePositive;
+
+      return matchesSearch && passesClassificationFilter;
+    });
 
     return filtered.sort((a, b) => {
-      let aValue: any, bValue: any
+      let aValue: any, bValue: any;
 
       switch (trivySortField) {
         case "severity":
-          aValue = getSeverityWeight(a.Severity || '')
-          bValue = getSeverityWeight(b.Severity || '')
-          break
+          aValue = getSeverityWeight(a.Severity || "");
+          bValue = getSeverityWeight(b.Severity || "");
+          break;
         case "cvss":
-          aValue = a.CVSS?.nvd?.V3Score || a.CVSS?.redhat?.V3Score || 0
-          bValue = b.CVSS?.nvd?.V3Score || b.CVSS?.redhat?.V3Score || 0
-          break
+          aValue = a.CVSS?.nvd?.V3Score || a.CVSS?.redhat?.V3Score || 0;
+          bValue = b.CVSS?.nvd?.V3Score || b.CVSS?.redhat?.V3Score || 0;
+          break;
         case "package":
-          aValue = a.PkgName || ''
-          bValue = b.PkgName || ''
-          break
+          aValue = a.PkgName || "";
+          bValue = b.PkgName || "";
+          break;
         case "vulnerability":
-          aValue = a.VulnerabilityID || ''
-          bValue = b.VulnerabilityID || ''
-          break
+          aValue = a.VulnerabilityID || "";
+          bValue = b.VulnerabilityID || "";
+          break;
         default:
-          return 0
+          return 0;
       }
 
       if (trivySortOrder === "asc") {
-        return aValue > bValue ? 1 : -1
+        return aValue > bValue ? 1 : -1;
       } else {
-        return aValue < bValue ? 1 : -1
+        return aValue < bValue ? 1 : -1;
       }
-    })
-  }, [trivyResults, trivySearch, trivySortField, trivySortOrder])
+    });
+  }, [
+    trivyResults,
+    trivySearch,
+    trivySortField,
+    trivySortOrder,
+    showFalsePositives,
+    isFalsePositive,
+  ]);
+
+  // Filter and sort Grype vulnerabilities
+  const filteredGrypeVulns = React.useMemo(() => {
+    if (!grypResults?.matches) return [];
+
+    let filtered = grypResults.matches.filter((match) => {
+      // Search filter
+      const matchesSearch =
+        (match.vulnerability.id || "")
+          .toLowerCase()
+          .includes(grypeSearch.toLowerCase()) ||
+        (match.artifact.name || "")
+          .toLowerCase()
+          .includes(grypeSearch.toLowerCase()) ||
+        (match.vulnerability.description || "")
+          .toLowerCase()
+          .includes(grypeSearch.toLowerCase()) ||
+        (match.vulnerability.severity || "")
+          .toLowerCase()
+          .includes(grypeSearch.toLowerCase());
+
+      // False positive filter
+      const isMarkedFalsePositive = isFalsePositive(match.vulnerability.id);
+      const passesClassificationFilter =
+        showFalsePositives || !isMarkedFalsePositive;
+
+      return matchesSearch && passesClassificationFilter;
+    });
+
+    return filtered.sort((a, b) => {
+      // Sort by severity by default
+      const aWeight = getSeverityWeight(a.vulnerability.severity || "");
+      const bWeight = getSeverityWeight(b.vulnerability.severity || "");
+      return bWeight - aWeight;
+    });
+  }, [grypResults, grypeSearch, showFalsePositives, isFalsePositive]);
 
   // Filter and sort Dockle findings
   const filteredDockleFindings = React.useMemo(() => {
-    if (!dockleResults?.details) return []
-    
-    let filtered = dockleResults.details.filter(detail =>
-      detail.code.toLowerCase().includes(dockleSearch.toLowerCase()) ||
-      detail.title.toLowerCase().includes(dockleSearch.toLowerCase()) ||
-      detail.details.toLowerCase().includes(dockleSearch.toLowerCase()) ||
-      detail.level.toLowerCase().includes(dockleSearch.toLowerCase())
-    )
+    if (!dockleResults?.details) return [];
+
+    let filtered = dockleResults.details.filter(
+      (detail) =>
+        detail.code.toLowerCase().includes(dockleSearch.toLowerCase()) ||
+        detail.title.toLowerCase().includes(dockleSearch.toLowerCase()) ||
+        detail.details.toLowerCase().includes(dockleSearch.toLowerCase()) ||
+        detail.level.toLowerCase().includes(dockleSearch.toLowerCase())
+    );
 
     return filtered.sort((a, b) => {
-      let aValue: any, bValue: any
+      let aValue: any, bValue: any;
 
       switch (dockleSortField) {
         case "level":
-          aValue = getLevelWeight(a.level)
-          bValue = getLevelWeight(b.level)
-          break
+          aValue = getLevelWeight(a.level);
+          bValue = getLevelWeight(b.level);
+          break;
         case "code":
-          aValue = a.code
-          bValue = b.code
-          break
+          aValue = a.code;
+          bValue = b.code;
+          break;
         case "title":
-          aValue = a.title
-          bValue = b.title
-          break
+          aValue = a.title;
+          bValue = b.title;
+          break;
         default:
-          return 0
+          return 0;
       }
 
       if (dockleSortOrder === "asc") {
-        return aValue > bValue ? 1 : -1
+        return aValue > bValue ? 1 : -1;
       } else {
-        return aValue < bValue ? 1 : -1
+        return aValue < bValue ? 1 : -1;
       }
-    })
-  }, [dockleResults, dockleSearch, dockleSortField, dockleSortOrder])
-
+    });
+  }, [dockleResults, dockleSearch, dockleSortField, dockleSortOrder]);
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen">Loading scan data...</div>
+    return (
+      <div className="flex items-center justify-center h-screen">
+        Loading scan data...
+      </div>
+    );
   }
-  
+
   if (error || !scanData) {
     const breadcrumbs = [
       { label: "Dashboard", href: "/" },
-      { label: decodedImageName, href: `/image/${encodeURIComponent(decodedImageName)}` },
-      { label: `Scan ${scanId}` }
-    ]
+      {
+        label: decodedImageName,
+        href: `/image/${encodeURIComponent(decodedImageName)}`,
+      },
+      { label: `Scan ${scanId}` },
+    ];
 
     return (
       <SidebarProvider
@@ -296,12 +399,13 @@ export default function ScanResultsPage() {
                     Scan Not Found
                   </CardTitle>
                   <CardDescription>
-                    {error || 'The requested scan could not be found'}
+                    {error || "The requested scan could not be found"}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center gap-4 py-8">
                   <p className="text-muted-foreground text-center">
-                    Scan "{scanId}" for image "{decodedImageName}" does not exist or may have been removed.
+                    Scan "{scanId}" for image "{decodedImageName}" does not
+                    exist or may have been removed.
                   </p>
                   <Button asChild>
                     <a href={`/image/${encodeURIComponent(decodedImageName)}`}>
@@ -314,70 +418,84 @@ export default function ScanResultsPage() {
           </div>
         </SidebarInset>
       </SidebarProvider>
-    )
+    );
   }
 
   const handleTrivySort = (field: string) => {
     if (trivySortField === field) {
-      setTrivySortOrder(trivySortOrder === "asc" ? "desc" : "asc")
+      setTrivySortOrder(trivySortOrder === "asc" ? "desc" : "asc");
     } else {
-      setTrivySortField(field)
-      setTrivySortOrder("desc")
+      setTrivySortField(field);
+      setTrivySortOrder("desc");
     }
-  }
+  };
 
   const handleDockleSort = (field: string) => {
     if (dockleSortField === field) {
-      setDockleSortOrder(dockleSortOrder === "asc" ? "desc" : "asc")
+      setDockleSortOrder(dockleSortOrder === "asc" ? "desc" : "asc");
     } else {
-      setDockleSortField(field)
-      setDockleSortOrder("desc")
+      setDockleSortField(field);
+      setDockleSortOrder("desc");
     }
-  }
+  };
 
   const handleDownloadZip = async () => {
     try {
-      const response = await fetch(`/api/image/${encodeURIComponent(decodedImageName)}/scan/${scanId}/download`)
+      const response = await fetch(
+        `/api/image/${encodeURIComponent(
+          decodedImageName
+        )}/scan/${scanId}/download`
+      );
       if (!response.ok) {
-        throw new Error('Download failed')
+        throw new Error("Download failed");
       }
-      
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${decodedImageName.replace('/', '_')}_${scanId}_reports.zip`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(url)
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${decodedImageName.replace(
+        "/",
+        "_"
+      )}_${scanId}_reports.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Download failed:', error)
+      console.error("Download failed:", error);
       // Could add toast notification here
     }
-  }
+  };
 
   const handleDownloadReport = async (reportType: string) => {
     try {
-      const response = await fetch(`/api/image/${encodeURIComponent(decodedImageName)}/scan/${scanId}/${reportType}`)
+      const response = await fetch(
+        `/api/image/${encodeURIComponent(
+          decodedImageName
+        )}/scan/${scanId}/${reportType}`
+      );
       if (!response.ok) {
-        throw new Error('Download failed')
+        throw new Error("Download failed");
       }
-      
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${decodedImageName.replace('/', '_')}_${scanId}_${reportType}.json`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(url)
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${decodedImageName.replace(
+        "/",
+        "_"
+      )}_${scanId}_${reportType}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Download failed:', error)
+      console.error("Download failed:", error);
       // Could add toast notification here
     }
-  }
+  };
 
   return (
     <SidebarProvider
@@ -393,360 +511,692 @@ export default function ScanResultsPage() {
         <SiteHeader breadcrumbs={breadcrumbs} />
         <div className="flex-1 overflow-auto">
           <div className="@container/main flex flex-col gap-4 p-4 lg:p-6">
-
-              {/* Scan Summary */}
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <IconClock className="h-5 w-5" />
-                      Scan Summary
-                    </CardTitle>
-                    <div className="flex items-center gap-2">
-                      <Button onClick={handleDownloadZip} className="flex items-center gap-2">
-                        <IconDownload className="h-4 w-4" />
-                        Export Report
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="icon">
-                            <IconChevronDown className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {trivyResults && (
-                            <DropdownMenuItem onClick={() => handleDownloadReport('trivy')}>
-                              <IconBug className="h-4 w-4 mr-2" />
-                              Trivy Report
-                            </DropdownMenuItem>
-                          )}
-                          {grypResults && (
-                            <DropdownMenuItem onClick={() => handleDownloadReport('grype')}>
-                              <IconShield className="h-4 w-4 mr-2" />
-                              Grype Report
-                            </DropdownMenuItem>
-                          )}
-                          {syftResults && (
-                            <DropdownMenuItem onClick={() => handleDownloadReport('syft')}>
-                              <IconPackage className="h-4 w-4 mr-2" />
-                              Syft Report
-                            </DropdownMenuItem>
-                          )}
-                          {dockleResults && (
-                            <DropdownMenuItem onClick={() => handleDownloadReport('dockle')}>
-                              <IconSettings className="h-4 w-4 mr-2" />
-                              Dockle Report
-                            </DropdownMenuItem>
-                          )}
-                          {osvResults && (
-                            <DropdownMenuItem onClick={() => handleDownloadReport('osv')}>
-                              <IconPackage className="h-4 w-4 mr-2" />
-                              OSV Report
-                            </DropdownMenuItem>
-                          )}
-                          {diveResults && (
-                            <DropdownMenuItem onClick={() => handleDownloadReport('dive')}>
-                              <IconStack className="h-4 w-4 mr-2" />
-                              Dive Report
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+            {/* Scan Summary */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <IconClock className="h-5 w-5" />
+                    Scan Summary
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handleDownloadZip}
+                      className="flex items-center gap-2"
+                    >
+                      <IconDownload className="h-4 w-4" />
+                      Export Report
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="icon">
+                          <IconChevronDown className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {trivyResults && (
+                          <DropdownMenuItem
+                            onClick={() => handleDownloadReport("trivy")}
+                          >
+                            <IconBug className="h-4 w-4 mr-2" />
+                            Trivy Report
+                          </DropdownMenuItem>
+                        )}
+                        {grypResults && (
+                          <DropdownMenuItem
+                            onClick={() => handleDownloadReport("grype")}
+                          >
+                            <IconShield className="h-4 w-4 mr-2" />
+                            Grype Report
+                          </DropdownMenuItem>
+                        )}
+                        {syftResults && (
+                          <DropdownMenuItem
+                            onClick={() => handleDownloadReport("syft")}
+                          >
+                            <IconPackage className="h-4 w-4 mr-2" />
+                            Syft Report
+                          </DropdownMenuItem>
+                        )}
+                        {dockleResults && (
+                          <DropdownMenuItem
+                            onClick={() => handleDownloadReport("dockle")}
+                          >
+                            <IconSettings className="h-4 w-4 mr-2" />
+                            Dockle Report
+                          </DropdownMenuItem>
+                        )}
+                        {osvResults && (
+                          <DropdownMenuItem
+                            onClick={() => handleDownloadReport("osv")}
+                          >
+                            <IconPackage className="h-4 w-4 mr-2" />
+                            OSV Report
+                          </DropdownMenuItem>
+                        )}
+                        {diveResults && (
+                          <DropdownMenuItem
+                            onClick={() => handleDownloadReport("dive")}
+                          >
+                            <IconStack className="h-4 w-4 mr-2" />
+                            Dive Report
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Scan Date</p>
-                      <p className="text-sm">
-                        {scanData.startedAt ? new Date(scanData.startedAt).toLocaleString() : 'N/A'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Duration</p>
-                      <p className="text-sm">
-                        {scanData.startedAt && scanData.finishedAt ? 
-                          (() => {
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Scan Date
+                    </p>
+                    <p className="text-sm">
+                      {scanData.startedAt
+                        ? new Date(scanData.startedAt).toLocaleString()
+                        : "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Duration
+                    </p>
+                    <p className="text-sm">
+                      {scanData.startedAt && scanData.finishedAt
+                        ? (() => {
                             const start = new Date(scanData.startedAt);
                             const end = new Date(scanData.finishedAt);
                             const diffMs = end.getTime() - start.getTime();
                             const minutes = Math.floor(diffMs / 60000);
                             const seconds = Math.floor((diffMs % 60000) / 1000);
                             return `${minutes}m ${seconds}s`;
-                          })() : 
-                          scanData.status === 'RUNNING' ? 'Running...' : 'N/A'
-                        }
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Tools Used</p>
-                      <div className="flex gap-1 flex-wrap mt-1">
-                        <Badge variant="outline" className="text-xs hover:bg-muted/50 transition-colors">
-                          <a href="https://github.com/aquasecurity/trivy" target="_blank" rel="noopener noreferrer" className="flex items-center">
-                            Trivy
+                          })()
+                        : scanData.status === "RUNNING"
+                        ? "Running..."
+                        : "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Tools Used
+                    </p>
+                    <div className="flex gap-1 flex-wrap mt-1">
+                      <Badge
+                        variant="outline"
+                        className="text-xs hover:bg-muted/50 transition-colors"
+                      >
+                        <a
+                          href="https://github.com/aquasecurity/trivy"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center"
+                        >
+                          Trivy
+                        </a>
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className="text-xs hover:bg-muted/50 transition-colors"
+                      >
+                        <a
+                          href="https://github.com/anchore/grype"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center"
+                        >
+                          Grype
+                        </a>
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className="text-xs hover:bg-muted/50 transition-colors"
+                      >
+                        <a
+                          href="https://github.com/anchore/syft"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center"
+                        >
+                          Syft
+                        </a>
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className="text-xs hover:bg-muted/50 transition-colors"
+                      >
+                        <a
+                          href="https://github.com/goodwithtech/dockle"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center"
+                        >
+                          Dockle
+                        </a>
+                      </Badge>
+                      {osvResults && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs hover:bg-muted/50 transition-colors"
+                        >
+                          <a
+                            href="https://github.com/google/osv-scanner"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center"
+                          >
+                            OSV
                           </a>
                         </Badge>
-                        <Badge variant="outline" className="text-xs hover:bg-muted/50 transition-colors">
-                          <a href="https://github.com/anchore/grype" target="_blank" rel="noopener noreferrer" className="flex items-center">
-                            Grype
+                      )}
+                      {diveResults && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs hover:bg-muted/50 transition-colors"
+                        >
+                          <a
+                            href="https://github.com/wagoodman/dive"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center"
+                          >
+                            Dive
                           </a>
                         </Badge>
-                        <Badge variant="outline" className="text-xs hover:bg-muted/50 transition-colors">
-                          <a href="https://github.com/anchore/syft" target="_blank" rel="noopener noreferrer" className="flex items-center">
-                            Syft
-                          </a>
-                        </Badge>
-                        <Badge variant="outline" className="text-xs hover:bg-muted/50 transition-colors">
-                          <a href="https://github.com/goodwithtech/dockle" target="_blank" rel="noopener noreferrer" className="flex items-center">
-                            Dockle
-                          </a>
-                        </Badge>
-                        {osvResults && (
-                          <Badge variant="outline" className="text-xs hover:bg-muted/50 transition-colors">
-                            <a href="https://github.com/google/osv-scanner" target="_blank" rel="noopener noreferrer" className="flex items-center">
-                              OSV
-                            </a>
-                          </Badge>
-                        )}
-                        {diveResults && (
-                          <Badge variant="outline" className="text-xs hover:bg-muted/50 transition-colors">
-                            <a href="https://github.com/wagoodman/dive" target="_blank" rel="noopener noreferrer" className="flex items-center">
-                              Dive
-                            </a>
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Status</p>
-                      <Badge className="bg-green-500 text-white hover:bg-green-600">Complete</Badge>
+                      )}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Status
+                    </p>
+                    <Badge className="bg-green-500 text-white hover:bg-green-600">
+                      Complete
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-              {/* Scan Tools Results */}
-              <Tabs defaultValue="trivy" className="w-full">
-                <TabsList className={`grid w-full ${
-                  diveResults?.layer && diveResults.layer.length > 0 && osvResults ? 'grid-cols-6' :
-                  (diveResults?.layer && diveResults.layer.length > 0) || osvResults ? 'grid-cols-5' : 'grid-cols-4'
-                }`}>
-                  <TabsTrigger value="trivy" className="flex items-center gap-2">
-                    <IconBug className="h-4 w-4" />
-                    Trivy
-                  </TabsTrigger>
-                  <TabsTrigger value="grype" className="flex items-center gap-2">
-                    <IconShield className="h-4 w-4" />
-                    Grype
-                  </TabsTrigger>
-                  <TabsTrigger value="syft" className="flex items-center gap-2">
+            {/* Scan Tools Results */}
+            <Tabs defaultValue="trivy" className="w-full">
+              <TabsList
+                className={`grid w-full ${
+                  diveResults?.layer &&
+                  diveResults.layer.length > 0 &&
+                  osvResults
+                    ? "grid-cols-6"
+                    : (diveResults?.layer && diveResults.layer.length > 0) ||
+                      osvResults
+                    ? "grid-cols-5"
+                    : "grid-cols-4"
+                }`}
+              >
+                <TabsTrigger value="trivy" className="flex items-center gap-2">
+                  <IconBug className="h-4 w-4" />
+                  Trivy
+                </TabsTrigger>
+                <TabsTrigger value="grype" className="flex items-center gap-2">
+                  <IconShield className="h-4 w-4" />
+                  Grype
+                </TabsTrigger>
+                <TabsTrigger value="syft" className="flex items-center gap-2">
+                  <IconPackage className="h-4 w-4" />
+                  Syft
+                </TabsTrigger>
+                <TabsTrigger value="dockle" className="flex items-center gap-2">
+                  <IconSettings className="h-4 w-4" />
+                  Dockle
+                </TabsTrigger>
+                {osvResults && (
+                  <TabsTrigger value="osv" className="flex items-center gap-2">
                     <IconPackage className="h-4 w-4" />
-                    Syft
+                    OSV
                   </TabsTrigger>
-                  <TabsTrigger value="dockle" className="flex items-center gap-2">
-                    <IconSettings className="h-4 w-4" />
-                    Dockle
+                )}
+                {diveResults?.layer && diveResults.layer.length > 0 && (
+                  <TabsTrigger value="dive" className="flex items-center gap-2">
+                    <IconStack className="h-4 w-4" />
+                    Layers ({diveResults.layer.length})
                   </TabsTrigger>
-                  {osvResults && (
-                    <TabsTrigger value="osv" className="flex items-center gap-2">
-                      <IconPackage className="h-4 w-4" />
-                      OSV
-                    </TabsTrigger>
-                  )}
-                  {diveResults?.layer && diveResults.layer.length > 0 && (
-                    <TabsTrigger value="dive" className="flex items-center gap-2">
-                      <IconStack className="h-4 w-4" />
-                      Layers ({diveResults.layer.length})
-                    </TabsTrigger>
-                  )}
-                </TabsList>
+                )}
+              </TabsList>
 
-                {/* Trivy Results */}
-                <TabsContent value="trivy" className="space-y-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <IconBug className="h-5 w-5" />
-                        Trivy Vulnerability Scan
-                      </CardTitle>
-                      <CardDescription>
-                        Comprehensive vulnerability scanner for containers
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {/* Search and Filter Bar */}
-                        <div className="flex items-center gap-4">
-                          <div className="relative flex-1">
-                            <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                            <Input
-                              placeholder="Search vulnerabilities, packages, or CVE IDs..."
-                              value={trivySearch}
-                              onChange={(e) => setTrivySearch(e.target.value)}
-                              className="pl-10"
-                            />
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {filteredTrivyVulns.length} of {trivyResults?.Results?.reduce((count, result) => count + (result.Vulnerabilities?.length || 0), 0) || 0} vulnerabilities
-                          </div>
+              {/* Trivy Results */}
+              <TabsContent value="trivy" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <IconBug className="h-5 w-5" />
+                      Trivy Vulnerability Scan
+                    </CardTitle>
+                    <CardDescription>
+                      Comprehensive vulnerability scanner for containers
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {/* Search and Filter Bar */}
+                      <div className="flex items-center gap-4">
+                        <div className="relative flex-1">
+                          <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                          <Input
+                            placeholder="Search vulnerabilities, packages, or CVE IDs..."
+                            value={trivySearch}
+                            onChange={(e) => setTrivySearch(e.target.value)}
+                            className="pl-10"
+                          />
                         </div>
+                        <Button
+                          variant={showFalsePositives ? "outline" : "secondary"}
+                          size="sm"
+                          onClick={() =>
+                            setShowFalsePositives(!showFalsePositives)
+                          }
+                          className="flex items-center gap-2"
+                        >
+                          {showFalsePositives ? "Hide" : "Show"} False Positives
+                        </Button>
+                        <div className="text-sm text-muted-foreground">
+                          {filteredTrivyVulns.length} of{" "}
+                          {trivyResults?.Results?.reduce(
+                            (count, result) =>
+                              count + (result.Vulnerabilities?.length || 0),
+                            0
+                          ) || 0}{" "}
+                          vulnerabilities
+                        </div>
+                      </div>
 
-                        {/* Vulnerabilities Table */}
-                        <div className="border rounded-lg">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>
-                                  <Button
-                                    variant="ghost"
-                                    className="h-auto p-0 font-medium"
-                                    onClick={() => handleTrivySort("severity")}
-                                  >
-                                    Severity
-                                    {trivySortField === "severity" && (
-                                      trivySortOrder === "asc" ? <IconSortAscending className="ml-1 h-4 w-4" /> : <IconSortDescending className="ml-1 h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </TableHead>
-                                <TableHead>
-                                  <Button
-                                    variant="ghost"
-                                    className="h-auto p-0 font-medium"
-                                    onClick={() => handleTrivySort("vulnerability")}
-                                  >
-                                    Vulnerability
-                                    {trivySortField === "vulnerability" && (
-                                      trivySortOrder === "asc" ? <IconSortAscending className="ml-1 h-4 w-4" /> : <IconSortDescending className="ml-1 h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </TableHead>
-                                <TableHead>
-                                  <Button
-                                    variant="ghost"
-                                    className="h-auto p-0 font-medium"
-                                    onClick={() => handleTrivySort("package")}
-                                  >
-                                    Package
-                                    {trivySortField === "package" && (
-                                      trivySortOrder === "asc" ? <IconSortAscending className="ml-1 h-4 w-4" /> : <IconSortDescending className="ml-1 h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </TableHead>
-                                <TableHead>
-                                  <Button
-                                    variant="ghost"
-                                    className="h-auto p-0 font-medium"
-                                    onClick={() => handleTrivySort("cvss")}
-                                  >
-                                    CVSS Score
-                                    {trivySortField === "cvss" && (
-                                      trivySortOrder === "asc" ? <IconSortAscending className="ml-1 h-4 w-4" /> : <IconSortDescending className="ml-1 h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </TableHead>
-                                <TableHead>Fixed Version</TableHead>
-                                <TableHead>Published</TableHead>
-                                <TableHead>Actions</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {filteredTrivyVulns.map((vuln, index) => (
-                                <TableRow key={index}>
+                      {/* Vulnerabilities Table */}
+                      <div className="border rounded-lg">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Actions</TableHead>
+                              <TableHead>
+                                <Button
+                                  variant="ghost"
+                                  className="h-auto p-0 font-medium"
+                                  onClick={() => handleTrivySort("severity")}
+                                >
+                                  Severity
+                                  {trivySortField === "severity" &&
+                                    (trivySortOrder === "asc" ? (
+                                      <IconSortAscending className="ml-1 h-4 w-4" />
+                                    ) : (
+                                      <IconSortDescending className="ml-1 h-4 w-4" />
+                                    ))}
+                                </Button>
+                              </TableHead>
+                              <TableHead>
+                                <Button
+                                  variant="ghost"
+                                  className="h-auto p-0 font-medium"
+                                  onClick={() =>
+                                    handleTrivySort("vulnerability")
+                                  }
+                                >
+                                  Vulnerability
+                                  {trivySortField === "vulnerability" &&
+                                    (trivySortOrder === "asc" ? (
+                                      <IconSortAscending className="ml-1 h-4 w-4" />
+                                    ) : (
+                                      <IconSortDescending className="ml-1 h-4 w-4" />
+                                    ))}
+                                </Button>
+                              </TableHead>
+                              <TableHead>
+                                <Button
+                                  variant="ghost"
+                                  className="h-auto p-0 font-medium"
+                                  onClick={() => handleTrivySort("package")}
+                                >
+                                  Package
+                                  {trivySortField === "package" &&
+                                    (trivySortOrder === "asc" ? (
+                                      <IconSortAscending className="ml-1 h-4 w-4" />
+                                    ) : (
+                                      <IconSortDescending className="ml-1 h-4 w-4" />
+                                    ))}
+                                </Button>
+                              </TableHead>
+                              <TableHead>
+                                <Button
+                                  variant="ghost"
+                                  className="h-auto p-0 font-medium"
+                                  onClick={() => handleTrivySort("cvss")}
+                                >
+                                  CVSS Score
+                                  {trivySortField === "cvss" &&
+                                    (trivySortOrder === "asc" ? (
+                                      <IconSortAscending className="ml-1 h-4 w-4" />
+                                    ) : (
+                                      <IconSortDescending className="ml-1 h-4 w-4" />
+                                    ))}
+                                </Button>
+                              </TableHead>
+                              <TableHead>Fixed Version</TableHead>
+                              <TableHead>Published</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {filteredTrivyVulns.map((vuln, index) => {
+                              const classification = getClassification(
+                                vuln.VulnerabilityID
+                              );
+                              const isMarkedFalsePositive = isFalsePositive(
+                                vuln.VulnerabilityID
+                              );
+                              const comment = getComment(vuln.VulnerabilityID);
+
+                              return (
+                                <TableRow
+                                  key={index}
+                                  className={
+                                    isMarkedFalsePositive ? "opacity-50" : ""
+                                  }
+                                >
                                   <TableCell>
-                                    <Badge variant={getSeverityColor(vuln.Severity || '') as any}>
-                                      {vuln.Severity}
-                                    </Badge>
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                          handleOpenClassificationDialog(
+                                            vuln.VulnerabilityID
+                                          )
+                                        }
+                                        className="flex items-center gap-1"
+                                      >
+                                        <IconMessage className="h-4 w-4" />
+                                        {classification ? "Edit" : "Classify"}
+                                      </Button>
+                                      {classification && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() =>
+                                            deleteClassification(
+                                              vuln.VulnerabilityID
+                                            )
+                                          }
+                                          className="text-red-500 hover:text-red-700"
+                                        >
+                                          <IconX className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                      {vuln.references &&
+                                        vuln.references.length > 0 && (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            asChild
+                                          >
+                                            <a
+                                              href={vuln.references[0]}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                            >
+                                              <IconExternalLink className="h-4 w-4" />
+                                            </a>
+                                          </Button>
+                                        )}
+                                    </div>
                                   </TableCell>
                                   <TableCell>
-                                    <div>
-                                      <p className="font-medium">{vuln.VulnerabilityID}</p>
-                                      <p className="text-sm text-muted-foreground">{vuln.Title || vuln.Description}</p>
+                                    <div className="flex items-center gap-2">
+                                      <Badge
+                                        variant={
+                                          getSeverityColor(
+                                            vuln.Severity || ""
+                                          ) as any
+                                        }
+                                      >
+                                        {vuln.Severity}
+                                      </Badge>
+                                      {isMarkedFalsePositive && (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-xs"
+                                        >
+                                          False Positive
+                                        </Badge>
+                                      )}
                                     </div>
                                   </TableCell>
                                   <TableCell>
                                     <div>
-                                      <p className="font-medium">{vuln.PkgName}</p>
-                                      <p className="text-sm text-muted-foreground">{vuln.InstalledVersion}</p>
+                                      <div className="flex items-center gap-2">
+                                        <p className="font-medium">
+                                          {vuln.VulnerabilityID}
+                                        </p>
+                                        {comment && (
+                                          <IconMessage
+                                            className="h-4 w-4 text-muted-foreground"
+                                            title={comment}
+                                          />
+                                        )}
+                                      </div>
+                                      <p className="text-sm text-muted-foreground">
+                                        {vuln.Title || vuln.Description}
+                                      </p>
+                                      {comment && (
+                                        <p className="text-xs text-blue-600 mt-1">
+                                          💬 {comment.slice(0, 50)}
+                                          {comment.length > 50 ? "..." : ""}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div>
+                                      <p className="font-medium">
+                                        {vuln.PkgName}
+                                      </p>
+                                      <p className="text-sm text-muted-foreground">
+                                        {vuln.InstalledVersion}
+                                      </p>
                                     </div>
                                   </TableCell>
                                   <TableCell>
                                     <Badge variant="outline">
-                                      {vuln.CVSS?.nvd?.V3Score || vuln.CVSS?.redhat?.V3Score || "N/A"}
+                                      {vuln.CVSS?.nvd?.V3Score ||
+                                        vuln.CVSS?.redhat?.V3Score ||
+                                        "N/A"}
                                     </Badge>
                                   </TableCell>
                                   <TableCell>
                                     {vuln.FixedVersion ? (
-                                      <Badge variant="default">{vuln.FixedVersion}</Badge>
+                                      <Badge variant="default">
+                                        {vuln.FixedVersion}
+                                      </Badge>
                                     ) : (
                                       <Badge variant="secondary">No fix</Badge>
                                     )}
                                   </TableCell>
                                   <TableCell>
-                                    {vuln.publishedDate ? new Date(vuln.publishedDate).toLocaleDateString() : '—'}
-                                  </TableCell>
-
-                                  <TableCell>
-                                    <div className="flex items-center gap-2">
-                                      {vuln.references && vuln.references.length > 0 && (
-                                        <Button variant="ghost" size="sm" asChild>
-                                          <a
-                                            href={vuln.references[0]}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                          >
-                                            <IconExternalLink className="h-4 w-4" />
-                                          </a>
-                                        </Button>
-                                      )}
-                                    </div>
+                                    {vuln.publishedDate
+                                      ? new Date(
+                                          vuln.publishedDate
+                                        ).toLocaleDateString()
+                                      : "—"}
                                   </TableCell>
                                 </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Grype Results */}
+              <TabsContent value="grype" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <IconShield className="h-5 w-5" />
+                      Grype Vulnerability Scanner
+                    </CardTitle>
+                    <CardDescription>
+                      Container vulnerability scanner by Anchore
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {/* Search and Filter Bar */}
+                      <div className="flex items-center gap-4">
+                        <div className="relative flex-1">
+                          <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                          <Input
+                            placeholder="Search vulnerabilities, packages, or CVE IDs..."
+                            value={grypeSearch}
+                            onChange={(e) => setGrypeSearch(e.target.value)}
+                            className="pl-10"
+                          />
+                        </div>
+                        <Button
+                          variant={showFalsePositives ? "outline" : "secondary"}
+                          size="sm"
+                          onClick={() =>
+                            setShowFalsePositives(!showFalsePositives)
+                          }
+                          className="flex items-center gap-2"
+                        >
+                          {showFalsePositives ? "Hide" : "Show"} False Positives
+                        </Button>
+                        <div className="text-sm text-muted-foreground">
+                          {filteredGrypeVulns.length} of {grypResults?.matches?.length || 0} vulnerabilities
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
 
-                {/* Grype Results */}
-                <TabsContent value="grype" className="space-y-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <IconShield className="h-5 w-5" />
-                        Grype Vulnerability Scanner
-                      </CardTitle>
-                      <CardDescription>
-                        Container vulnerability scanner by Anchore
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
                       <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Vulnerability</TableHead>
-                            <TableHead>Severity</TableHead>
-                            <TableHead>Package</TableHead>
-                            <TableHead>Version</TableHead>
-                            <TableHead>Fix Available</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {(grypResults?.matches || []).map((match, index) => (
-                            <TableRow key={index}>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Actions</TableHead>
+                          <TableHead>Severity</TableHead>
+                          <TableHead>Vulnerability</TableHead>
+                          <TableHead>Package</TableHead>
+                          <TableHead>Version</TableHead>
+                          <TableHead>Fix Available</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredGrypeVulns.map((match, index) => {
+                          const classification = getClassification(
+                            match.vulnerability.id
+                          );
+                          const isMarkedFalsePositive = isFalsePositive(
+                            match.vulnerability.id
+                          );
+                          const comment = getComment(match.vulnerability.id);
+
+                          return (
+                            <TableRow
+                              key={index}
+                              className={
+                                isMarkedFalsePositive ? "opacity-50" : ""
+                              }
+                            >
                               <TableCell>
-                                <div>
-                                  <p className="font-medium">{match.vulnerability.id}</p>
-                                  <p className="text-sm text-muted-foreground">{match.vulnerability.description?.slice(0, 80)}...</p>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleOpenClassificationDialog(
+                                        match.vulnerability.id
+                                      )
+                                    }
+                                    className="flex items-center gap-1"
+                                  >
+                                    <IconMessage className="h-4 w-4" />
+                                    {classification ? "Edit" : "Classify"}
+                                  </Button>
+                                  {classification && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        deleteClassification(
+                                          match.vulnerability.id
+                                        )
+                                      }
+                                      className="text-red-500 hover:text-red-700"
+                                    >
+                                      <IconX className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  {match.vulnerability.urls &&
+                                    match.vulnerability.urls.length > 0 && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        asChild
+                                      >
+                                        <a
+                                          href={match.vulnerability.urls[0]}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                        >
+                                          <IconExternalLink className="h-4 w-4" />
+                                        </a>
+                                      </Button>
+                                    )}
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <Badge variant={getSeverityColor(match.vulnerability.severity) as any}>
-                                  {match.vulnerability.severity}
-                                </Badge>
+                                <div className="flex items-center gap-2">
+                                  <Badge
+                                    variant={
+                                      getSeverityColor(
+                                        match.vulnerability.severity
+                                      ) as any
+                                    }
+                                  >
+                                    {match.vulnerability.severity}
+                                  </Badge>
+                                  {isMarkedFalsePositive && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      False Positive
+                                    </Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium">
+                                      {match.vulnerability.id}
+                                    </p>
+                                    {comment && (
+                                      <IconMessage
+                                        className="h-4 w-4 text-muted-foreground"
+                                        title={comment}
+                                      />
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-muted-foreground">
+                                    {match.vulnerability.description?.slice(
+                                      0,
+                                      80
+                                    )}
+                                    ...
+                                  </p>
+                                  {comment && (
+                                    <p className="text-xs text-blue-600 mt-1">
+                                      💬 {comment.slice(0, 50)}
+                                      {comment.length > 50 ? "..." : ""}
+                                    </p>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell>{match.artifact.name}</TableCell>
                               <TableCell>{match.artifact.version}</TableCell>
@@ -760,62 +1210,86 @@ export default function ScanResultsPage() {
                                 )}
                               </TableCell>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-                {/* Syft Results */}
-                <TabsContent value="syft" className="space-y-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <IconPackage className="h-5 w-5" />
-                        Syft SBOM Generator
-                      </CardTitle>
-                      <CardDescription>
-                        Software Bill of Materials (SBOM) by Anchore
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <div className="text-center p-4 border rounded-lg">
-                          <p className="text-2xl font-bold">{syftResults?.artifacts?.length || 0}</p>
-                          <p className="text-sm text-muted-foreground">Total Packages</p>
-                        </div>
-                        <div className="text-center p-4 border rounded-lg">
-                          <p className="text-2xl font-bold">{syftResults?.artifacts ? new Set(syftResults.artifacts.map(a => a.type)).size : 0}</p>
-                          <p className="text-sm text-muted-foreground">Package Types</p>
-                        </div>
-                        <div className="text-center p-4 border rounded-lg">
-                          <p className="text-2xl font-bold">{syftResults?.schema?.version || 'N/A'}</p>
-                          <p className="text-sm text-muted-foreground">SBOM Version</p>
-                        </div>
+              {/* Syft Results */}
+              <TabsContent value="syft" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <IconPackage className="h-5 w-5" />
+                      Syft SBOM Generator
+                    </CardTitle>
+                    <CardDescription>
+                      Software Bill of Materials (SBOM) by Anchore
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                      <div className="text-center p-4 border rounded-lg">
+                        <p className="text-2xl font-bold">
+                          {syftResults?.artifacts?.length || 0}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Total Packages
+                        </p>
                       </div>
+                      <div className="text-center p-4 border rounded-lg">
+                        <p className="text-2xl font-bold">
+                          {syftResults?.artifacts
+                            ? new Set(syftResults.artifacts.map((a) => a.type))
+                                .size
+                            : 0}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Package Types
+                        </p>
+                      </div>
+                      <div className="text-center p-4 border rounded-lg">
+                        <p className="text-2xl font-bold">
+                          {syftResults?.schema?.version || "N/A"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          SBOM Version
+                        </p>
+                      </div>
+                    </div>
 
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Package Name</TableHead>
-                            <TableHead>Version</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead>Language</TableHead>
-                            <TableHead>Locations</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {(syftResults?.artifacts || [])
-                        .slice((syftCurrentPage - 1) * syftItemsPerPage, syftCurrentPage * syftItemsPerPage)
-                        .map((artifact, index) => (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Package Name</TableHead>
+                          <TableHead>Version</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Language</TableHead>
+                          <TableHead>Locations</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(syftResults?.artifacts || [])
+                          .slice(
+                            (syftCurrentPage - 1) * syftItemsPerPage,
+                            syftCurrentPage * syftItemsPerPage
+                          )
+                          .map((artifact, index) => (
                             <TableRow key={index}>
-                              <TableCell className="font-medium">{artifact.name}</TableCell>
+                              <TableCell className="font-medium">
+                                {artifact.name}
+                              </TableCell>
                               <TableCell>{artifact.version}</TableCell>
                               <TableCell>
                                 <Badge variant="outline">{artifact.type}</Badge>
                               </TableCell>
-                              <TableCell>{artifact.language || "N/A"}</TableCell>
+                              <TableCell>
+                                {artifact.language || "N/A"}
+                              </TableCell>
                               <TableCell>
                                 <span className="text-sm text-muted-foreground">
                                   {artifact.locations?.length || 0} location(s)
@@ -823,385 +1297,558 @@ export default function ScanResultsPage() {
                               </TableCell>
                             </TableRow>
                           ))}
-                        </TableBody>
-                      </Table>
+                      </TableBody>
+                    </Table>
 
-                      {(syftResults?.artifacts?.length || 0) > syftItemsPerPage && (
-                        <div className="flex items-center justify-between mt-4">
+                    {(syftResults?.artifacts?.length || 0) >
+                      syftItemsPerPage && (
+                      <div className="flex items-center justify-between mt-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">
+                            Items per page:
+                          </span>
+                          <Select
+                            value={syftItemsPerPage.toString()}
+                            onValueChange={(value) => {
+                              setSyftItemsPerPage(Number(value));
+                              setSyftCurrentPage(1);
+                            }}
+                          >
+                            <SelectTrigger className="w-20">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="10">10</SelectItem>
+                              <SelectItem value="20">20</SelectItem>
+                              <SelectItem value="50">50</SelectItem>
+                              <SelectItem value="100">100</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <p className="text-sm text-muted-foreground">
+                            Showing{" "}
+                            {(syftCurrentPage - 1) * syftItemsPerPage + 1}-
+                            {Math.min(
+                              syftCurrentPage * syftItemsPerPage,
+                              syftResults?.artifacts?.length || 0
+                            )}{" "}
+                            of {syftResults?.artifacts?.length || 0} packages
+                          </p>
                           <div className="flex items-center gap-2">
-                            <span className="text-sm text-muted-foreground">Items per page:</span>
-                            <Select
-                              value={syftItemsPerPage.toString()}
-                              onValueChange={(value) => {
-                                setSyftItemsPerPage(Number(value))
-                                setSyftCurrentPage(1)
-                              }}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                setSyftCurrentPage(
+                                  Math.max(1, syftCurrentPage - 1)
+                                )
+                              }
+                              disabled={syftCurrentPage === 1}
                             >
-                              <SelectTrigger className="w-20">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="10">10</SelectItem>
-                                <SelectItem value="20">20</SelectItem>
-                                <SelectItem value="50">50</SelectItem>
-                                <SelectItem value="100">100</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <p className="text-sm text-muted-foreground">
-                              Showing {((syftCurrentPage - 1) * syftItemsPerPage) + 1}-{Math.min(syftCurrentPage * syftItemsPerPage, syftResults?.artifacts?.length || 0)} of {syftResults?.artifacts?.length || 0} packages
-                            </p>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setSyftCurrentPage(Math.max(1, syftCurrentPage - 1))}
-                                disabled={syftCurrentPage === 1}
-                              >
-                                Previous
-                              </Button>
-                              <span className="text-sm">
-                                Page {syftCurrentPage} of {Math.ceil((syftResults?.artifacts?.length || 0) / syftItemsPerPage)}
-                              </span>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setSyftCurrentPage(Math.min(Math.ceil((syftResults?.artifacts?.length || 0) / syftItemsPerPage), syftCurrentPage + 1))}
-                                disabled={syftCurrentPage >= Math.ceil((syftResults?.artifacts?.length || 0) / syftItemsPerPage)}
-                              >
-                                Next
-                              </Button>
-                            </div>
+                              Previous
+                            </Button>
+                            <span className="text-sm">
+                              Page {syftCurrentPage} of{" "}
+                              {Math.ceil(
+                                (syftResults?.artifacts?.length || 0) /
+                                  syftItemsPerPage
+                              )}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                setSyftCurrentPage(
+                                  Math.min(
+                                    Math.ceil(
+                                      (syftResults?.artifacts?.length || 0) /
+                                        syftItemsPerPage
+                                    ),
+                                    syftCurrentPage + 1
+                                  )
+                                )
+                              }
+                              disabled={
+                                syftCurrentPage >=
+                                Math.ceil(
+                                  (syftResults?.artifacts?.length || 0) /
+                                    syftItemsPerPage
+                                )
+                              }
+                            >
+                              Next
+                            </Button>
                           </div>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-                {/* Dockle Results */}
-                <TabsContent value="dockle" className="space-y-4">
+              {/* Dockle Results */}
+              <TabsContent value="dockle" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <IconSettings className="h-5 w-5" />
+                      Dockle Configuration Linter
+                    </CardTitle>
+                    <CardDescription>
+                      Container image linter for security and best practices
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {/* Summary Statistics */}
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="text-center p-4 border rounded-lg">
+                          <p className="text-2xl font-bold text-red-600">
+                            {dockleResults?.summary?.fatal || 0}
+                          </p>
+                          <p className="text-sm text-muted-foreground">Fatal</p>
+                        </div>
+                        <div className="text-center p-4 border rounded-lg">
+                          <p className="text-2xl font-bold text-orange-600">
+                            {dockleResults?.summary?.warn || 0}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Warnings
+                          </p>
+                        </div>
+                        <div className="text-center p-4 border rounded-lg">
+                          <p className="text-2xl font-bold text-blue-600">
+                            {dockleResults?.summary?.info || 0}
+                          </p>
+                          <p className="text-sm text-muted-foreground">Info</p>
+                        </div>
+                        <div className="text-center p-4 border rounded-lg">
+                          <p className="text-2xl font-bold">
+                            {dockleResults?.summary?.pass || 0}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Passed
+                          </p>
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      {/* Search and Filter Bar */}
+                      <div className="flex items-center gap-4">
+                        <div className="relative flex-1">
+                          <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                          <Input
+                            placeholder="Search rules, codes, or descriptions..."
+                            value={dockleSearch}
+                            onChange={(e) => setDockleSearch(e.target.value)}
+                            className="pl-10"
+                          />
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {filteredDockleFindings.length} of{" "}
+                          {dockleResults?.details?.length || 0} findings
+                        </div>
+                      </div>
+
+                      {/* Findings Table */}
+                      <div className="border rounded-lg">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>
+                                <Button
+                                  variant="ghost"
+                                  className="h-auto p-0 font-medium"
+                                  onClick={() => handleDockleSort("level")}
+                                >
+                                  Level
+                                  {dockleSortField === "level" &&
+                                    (dockleSortOrder === "asc" ? (
+                                      <IconSortAscending className="ml-1 h-4 w-4" />
+                                    ) : (
+                                      <IconSortDescending className="ml-1 h-4 w-4" />
+                                    ))}
+                                </Button>
+                              </TableHead>
+                              <TableHead>
+                                <Button
+                                  variant="ghost"
+                                  className="h-auto p-0 font-medium"
+                                  onClick={() => handleDockleSort("code")}
+                                >
+                                  Rule Code
+                                  {dockleSortField === "code" &&
+                                    (dockleSortOrder === "asc" ? (
+                                      <IconSortAscending className="ml-1 h-4 w-4" />
+                                    ) : (
+                                      <IconSortDescending className="ml-1 h-4 w-4" />
+                                    ))}
+                                </Button>
+                              </TableHead>
+                              <TableHead>
+                                <Button
+                                  variant="ghost"
+                                  className="h-auto p-0 font-medium"
+                                  onClick={() => handleDockleSort("title")}
+                                >
+                                  Title
+                                  {dockleSortField === "title" &&
+                                    (dockleSortOrder === "asc" ? (
+                                      <IconSortAscending className="ml-1 h-4 w-4" />
+                                    ) : (
+                                      <IconSortDescending className="ml-1 h-4 w-4" />
+                                    ))}
+                                </Button>
+                              </TableHead>
+                              <TableHead>Details</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {filteredDockleFindings.map((detail, index) => (
+                              <TableRow key={index}>
+                                <TableCell>
+                                  <Badge
+                                    variant={
+                                      detail.level === "FATAL"
+                                        ? "destructive"
+                                        : detail.level === "WARN"
+                                        ? "secondary"
+                                        : "outline"
+                                    }
+                                  >
+                                    {detail.level}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <code className="text-sm bg-muted px-2 py-1 rounded">
+                                    {detail.code}
+                                  </code>
+                                </TableCell>
+                                <TableCell>
+                                  <p className="font-medium">{detail.title}</p>
+                                </TableCell>
+                                <TableCell>
+                                  <p className="text-sm text-muted-foreground max-w-md">
+                                    {detail.details}
+                                  </p>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* OSV Results */}
+              {osvResults && (
+                <TabsContent value="osv" className="space-y-4">
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
-                        <IconSettings className="h-5 w-5" />
-                        Dockle Configuration Linter
+                        <IconPackage className="h-5 w-5" />
+                        OSV Vulnerability Database
                       </CardTitle>
                       <CardDescription>
-                        Container image linter for security and best practices
+                        Open Source Vulnerability database analysis of container
+                        packages
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
                         {/* Summary Statistics */}
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                           <div className="text-center p-4 border rounded-lg">
-                            <p className="text-2xl font-bold text-red-600">{dockleResults?.summary?.fatal || 0}</p>
-                            <p className="text-sm text-muted-foreground">Fatal</p>
+                            <p className="text-2xl font-bold">
+                              {osvResults.results?.reduce(
+                                (total, result) =>
+                                  total + (result.packages?.length || 0),
+                                0
+                              ) || 0}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Total Packages
+                            </p>
                           </div>
                           <div className="text-center p-4 border rounded-lg">
-                            <p className="text-2xl font-bold text-orange-600">{dockleResults?.summary?.warn || 0}</p>
-                            <p className="text-sm text-muted-foreground">Warnings</p>
+                            <p className="text-2xl font-bold text-red-600">
+                              {osvResults.results?.reduce(
+                                (total, result) =>
+                                  total +
+                                  (result.packages?.filter(
+                                    (pkg) => pkg.vulnerabilities.length > 0
+                                  ).length || 0),
+                                0
+                              ) || 0}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Vulnerable
+                            </p>
                           </div>
                           <div className="text-center p-4 border rounded-lg">
-                            <p className="text-2xl font-bold text-blue-600">{dockleResults?.summary?.info || 0}</p>
-                            <p className="text-sm text-muted-foreground">Info</p>
-                          </div>
-                          <div className="text-center p-4 border rounded-lg">
-                            <p className="text-2xl font-bold">{dockleResults?.summary?.pass || 0}</p>
-                            <p className="text-sm text-muted-foreground">Passed</p>
+                            <p className="text-2xl font-bold">
+                              {new Set(
+                                osvResults.results?.flatMap(
+                                  (result) =>
+                                    result.packages?.map(
+                                      (pkg) => pkg.package.ecosystem
+                                    ) || []
+                                )
+                              ).size || 0}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Ecosystems
+                            </p>
                           </div>
                         </div>
 
-                        <Separator />
-
-                        {/* Search and Filter Bar */}
-                        <div className="flex items-center gap-4">
-                          <div className="relative flex-1">
-                            <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                            <Input
-                              placeholder="Search rules, codes, or descriptions..."
-                              value={dockleSearch}
-                              onChange={(e) => setDockleSearch(e.target.value)}
-                              className="pl-10"
-                            />
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {filteredDockleFindings.length} of {dockleResults?.details?.length || 0} findings
+                        {/* Ecosystem Distribution */}
+                        <div className="mb-6">
+                          <h4 className="font-semibold mb-2">
+                            Package Distribution by Ecosystem
+                          </h4>
+                          <div className="flex flex-wrap gap-2">
+                            {Array.from(
+                              new Set(
+                                osvResults.results?.flatMap(
+                                  (result) =>
+                                    result.packages?.map(
+                                      (pkg) => pkg.package.ecosystem
+                                    ) || []
+                                )
+                              )
+                            ).map((ecosystem) => {
+                              const count =
+                                osvResults.results?.reduce(
+                                  (total, result) =>
+                                    total +
+                                    (result.packages?.filter(
+                                      (pkg) =>
+                                        pkg.package.ecosystem === ecosystem
+                                    ).length || 0),
+                                  0
+                                ) || 0;
+                              return (
+                                <Badge key={ecosystem} variant="outline">
+                                  {ecosystem}: {count}
+                                </Badge>
+                              );
+                            })}
                           </div>
                         </div>
 
-                        {/* Findings Table */}
-                        <div className="border rounded-lg">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>
-                                  <Button
-                                    variant="ghost"
-                                    className="h-auto p-0 font-medium"
-                                    onClick={() => handleDockleSort("level")}
-                                  >
-                                    Level
-                                    {dockleSortField === "level" && (
-                                      dockleSortOrder === "asc" ? <IconSortAscending className="ml-1 h-4 w-4" /> : <IconSortDescending className="ml-1 h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </TableHead>
-                                <TableHead>
-                                  <Button
-                                    variant="ghost"
-                                    className="h-auto p-0 font-medium"
-                                    onClick={() => handleDockleSort("code")}
-                                  >
-                                    Rule Code
-                                    {dockleSortField === "code" && (
-                                      dockleSortOrder === "asc" ? <IconSortAscending className="ml-1 h-4 w-4" /> : <IconSortDescending className="ml-1 h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </TableHead>
-                                <TableHead>
-                                  <Button
-                                    variant="ghost"
-                                    className="h-auto p-0 font-medium"
-                                    onClick={() => handleDockleSort("title")}
-                                  >
-                                    Title
-                                    {dockleSortField === "title" && (
-                                      dockleSortOrder === "asc" ? <IconSortAscending className="ml-1 h-4 w-4" /> : <IconSortDescending className="ml-1 h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </TableHead>
-                                <TableHead>Details</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {filteredDockleFindings.map((detail, index) => (
-                                <TableRow key={index}>
-                                  <TableCell>
-                                    <Badge variant={
-                                      detail.level === "FATAL" ? "destructive" :
-                                        detail.level === "WARN" ? "secondary" : "outline"
-                                    }>
-                                      {detail.level}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    <code className="text-sm bg-muted px-2 py-1 rounded">
-                                      {detail.code}
-                                    </code>
-                                  </TableCell>
-                                  <TableCell>
-                                    <p className="font-medium">{detail.title}</p>
-                                  </TableCell>
-                                  <TableCell>
-                                    <p className="text-sm text-muted-foreground max-w-md">
-                                      {detail.details}
-                                    </p>
-                                  </TableCell>
+                        {/* Vulnerable Packages Table */}
+                        <div>
+                          <h4 className="font-semibold mb-4">
+                            Vulnerable Packages
+                          </h4>
+                          <div className="border rounded-lg">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Package</TableHead>
+                                  <TableHead>Version</TableHead>
+                                  <TableHead>Ecosystem</TableHead>
+                                  <TableHead>Vulnerabilities</TableHead>
+                                  <TableHead>Severity</TableHead>
                                 </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
+                              </TableHeader>
+                              <TableBody>
+                                {osvResults.results
+                                  ?.flatMap((result) => result.packages || [])
+                                  .filter(
+                                    (pkg) => pkg.vulnerabilities.length > 0
+                                  )
+                                  .map((pkg, index) => {
+                                    const maxSeverity =
+                                      pkg.groups?.[0]?.max_severity || "0";
+                                    const severityNum = parseFloat(maxSeverity);
+                                    return (
+                                      <TableRow key={index}>
+                                        <TableCell className="font-medium">
+                                          {pkg.package.name}
+                                        </TableCell>
+                                        <TableCell>
+                                          {pkg.package.version}
+                                        </TableCell>
+                                        <TableCell>
+                                          <Badge variant="outline">
+                                            {pkg.package.ecosystem}
+                                          </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                          {pkg.vulnerabilities.length}
+                                        </TableCell>
+                                        <TableCell>
+                                          {severityNum >= 9 && (
+                                            <Badge variant="destructive">
+                                              Critical
+                                            </Badge>
+                                          )}
+                                          {severityNum >= 7 &&
+                                            severityNum < 9 && (
+                                              <Badge variant="destructive">
+                                                High
+                                              </Badge>
+                                            )}
+                                          {severityNum >= 4 &&
+                                            severityNum < 7 && (
+                                              <Badge variant="secondary">
+                                                Medium
+                                              </Badge>
+                                            )}
+                                          {severityNum > 0 &&
+                                            severityNum < 4 && (
+                                              <Badge variant="outline">
+                                                Low
+                                              </Badge>
+                                            )}
+                                          {severityNum === 0 && (
+                                            <Badge variant="outline">
+                                              Info
+                                            </Badge>
+                                          )}
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                              </TableBody>
+                            </Table>
+                          </div>
                         </div>
+
+                        {/* Show message if no vulnerable packages */}
+                        {(osvResults.results
+                          ?.flatMap((result) => result.packages || [])
+                          .filter((pkg) => pkg.vulnerabilities.length > 0)
+                          .length || 0) === 0 && (
+                          <div className="text-center py-8">
+                            <IconInfoCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                            <p className="text-muted-foreground">
+                              No vulnerable packages found
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
                 </TabsContent>
+              )}
 
-                {/* OSV Results */}
-                {osvResults && (
-                  <TabsContent value="osv" className="space-y-4">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <IconPackage className="h-5 w-5" />
-                          OSV Vulnerability Database
-                        </CardTitle>
-                        <CardDescription>
-                          Open Source Vulnerability database analysis of container packages
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-4">
-                          {/* Summary Statistics */}
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                            <div className="text-center p-4 border rounded-lg">
-                              <p className="text-2xl font-bold">
-                                {osvResults.results?.reduce((total, result) => total + (result.packages?.length || 0), 0) || 0}
-                              </p>
-                              <p className="text-sm text-muted-foreground">Total Packages</p>
-                            </div>
-                            <div className="text-center p-4 border rounded-lg">
-                              <p className="text-2xl font-bold text-red-600">
-                                {osvResults.results?.reduce((total, result) => 
-                                  total + (result.packages?.filter(pkg => pkg.vulnerabilities.length > 0).length || 0), 0) || 0
-                                }
-                              </p>
-                              <p className="text-sm text-muted-foreground">Vulnerable</p>
-                            </div>
-                            <div className="text-center p-4 border rounded-lg">
-                              <p className="text-2xl font-bold">
-                                {new Set(osvResults.results?.flatMap(result => 
-                                  result.packages?.map(pkg => pkg.package.ecosystem) || []
-                                )).size || 0}
-                              </p>
-                              <p className="text-sm text-muted-foreground">Ecosystems</p>
-                            </div>
-                          </div>
-
-                          {/* Ecosystem Distribution */}
-                          <div className="mb-6">
-                            <h4 className="font-semibold mb-2">Package Distribution by Ecosystem</h4>
-                            <div className="flex flex-wrap gap-2">
-                              {Array.from(new Set(osvResults.results?.flatMap(result => 
-                                result.packages?.map(pkg => pkg.package.ecosystem) || []
-                              ))).map((ecosystem) => {
-                                const count = osvResults.results?.reduce((total, result) => 
-                                  total + (result.packages?.filter(pkg => pkg.package.ecosystem === ecosystem).length || 0), 0
-                                ) || 0;
-                                return (
-                                  <Badge key={ecosystem} variant="outline">
-                                    {ecosystem}: {count}
-                                  </Badge>
-                                );
-                              })}
-                            </div>
-                          </div>
-
-                          {/* Vulnerable Packages Table */}
-                          <div>
-                            <h4 className="font-semibold mb-4">Vulnerable Packages</h4>
-                            <div className="border rounded-lg">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Package</TableHead>
-                                    <TableHead>Version</TableHead>
-                                    <TableHead>Ecosystem</TableHead>
-                                    <TableHead>Vulnerabilities</TableHead>
-                                    <TableHead>Severity</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {osvResults.results?.flatMap(result => result.packages || [])
-                                    .filter(pkg => pkg.vulnerabilities.length > 0)
-                                    .map((pkg, index) => {
-                                      const maxSeverity = pkg.groups?.[0]?.max_severity || '0';
-                                      const severityNum = parseFloat(maxSeverity);
-                                      return (
-                                        <TableRow key={index}>
-                                          <TableCell className="font-medium">{pkg.package.name}</TableCell>
-                                          <TableCell>{pkg.package.version}</TableCell>
-                                          <TableCell>
-                                            <Badge variant="outline">{pkg.package.ecosystem}</Badge>
-                                          </TableCell>
-                                          <TableCell>{pkg.vulnerabilities.length}</TableCell>
-                                          <TableCell>
-                                            {severityNum >= 9 && <Badge variant="destructive">Critical</Badge>}
-                                            {severityNum >= 7 && severityNum < 9 && <Badge variant="destructive">High</Badge>}
-                                            {severityNum >= 4 && severityNum < 7 && <Badge variant="secondary">Medium</Badge>}
-                                            {severityNum > 0 && severityNum < 4 && <Badge variant="outline">Low</Badge>}
-                                            {severityNum === 0 && <Badge variant="outline">Info</Badge>}
-                                          </TableCell>
-                                        </TableRow>
-                                      );
-                                    })}
-                                </TableBody>
-                              </Table>
-                            </div>
-                            
-                          </div>
-
-                          {/* Show message if no vulnerable packages */}
-                          {(osvResults.results?.flatMap(result => result.packages || []).filter(pkg => pkg.vulnerabilities.length > 0).length || 0) === 0 && (
-                            <div className="text-center py-8">
-                              <IconInfoCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                              <p className="text-muted-foreground">No vulnerable packages found</p>
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                )}
-
-                {/* Dive Layer Analysis Results */}
-                {diveResults?.layer && diveResults.layer.length > 0 && (
-                  <TabsContent value="dive" className="space-y-4">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Layer Analysis</CardTitle>
-                        <CardDescription>
-                          Docker image layer breakdown and file system analysis
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <Tabs value={selectedLayer} onValueChange={setSelectedLayer} className="w-full">
-                          <TabsList className="flex w-full flex-wrap gap-1 h-auto p-1">
-                            {diveResults.layer.map((layer, index) => (
-                              <TabsTrigger 
-                                key={index} 
-                                value={index.toString()} 
-                                className="flex items-center gap-1 text-xs px-2 py-1.5 flex-shrink-0 min-w-fit"
-                              >
-                                <IconStack className="h-3 w-3" />
-                                Layer {layer.index + 1}
-                                <Badge variant="secondary" className="text-xs ml-1">
-                                  {(layer.sizeBytes / (1024 * 1024)).toFixed(1)}MB
-                                </Badge>
-                              </TabsTrigger>
-                            ))}
-                          </TabsList>
-
+              {/* Dive Layer Analysis Results */}
+              {diveResults?.layer && diveResults.layer.length > 0 && (
+                <TabsContent value="dive" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Layer Analysis</CardTitle>
+                      <CardDescription>
+                        Docker image layer breakdown and file system analysis
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Tabs
+                        value={selectedLayer}
+                        onValueChange={setSelectedLayer}
+                        className="w-full"
+                      >
+                        <TabsList className="flex w-full flex-wrap gap-1 h-auto p-1">
                           {diveResults.layer.map((layer, index) => (
-                            <TabsContent key={index} value={index.toString()} className="space-y-4">
-                              <div className="border rounded-lg p-4">
-                                <div className="flex items-center justify-between mb-3">
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="font-mono">
-                                      Layer {layer.index + 1}
-                                    </Badge>
-                                    <span className="text-sm text-muted-foreground">
-                                      {(layer.sizeBytes / (1024 * 1024)).toFixed(2)} MB
-                                    </span>
-                                  </div>
-                                  <Badge variant="secondary" className="text-xs">
-                                    {layer.fileList.length} files
+                            <TabsTrigger
+                              key={index}
+                              value={index.toString()}
+                              className="flex items-center gap-1 text-xs px-2 py-1.5 flex-shrink-0 min-w-fit"
+                            >
+                              <IconStack className="h-3 w-3" />
+                              Layer {layer.index + 1}
+                              <Badge
+                                variant="secondary"
+                                className="text-xs ml-1"
+                              >
+                                {(layer.sizeBytes / (1024 * 1024)).toFixed(1)}MB
+                              </Badge>
+                            </TabsTrigger>
+                          ))}
+                        </TabsList>
+
+                        {diveResults.layer.map((layer, index) => (
+                          <TabsContent
+                            key={index}
+                            value={index.toString()}
+                            className="space-y-4"
+                          >
+                            <div className="border rounded-lg p-4">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <Badge
+                                    variant="outline"
+                                    className="font-mono"
+                                  >
+                                    Layer {layer.index + 1}
                                   </Badge>
+                                  <span className="text-sm text-muted-foreground">
+                                    {(layer.sizeBytes / (1024 * 1024)).toFixed(
+                                      2
+                                    )}{" "}
+                                    MB
+                                  </span>
                                 </div>
-                                
-                                <div className="mb-3">
-                                  <p className="text-sm font-medium mb-1">Command:</p>
-                                  <code className="text-xs bg-muted p-2 rounded block overflow-x-auto">
-                                    {layer.command}
-                                  </code>
-                                </div>
+                                <Badge variant="secondary" className="text-xs">
+                                  {layer.fileList.length} files
+                                </Badge>
+                              </div>
 
-                                <div className="mb-3">
-                                  <p className="text-sm font-medium mb-2">Layer ID:</p>
-                                  <code className="text-xs text-muted-foreground font-mono">
-                                    {layer.digestId}
-                                  </code>
-                                </div>
+                              <div className="mb-3">
+                                <p className="text-sm font-medium mb-1">
+                                  Command:
+                                </p>
+                                <code className="text-xs bg-muted p-2 rounded block overflow-x-auto">
+                                  {layer.command}
+                                </code>
+                              </div>
 
-                                {layer.fileList.length > 0 && (
-                                  <div>
-                                    <p className="text-sm font-medium mb-2">Files ({layer.fileList.length}):</p>
-                                    <div className="max-h-96 overflow-y-auto border rounded">
-                                      <table className="w-full text-xs">
-                                        <thead>
-                                          <tr className="border-b bg-muted/50">
-                                            <th className="text-left p-2 font-medium">Path</th>
-                                            <th className="text-left p-2 font-medium">Size</th>
-                                            <th className="text-left p-2 font-medium">Mode</th>
-                                            <th className="text-left p-2 font-medium">Owner</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {layer.fileList.map((file, fileIndex) => (
-                                            <tr key={fileIndex} className="border-b hover:bg-muted/25">
+                              <div className="mb-3">
+                                <p className="text-sm font-medium mb-2">
+                                  Layer ID:
+                                </p>
+                                <code className="text-xs text-muted-foreground font-mono">
+                                  {layer.digestId}
+                                </code>
+                              </div>
+
+                              {layer.fileList.length > 0 && (
+                                <div>
+                                  <p className="text-sm font-medium mb-2">
+                                    Files ({layer.fileList.length}):
+                                  </p>
+                                  <div className="max-h-96 overflow-y-auto border rounded">
+                                    <table className="w-full text-xs">
+                                      <thead>
+                                        <tr className="border-b bg-muted/50">
+                                          <th className="text-left p-2 font-medium">
+                                            Path
+                                          </th>
+                                          <th className="text-left p-2 font-medium">
+                                            Size
+                                          </th>
+                                          <th className="text-left p-2 font-medium">
+                                            Mode
+                                          </th>
+                                          <th className="text-left p-2 font-medium">
+                                            Owner
+                                          </th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {layer.fileList.map(
+                                          (file, fileIndex) => (
+                                            <tr
+                                              key={fileIndex}
+                                              className="border-b hover:bg-muted/25"
+                                            >
                                               <td className="p-2 font-mono">
                                                 {file.path}
                                                 {file.linkName && (
@@ -1211,33 +1858,50 @@ export default function ScanResultsPage() {
                                                 )}
                                               </td>
                                               <td className="p-2">
-                                                {file.size > 0 ? `${(file.size / 1024).toFixed(1)}KB` : '-'}
+                                                {file.size > 0
+                                                  ? `${(
+                                                      file.size / 1024
+                                                    ).toFixed(1)}KB`
+                                                  : "-"}
                                               </td>
                                               <td className="p-2 font-mono">
-                                                {file.fileMode.toString(8).slice(-4)}
+                                                {file.fileMode
+                                                  .toString(8)
+                                                  .slice(-4)}
                                               </td>
                                               <td className="p-2">
                                                 {file.uid}:{file.gid}
                                               </td>
                                             </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    </div>
+                                          )
+                                        )}
+                                      </tbody>
+                                    </table>
                                   </div>
-                                )}
-                              </div>
-                            </TabsContent>
-                          ))}
-                        </Tabs>
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                )}
-              </Tabs>
+                                </div>
+                              )}
+                            </div>
+                          </TabsContent>
+                        ))}
+                      </Tabs>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              )}
+            </Tabs>
           </div>
         </div>
       </SidebarInset>
+
+      {/* CVE Classification Dialog */}
+      <CveClassificationDialog
+        isOpen={classificationDialogOpen}
+        onClose={handleCloseClassificationDialog}
+        cveId={selectedCveId}
+        imageId={scanData?.image?.id || ""}
+        currentClassification={getClassification(selectedCveId)}
+        onSave={saveClassification}
+      />
     </SidebarProvider>
-  )
+  );
 }

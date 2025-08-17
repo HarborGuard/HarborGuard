@@ -1,10 +1,9 @@
 "use client"
 
-import { IconCirclePlusFilled, IconMail, type Icon } from "@tabler/icons-react"
+import { IconCirclePlusFilled, type Icon } from "@tabler/icons-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-
-import { Button } from "@/components/ui/button"
+import { Layers2Icon } from "lucide-react"
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -13,6 +12,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { NewScanModal } from "@/components/new-scan-modal"
+import { BulkScanModal } from "@/components/bulk-scan-modal"
 import { Separator } from "./ui/separator"
 
 export function NavMain({
@@ -31,16 +31,24 @@ export function NavMain({
 
         <Separator className="mb-2" />
         <SidebarMenu>
-          <SidebarMenuItem className="flex items-center gap-2">
+          <SidebarMenuItem className="flex items-center gap-1">
             <NewScanModal>
               <SidebarMenuButton
                 tooltip="New Scan"
-                className="bg-blue-500 text-primary-foreground hover:bg-blue-500/70 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear cursor-pointer"
+                className="bg-blue-500 text-primary-foreground hover:bg-blue-500/70 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear cursor-pointer flex-1"
               >
                 <IconCirclePlusFilled />
                 <span>New Scan</span>
               </SidebarMenuButton>
             </NewScanModal>
+            <BulkScanModal>
+              <SidebarMenuButton
+                tooltip="Bulk Scan"
+                className="bg-blue-500 text-primary-foreground hover:bg-blue-500/70 hover:text-primary-foreground active:bg-blue-600/90 active:text-primary-foreground min-w-8 w-8 h-8 duration-200 ease-linear cursor-pointer p-0 flex items-center justify-center"
+              >
+                <Layers2Icon />
+              </SidebarMenuButton>
+            </BulkScanModal>
           </SidebarMenuItem>
         </SidebarMenu>
         <Separator className="mt-2" />

@@ -4,12 +4,14 @@
 import type { 
   Scan as PrismaScan, 
   Image as PrismaImage,
-  ScanStatus as PrismaScanStatus 
+  ScanStatus as PrismaScanStatus,
+  CveClassification as PrismaCveClassification
 } from '@/generated/prisma';
 
 // Re-export Prisma types as the canonical types
 export type ScanStatus = PrismaScanStatus;
 export type Image = PrismaImage;
+export type CveClassification = PrismaCveClassification;
 
 // Base Scan type from Prisma with proper typing for JSON fields
 export type Scan = Omit<PrismaScan, 'sizeBytes'> & {

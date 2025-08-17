@@ -25,7 +25,7 @@ export class ScanExecutor implements IScanExecutor {
     await this.setupDirectories(reportDir, cacheDir);
     this.progressTracker.updateProgress(requestId, 10, 'Setting up scan environment');
 
-    const imageName = request.dockerImageId!;
+    const imageName = request.dockerImageId || `${request.image}:${request.tag}`;
     const safeImageName = request.image.replace(/\//g, '_');
     const tarPath = path.join(imageDir, `${safeImageName}-${requestId}.tar`);
 

@@ -181,7 +181,7 @@ export class ScannerService {
   }
 
   private isLocalDockerScan(request: ScanRequest | AppliedScanRequest): boolean {
-    return request.source === 'local' && !!request.dockerImageId;
+    return request.source === 'local';
   }
 
   private shouldSimulateDownload(request: ScanRequest | AppliedScanRequest): boolean {

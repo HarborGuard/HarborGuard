@@ -24,6 +24,7 @@ model Image {
   updatedAt   DateTime @updatedAt
   scans       Scan[]
   bulkScanItems BulkScanItem[]
+  cveClassifications CveClassification[]
 
   @@index([name, tag])
   @@index([registry, name, tag])
@@ -166,4 +167,22 @@ model BulkScanItem {
   @@index([batchId])
   @@index([status])
   @@map("bulk_scan_items")
+}
+
+model CveClassification {
+  id            String   @id @default(cuid())
+  cveId         String   // CVE identifier (e.g., "CVE-2023-1234")
+  imageId       String   // Image this classification applies to
+  image         Image    @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  isFalsePositive Boolean @default(false)
+  comment       String?  // User comment about this CVE
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdBy     String?  // User who created this classification
+
+  @@unique([cveId, imageId]) // Ensure one classification per CVE per image
+  @@index([cveId])
+  @@index([imageId])
+  @@index([isFalsePositive])
+  @@map("cve_classifications")
 }
