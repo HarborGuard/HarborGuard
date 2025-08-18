@@ -256,7 +256,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         scanTime: new Date(scan.startedAt).toLocaleString(),
         status: mapScanStatus(scan.status),
         statusRaw: scan.status,
-        compliance: scan.complianceScore || { pass: 0, warn: 0, info: 0 },
+        compliance: {
+          dockle: undefined // The data table expects a dockle property
+        },
         misconfiguration: { pass: 0, warn: 0, info: 0 },
         secretsData: { count: 0, results: [] }, // Rename to avoid conflict
         fixed: 0,
