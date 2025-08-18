@@ -10,10 +10,17 @@ export function useScans() {
   const error = state.error
 
   const stats = useMemo(() => {
-    // Use unique CVE aggregation to prevent double-counting when same image is scanned multiple times
     const totalScans = scans.length
-    const uniqueVulns = aggregateUniqueVulnerabilities(state.rawScans)
-    const totalVulns = uniqueVulns.critical + uniqueVulns.high + uniqueVulns.medium + uniqueVulns.low
+    
+    // Aggregate vulnerabilities directly from the transformed scans
+    const aggregatedVulns = scans.reduce((acc, scan) => ({
+      critical: acc.critical + (scan.severities?.crit || 0),
+      high: acc.high + (scan.severities?.high || 0),
+      medium: acc.medium + (scan.severities?.med || 0),
+      low: acc.low + (scan.severities?.low || 0)
+    }), { critical: 0, high: 0, medium: 0, low: 0 })
+    
+    const totalVulns = aggregatedVulns.critical + aggregatedVulns.high + aggregatedVulns.medium + aggregatedVulns.low
     
     const avgRiskScore = scans.length > 0 
       ? scans.reduce((sum, scan) => sum + scan.riskScore, 0) / scans.length 
@@ -25,10 +32,10 @@ export function useScans() {
     return {
       totalScans,
       vulnerabilities: {
-        critical: uniqueVulns.critical,
-        high: uniqueVulns.high,
-        medium: uniqueVulns.medium,
-        low: uniqueVulns.low,
+        critical: aggregatedVulns.critical,
+        high: aggregatedVulns.high,
+        medium: aggregatedVulns.medium,
+        low: aggregatedVulns.low,
         total: totalVulns
       },
       avgRiskScore: Math.round(avgRiskScore),
@@ -36,7 +43,7 @@ export function useScans() {
       completeScans,
       completionRate: totalScans > 0 ? Math.round((completeScans / totalScans) * 100) : 0
     }
-  }, [scans, state.rawScans])
+  }, [scans])
 
   const getScansByRiskLevel = (level: 'low' | 'medium' | 'high' | 'critical') => {
     const thresholds = {

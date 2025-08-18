@@ -8,22 +8,30 @@ export async function GET(
 ) {
   try {
     const { name } = await params
+    const { searchParams } = new URL(request.url)
     
     // Decode the image name in case it has special characters
     const decodedName = decodeURIComponent(name)
     
-    // Fetch all images with this name (across all tags and registries)
+    // Pagination parameters
+    const scanLimit = Math.min(parseInt(searchParams.get('scanLimit') || '10'), 50)
+    const scanOffset = parseInt(searchParams.get('scanOffset') || '0')
+    const includeReports = searchParams.get('includeReports') === 'true'
+    
+    // First get images metadata without scans
     const images = await prisma.image.findMany({
       where: { 
         name: decodedName 
       },
-      include: {
-        scans: {
-          orderBy: { startedAt: 'desc' },
-          include: {
-            image: true
-          }
-        }
+      select: {
+        id: true,
+        name: true,
+        tag: true,
+        registry: true,
+        digest: true,
+        sizeBytes: true,
+        createdAt: true,
+        updatedAt: true
       },
       orderBy: [
         { tag: 'desc' }, // Show latest tags first
@@ -38,42 +46,105 @@ export async function GET(
       )
     }
     
-    // Flatten all scans from all tags into one list
-    const allScans = images.flatMap(image => 
-      image.scans.map(scan => ({
-        ...scan,
-        sizeBytes: scan.sizeBytes?.toString() || null,
-        image: {
-          ...scan.image,
-          sizeBytes: scan.image.sizeBytes?.toString() || null
-        }
-      }))
-    )
+    const imageIds = images.map(img => img.id)
     
-    // Sort all scans by date (most recent first)
-    allScans.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+    // Get total scan count for pagination
+    const totalScans = await prisma.scan.count({
+      where: {
+        imageId: { in: imageIds }
+      }
+    })
+    
+    // Selective field loading for scans - exclude large JSON reports by default
+    const scanSelectFields = includeReports ? undefined : {
+      id: true,
+      requestId: true,
+      imageId: true,
+      startedAt: true,
+      finishedAt: true,
+      sizeBytes: true,
+      status: true,
+      errorMessage: true,
+      vulnerabilityCount: true,
+      riskScore: true,
+      complianceScore: true,
+      createdAt: true,
+      updatedAt: true,
+      source: true,
+      // Exclude large JSON fields: trivy, grype, syft, dockle, metadata, osv, dive
+      image: {
+        select: {
+          id: true,
+          name: true,
+          tag: true,
+          registry: true,
+          digest: true
+        }
+      }
+    }
+    
+    // Get paginated scans with selective loading
+    const scanQuery: any = {
+      where: {
+        imageId: { in: imageIds }
+      },
+      orderBy: { startedAt: 'desc' },
+      take: scanLimit,
+      skip: scanOffset
+    }
+    
+    if (scanSelectFields) {
+      scanQuery.select = scanSelectFields
+    } else {
+      scanQuery.include = {
+        image: {
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+            registry: true,
+            digest: true
+          }
+        }
+      }
+    }
+    
+    const scans = await prisma.scan.findMany(scanQuery)
+    
+    // Convert BigInt to string for JSON serialization
+    const serializedScans = scans.map((scan: any) => ({
+      ...scan,
+      sizeBytes: scan.sizeBytes?.toString() || null,
+      image: scan.image ? {
+        ...scan.image,
+        sizeBytes: scan.image.sizeBytes?.toString() || null
+      } : undefined
+    }))
     
     // Get the most recent image info for the main display
     const latestImage = images[0]
     
-    // Convert BigInt to string for JSON serialization
     const serializedResponse = {
       name: decodedName,
       images: images.map(image => ({
         ...image,
-        sizeBytes: image.sizeBytes?.toString() || null,
-        scans: [] // Remove scans from images to avoid duplication
+        sizeBytes: image.sizeBytes?.toString() || null
       })),
-      allScans,
+      scans: serializedScans,
       latestImage: {
         ...latestImage,
-        sizeBytes: latestImage.sizeBytes?.toString() || null,
-        scans: [] // Remove scans to avoid BigInt issues
+        sizeBytes: latestImage.sizeBytes?.toString() || null
       },
-      // Summary stats across all tags
-      totalScans: allScans.length,
+      // Summary stats
+      totalScans,
       tags: [...new Set(images.map(img => img.tag))].sort(),
-      registries: [...new Set(images.map(img => img.registry).filter(Boolean))]
+      registries: [...new Set(images.map(img => img.registry).filter(Boolean))],
+      pagination: {
+        limit: scanLimit,
+        offset: scanOffset,
+        total: totalScans,
+        hasMore: scanOffset + scanLimit < totalScans
+      }
     }
     
     return NextResponse.json(serializedResponse)

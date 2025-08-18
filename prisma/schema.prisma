@@ -62,6 +62,9 @@ model Scan {
   @@index([status])
   @@index([startedAt])
   @@index([imageId])
+  @@index([imageId, status])
+  @@index([imageId, startedAt])
+  @@index([status, startedAt])
   @@map("scans")
 }
 

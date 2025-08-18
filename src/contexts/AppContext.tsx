@@ -133,24 +133,35 @@ function extractOsInfo(scan: ScanWithImage): { family: string; name: string } | 
 
 interface AppState {
   scans: Scan[]
-  rawScans: ScanWithImage[] // Keep raw scan data for unique aggregation
   loading: boolean
   error: string | null
+  pagination: {
+    total: number
+    limit: number
+    offset: number
+    hasMore: boolean
+  }
 }
 
 type AppAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'SET_SCANS'; payload: { scans: Scan[], rawScans: ScanWithImage[] } }
+  | { type: 'SET_SCANS'; payload: { scans: Scan[], pagination: AppState['pagination'] } }
+  | { type: 'APPEND_SCANS'; payload: { scans: Scan[], pagination: AppState['pagination'] } }
   | { type: 'UPDATE_SCAN'; payload: Scan }
   | { type: 'ADD_SCAN'; payload: Scan }
   | { type: 'DELETE_SCAN'; payload: number }
 
 const initialState: AppState = {
   scans: [],
-  rawScans: [],
   loading: false,
-  error: null
+  error: null,
+  pagination: {
+    total: 0,
+    limit: 25,
+    offset: 0,
+    hasMore: false
+  }
 }
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -160,7 +171,19 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'SET_ERROR':
       return { ...state, error: action.payload, loading: false }
     case 'SET_SCANS':
-      return { ...state, scans: action.payload.scans, rawScans: action.payload.rawScans, loading: false }
+      return { 
+        ...state, 
+        scans: action.payload.scans, 
+        pagination: action.payload.pagination,
+        loading: false 
+      }
+    case 'APPEND_SCANS':
+      return {
+        ...state,
+        scans: [...state.scans, ...action.payload.scans],
+        pagination: action.payload.pagination,
+        loading: false
+      }
     case 'UPDATE_SCAN':
       return {
         ...state,
@@ -184,6 +207,7 @@ interface AppContextType {
   state: AppState
   dispatch: React.Dispatch<AppAction>
   refreshData: () => Promise<void>
+  loadMore: () => Promise<void>
   handleScanComplete: (job: any) => Promise<void>
 }
 
@@ -194,13 +218,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const refreshPromiseRef = useRef<Promise<void> | null>(null)
   const router = useRouter()
 
-  const loadData = async () => {
+  const loadData = async (loadMore: boolean = false) => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true })
       dispatch({ type: 'SET_ERROR', payload: null })
 
-      // Fetch real scan data from API
-      const scansRes = await fetch('/api/scans?limit=100')
+      const offset = loadMore ? state.scans.length : 0
+      
+      // Use optimized aggregated endpoint for better performance
+      const scansRes = await fetch(`/api/scans/aggregated?limit=${state.pagination.limit}&offset=${offset}`)
 
       if (!scansRes.ok) {
         throw new Error(`Failed to fetch scans: ${scansRes.status}`)
@@ -208,11 +234,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       const scansData = await scansRes.json()
 
-      // Transform database scans to legacy format for UI compatibility
-      const rawScans = scansData.scans || []
-      const transformedScans = transformScansForUI(rawScans)
+      // The aggregated endpoint returns data in the format we need
+      const transformedScans = scansData.scans?.map((scan: any) => ({
+        id: Math.abs(scan.id.split('').reduce((a: number, b: string) => ((a << 5) - a + b.charCodeAt(0)) | 0, 0)),
+        imageId: scan.imageId,
+        imageName: scan.image.name,
+        uid: scan.requestId,
+        image: `${scan.image.name}:${scan.image.tag}`,
+        source: scan.source,
+        digestShort: scan.image.digest?.slice(7, 19) || '',
+        platform: 'unknown',
+        sizeMb: 0,
+        riskScore: scan.riskScore || 0,
+        severities: {
+          crit: scan.vulnerabilityCount?.critical || 0,
+          high: scan.vulnerabilityCount?.high || 0,
+          med: scan.vulnerabilityCount?.medium || 0,
+          low: scan.vulnerabilityCount?.low || 0,
+        },
+        total: scan.vulnerabilityCount?.total || 0,
+        scanTime: new Date(scan.startedAt).toLocaleString(),
+        status: mapScanStatus(scan.status),
+        statusRaw: scan.status,
+        compliance: scan.complianceScore || { pass: 0, warn: 0, info: 0 },
+        misconfiguration: { pass: 0, warn: 0, info: 0 },
+        secretsData: { count: 0, results: [] }, // Rename to avoid conflict
+        fixed: 0,
+        fixable: {
+          count: 0,
+          percent: 0
+        },
+        misconfigs: 0,
+        secrets: 0, // This should be a number for the reduce operation
+        osvPackages: 0,
+        osvVulnerable: 0,
+        osvEcosystems: [],
+        baseImage: extractBaseImage(scan.image.name),
+        osInfo: undefined
+      })) || []
 
-      dispatch({ type: 'SET_SCANS', payload: { scans: transformedScans, rawScans } })
+      const actionType = loadMore ? 'APPEND_SCANS' : 'SET_SCANS'
+      dispatch({ 
+        type: actionType, 
+        payload: { 
+          scans: transformedScans, 
+          pagination: scansData.pagination 
+        } 
+      })
     } catch (error) {
       console.error('Failed to load data:', error)
       dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' })
@@ -225,11 +293,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return refreshPromiseRef.current;
     }
 
-    refreshPromiseRef.current = loadData().finally(() => {
+    refreshPromiseRef.current = loadData(false).finally(() => {
       refreshPromiseRef.current = null;
     });
 
     return refreshPromiseRef.current;
+  }
+
+  const loadMore = async () => {
+    if (!state.pagination.hasMore || state.loading) {
+      return;
+    }
+    await loadData(true);
   }
 
   const handleScanComplete = async (job: any) => {
@@ -273,11 +348,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    loadData()
+    loadData(false)
   }, [])
 
   return (
-    <AppContext.Provider value={{ state, dispatch, refreshData, handleScanComplete }}>
+    <AppContext.Provider value={{ state, dispatch, refreshData, loadMore, handleScanComplete }}>
       {children}
     </AppContext.Provider>
   )
