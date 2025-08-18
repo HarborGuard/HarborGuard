@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 import type { TrivyReport, GrypeReport } from '@/types';
 
 interface VulnerabilityData {
@@ -40,11 +41,7 @@ export async function GET(request: NextRequest) {
         }
       },
       where: {
-        status: 'SUCCESS',
-        OR: [
-          { trivy: { not: null } },
-          { grype: { not: null } }
-        ]
+        status: 'SUCCESS'
       }
     });
 
@@ -82,7 +79,7 @@ export async function GET(request: NextRequest) {
       
       // Process Trivy results
       if (scan.trivy) {
-        const trivyReport = scan.trivy as TrivyReport;
+        const trivyReport = scan.trivy as unknown as TrivyReport;
         if (trivyReport.Results) {
           for (const result of trivyReport.Results) {
             if (result.Vulnerabilities) {
@@ -111,7 +108,7 @@ export async function GET(request: NextRequest) {
                     totalAffectedImages: 0,
                     falsePositiveImages: [],
                     fixedVersion: vuln.FixedVersion,
-                    publishedDate: vuln.PublishedDate,
+                    publishedDate: vuln.publishedDate,
                     references: vuln.References
                   };
                   vulnerabilityMap.set(cveId, vulnData);
@@ -139,7 +136,7 @@ export async function GET(request: NextRequest) {
       }
       // Process Grype results if no Trivy data
       else if (scan.grype) {
-        const grypeReport = scan.grype as GrypeReport;
+        const grypeReport = scan.grype as unknown as GrypeReport;
         if (grypeReport.matches) {
           for (const match of grypeReport.matches) {
             if (!match.vulnerability.id) continue;
