@@ -78,7 +78,7 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/src/generated ./src/generated
 
 # Setup database
-ENV DATABASE_URL="file:./dev.db"
+ENV DATABASE_URL="file:./app.db"
 RUN npx prisma migrate deploy
 
 # Run as root (scanners need Docker access)

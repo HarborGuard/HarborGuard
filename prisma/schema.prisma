@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider      = "prisma-client-js"
   output        = "../src/generated/prisma"
@@ -13,18 +10,18 @@ datasource db {
 }
 
 model Image {
-  id          String   @id @default(cuid())
-  name        String   // e.g. "nginx"
-  tag         String   // e.g. "1.27"
-  registry    String?  // e.g. "ghcr.io", "docker.io"
-  digest      String   @unique // sha256:...
-  platform    String?  // e.g. "linux/amd64"
-  sizeBytes   BigInt?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  scans       Scan[]
-  bulkScanItems BulkScanItem[]
+  id                 String              @id @default(cuid())
+  name               String
+  tag                String
+  registry           String?
+  digest             String              @unique
+  platform           String?
+  sizeBytes          BigInt?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  bulkScanItems      BulkScanItem[]
   cveClassifications CveClassification[]
+  scans              Scan[]
 
   @@index([name, tag])
   @@index([registry, name, tag])
@@ -33,41 +30,33 @@ model Image {
 }
 
 model Scan {
-  id             String        @id @default(cuid())
-  requestId      String        @unique // e.g. "20250813-145041-8b11d0de"
-  imageId        String
-  image          Image         @relation(fields: [imageId], references: [id], onDelete: Cascade)
-  startedAt      DateTime
-  finishedAt     DateTime?
-  sizeBytes      BigInt?
-  status         ScanStatus    @default(RUNNING)
-  source         String?       // 'local' or 'registry' to track image source
-  
-  // Scanner outputs stored as JSON
-  trivy          Json?
-  grype          Json?
-  syft           Json?
-  dockle         Json?
-  osv            Json?
-  dive           Json?         // layer analysis output from `dive`
-  metadata       Json?         // output from `skopeo inspect`
-  
-  // Scan metadata
-  reportsDir     String?       // where files were written in the container
-  scannerVersions Json?        // versions of tools used
-  scanConfig     Json?         // scan parameters/configuration
-  errorMessage   String?       // error details if failed
-  
-  // Computed/aggregated fields for quick access
-  vulnerabilityCount Json?     // { "critical": 0, "high": 5, "medium": 10, "low": 20 }
-  riskScore          Int?      // computed risk score 0-100
-  complianceScore    Json?     // compliance results summary
-  
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  
+  id                  String                   @id @default(cuid())
+  requestId           String                   @unique
+  imageId             String
+  startedAt           DateTime
+  finishedAt          DateTime?
+  sizeBytes           BigInt?
+  status              ScanStatus               @default(RUNNING)
+  trivy               Json?
+  grype               Json?
+  syft                Json?
+  dockle              Json?
+  metadata            Json?
+  reportsDir          String?
+  scannerVersions     Json?
+  scanConfig          Json?
+  errorMessage        String?
+  vulnerabilityCount  Json?
+  riskScore           Int?
+  complianceScore     Json?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  osv                 Json?
+  dive                Json?
+  source              String?
+  bulkScanItems       BulkScanItem[]
+  image               Image                    @relation(fields: [imageId], references: [id], onDelete: Cascade)
   scheduledExecutions ScheduledScanExecution[]
-  bulkScanItems BulkScanItem[]
 
   @@index([requestId])
   @@index([status])
@@ -76,27 +65,18 @@ model Scan {
   @@map("scans")
 }
 
-enum ScanStatus {
-  RUNNING
-  SUCCESS
-  PARTIAL
-  FAILED
-  CANCELLED
-}
-
 model ScanSchedule {
-  id             String   @id @default(cuid())
+  id             String                   @id @default(cuid())
   name           String
-  cronExpression String   // e.g. "0 2 * * *" for daily at 2 AM
-  scanRequest    Json     // Store the ScanRequest configuration
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  cronExpression String
+  scanRequest    Json
+  isActive       Boolean                  @default(true)
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
   lastRunAt      DateTime?
   nextRunAt      DateTime?
   createdBy      String?
-
-  executions ScheduledScanExecution[]
+  executions     ScheduledScanExecution[]
 
   @@index([isActive])
   @@index([nextRunAt])
@@ -104,14 +84,14 @@ model ScanSchedule {
 }
 
 model ScheduledScanExecution {
-  id            String        @id @default(cuid())
+  id            String       @id @default(cuid())
   scheduleId    String
-  schedule      ScanSchedule  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
   scanId        String?
-  scan          Scan?         @relation(fields: [scanId], references: [id], onDelete: SetNull)
-  executionTime DateTime      @default(now())
-  status        String        // 'SUCCESS', 'FAILED', 'SKIPPED'
+  executionTime DateTime     @default(now())
+  status        String
   errorMessage  String?
+  scan          Scan?        @relation(fields: [scanId], references: [id])
+  schedule      ScanSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
 
   @@index([scheduleId])
   @@index([executionTime])
@@ -122,10 +102,10 @@ model ScanTemplate {
   id                 String   @id @default(cuid())
   name               String
   description        String?
-  environment        String   // 'production', 'staging', 'development', 'any'
-  scannerConfig      Json     // Which scanners to run, their settings
-  policyConfig       Json?    // Risk thresholds, compliance requirements
-  notificationConfig Json?    // Who to notify, when
+  environment        String
+  scannerConfig      Json
+  policyConfig       Json?
+  notificationConfig Json?
   isDefault          Boolean  @default(false)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
@@ -137,17 +117,16 @@ model ScanTemplate {
 }
 
 model BulkScanBatch {
-  id           String   @id @default(cuid())
-  name         String?  // Optional name for the bulk scan
+  id           String         @id @default(cuid())
   totalImages  Int
-  status       String   // 'RUNNING', 'COMPLETED', 'FAILED'
-  patterns     Json     // Store the search patterns used
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  status       String
+  patterns     Json
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
   completedAt  DateTime?
   errorMessage String?
-
-  items BulkScanItem[]
+  name         String?
+  items        BulkScanItem[]
 
   @@index([status])
   @@index([createdAt])
@@ -157,12 +136,12 @@ model BulkScanBatch {
 model BulkScanItem {
   id      String        @id @default(cuid())
   batchId String
-  batch   BulkScanBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
   scanId  String
-  scan    Scan          @relation(fields: [scanId], references: [id], onDelete: Cascade)
   imageId String
+  status  String
   image   Image         @relation(fields: [imageId], references: [id], onDelete: Cascade)
-  status  String        // 'RUNNING', 'SUCCESS', 'FAILED'
+  scan    Scan          @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  batch   BulkScanBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
   @@index([batchId])
   @@index([status])
@@ -170,17 +149,17 @@ model BulkScanItem {
 }
 
 model CveClassification {
-  id            String   @id @default(cuid())
-  cveId         String   // CVE identifier (e.g., "CVE-2023-1234")
-  imageId       String   // Image this classification applies to
-  image         Image    @relation(fields: [imageId], references: [id], onDelete: Cascade)
-  isFalsePositive Boolean @default(false)
-  comment       String?  // User comment about this CVE
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  createdBy     String?  // User who created this classification
+  id              String   @id @default(cuid())
+  cveId           String
+  imageId         String
+  isFalsePositive Boolean  @default(false)
+  comment         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       String?
+  image           Image    @relation(fields: [imageId], references: [id], onDelete: Cascade)
 
-  @@unique([cveId, imageId]) // Ensure one classification per CVE per image
+  @@unique([cveId, imageId])
   @@index([cveId])
   @@index([imageId])
   @@index([isFalsePositive])
@@ -188,22 +167,30 @@ model CveClassification {
 }
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  eventType   String   // 'page_view', 'scan_start', 'scan_complete', 'cve_classification', 'image_delete', etc.
-  category    String   // 'informative', 'action', 'security', 'error'
-  userIp      String   // IP address of the user
-  userAgent   String?  // Browser user agent
-  userId      String?  // User ID if authenticated
-  resource    String?  // Resource affected (e.g., image name, CVE ID)
-  action      String   // Human readable action description
-  details     Json?    // Additional structured data about the event
-  metadata    Json?    // Request metadata, headers, etc.
-  timestamp   DateTime @default(now())
-  
+  id        String   @id @default(cuid())
+  eventType String
+  category  String
+  userIp    String
+  userAgent String?
+  userId    String?
+  resource  String?
+  action    String
+  details   Json?
+  metadata  Json?
+  timestamp DateTime @default(now())
+
   @@index([eventType])
   @@index([category])
   @@index([userIp])
   @@index([timestamp])
   @@index([resource])
   @@map("audit_logs")
+}
+
+enum ScanStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+  CANCELLED
 }
