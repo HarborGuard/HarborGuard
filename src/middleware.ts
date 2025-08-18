@@ -52,7 +52,7 @@ function getUserIp(request: NextRequest): string {
     return cfConnectingIp;
   }
   
-  return request.ip || 'unknown';
+  return 'unknown';
 }
 
 async function logPageView(request: NextRequest, pathname: string) {

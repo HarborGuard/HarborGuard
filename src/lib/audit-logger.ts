@@ -49,8 +49,8 @@ export function getUserIpFromRequest(request: NextRequest): string {
     return cfConnectingIp;
   }
   
-  // Fallback to connection remote address
-  return request.ip || 'unknown';
+  // No IP address available
+  return 'unknown';
 }
 
 /**

@@ -11,7 +11,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useState } from "react"
 
-export interface AuditLogFilters {
+export interface AuditLogFiltersState {
   eventType?: string
   category?: string
   userIp?: string
@@ -22,7 +22,7 @@ export interface AuditLogFilters {
 }
 
 export default function AuditLogsPage() {
-  const [filters, setFilters] = useState<AuditLogFilters>({})
+  const [filters, setFilters] = useState<AuditLogFiltersState>({})
   
   const breadcrumbs = [
     { label: "Dashboard", href: "/" },
