@@ -8,55 +8,13 @@ import type { ScanRequest } from '@/types';
 const execAsync = promisify(exec);
 
 export class DatabaseAdapter implements IDatabaseAdapter {
-  private isDevelopmentMode = process.env.NODE_ENV === 'development' && process.platform === 'win32';
 
   async initializeScanRecord(requestId: string, request: ScanRequest): Promise<{ scanId: string; imageId: string }> {
-    if (this.isDevelopmentMode) {
-      return this.initializeMockScanRecord(requestId, request);
-    }
-
     if (this.isLocalDockerScan(request)) {
       return this.initializeLocalDockerScanRecord(requestId, request);
     }
 
     return this.initializeRegistryScanRecord(requestId, request);
-  }
-
-  private async initializeMockScanRecord(requestId: string, request: ScanRequest) {
-    const mockDigest = `sha256:${Math.random().toString(16).slice(2, 66)}`;
-    
-    let image = await prisma.image.findFirst({
-      where: {
-        name: request.image,
-        tag: request.tag,
-        registry: request.registry,
-      }
-    });
-
-    if (!image) {
-      image = await prisma.image.create({
-        data: {
-          name: request.image,
-          tag: request.tag,
-          registry: request.registry,
-          digest: mockDigest,
-          platform: 'linux/amd64',
-          sizeBytes: BigInt(134217728), // 128MB mock size
-        }
-      });
-    }
-
-    const scan = await prisma.scan.create({
-      data: {
-        requestId,
-        imageId: image.id,
-        startedAt: new Date(),
-        status: 'RUNNING',
-        source: request.source || 'registry'
-      }
-    });
-
-    return { scanId: scan.id, imageId: image.id };
   }
 
   private isLocalDockerScan(request: ScanRequest): boolean {

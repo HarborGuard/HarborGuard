@@ -13,8 +13,7 @@ export class ScanExecutor implements IScanExecutor {
   private workDir = process.env.SCANNER_WORKDIR || '/workspace';
 
   constructor(
-    private progressTracker: { updateProgress: (requestId: string, progress: number, step?: string) => void },
-    private isDevelopmentMode = process.env.NODE_ENV === 'development' && process.platform === 'win32'
+    private progressTracker: { updateProgress: (requestId: string, progress: number, step?: string) => void }
   ) {}
 
   async executeLocalDockerScan(requestId: string, request: ScanRequest, scanId: string, imageId: string): Promise<void> {
@@ -98,20 +97,6 @@ export class ScanExecutor implements IScanExecutor {
     }
   }
 
-  async executeMockScan(requestId: string, request: ScanRequest, scanId: string, imageId: string): Promise<void> {
-    console.log(`Development mode: mocking scan for ${request.image}:${request.tag}`);
-    
-    this.progressTracker.updateProgress(requestId, 25, 'Preparing mock scan data');
-    
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    this.progressTracker.updateProgress(requestId, 50, 'Running vulnerability analysis');
-    
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    this.progressTracker.updateProgress(requestId, 75, 'Generating compliance report');
-    
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    this.progressTracker.updateProgress(requestId, 95, 'Finalizing mock scan');
-  }
 
   private async setupDirectories(reportDir: string, cacheDir: string): Promise<void> {
     await fs.mkdir(reportDir, { recursive: true });

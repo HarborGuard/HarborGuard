@@ -1,7 +1,6 @@
 import { ScanProgressEvent } from './types';
 import { ProgressTracker } from './ProgressTracker';
 import { DatabaseAdapter } from './DatabaseAdapter';
-import { MockDataGenerator } from './MockDataGenerator';
 import { ScanExecutor } from './ScanExecutor';
 import { getScannerVersions } from './scanners';
 import type { ScanRequest, ScanJob } from '@/types';
@@ -11,17 +10,14 @@ export class ScannerService {
   private jobs = new Map<string, ScanJob>();
   private progressTracker: ProgressTracker;
   private databaseAdapter: DatabaseAdapter;
-  private mockDataGenerator: MockDataGenerator;
   private scanExecutor: ScanExecutor;
-  private isDevelopmentMode = process.env.NODE_ENV === 'development' && process.platform === 'win32';
 
   constructor() {
     this.progressTracker = new ProgressTracker(this.jobs, this.updateJobStatus.bind(this));
     this.databaseAdapter = new DatabaseAdapter();
-    this.mockDataGenerator = new MockDataGenerator();
     this.scanExecutor = new ScanExecutor({
       updateProgress: this.progressTracker.updateProgress.bind(this.progressTracker)
-    }, this.isDevelopmentMode);
+    });
   }
 
   async startScan(request: ScanRequest): Promise<{ requestId: string; scanId: string }> {
@@ -97,9 +93,7 @@ export class ScannerService {
 
   private async executeScan(requestId: string, request: ScanRequest | AppliedScanRequest, scanId: string, imageId: string) {
     try {
-      if (this.isDevelopmentMode) {
-        await this.executeMockScan(requestId, request, scanId, imageId);
-      } else if (this.isLocalDockerScan(request)) {
+      if (this.isLocalDockerScan(request)) {
         await this.scanExecutor.executeLocalDockerScan(requestId, request as ScanRequest, scanId, imageId);
         await this.finalizeScan(requestId, scanId, request);
       } else {
@@ -128,44 +122,8 @@ export class ScannerService {
     }
   }
 
-  private async executeMockScan(requestId: string, request: ScanRequest | AppliedScanRequest, scanId: string, imageId: string) {
-    try {
-      await this.scanExecutor.executeMockScan(requestId, request as ScanRequest, scanId, imageId);
-      
-      const mockReports = await this.mockDataGenerator.generateMockScanData(request as ScanRequest);
-      
-      await this.databaseAdapter.updateScanRecord(scanId, {
-        trivy: mockReports.trivy || null,
-        grype: mockReports.grype || null,
-        syft: mockReports.syft || null,
-        dockle: mockReports.dockle || null,
-        osv: mockReports.osv || null,
-        dive: mockReports.dive || null,
-        metadata: mockReports.metadata || null,
-        status: 'SUCCESS',
-        finishedAt: new Date()
-      });
 
-      if (mockReports.trivy || mockReports.dockle) {
-        await this.databaseAdapter.calculateAggregatedData(scanId, mockReports);
-      }
-
-      this.updateJobStatus(requestId, 'SUCCESS', 100, undefined, 'Mock scan completed successfully');
-      
-    } catch (error) {
-      console.error(`Mock scan failed for ${requestId}:`, error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      await this.databaseAdapter.updateScanRecord(scanId, {
-        status: 'FAILED',
-        errorMessage,
-        finishedAt: new Date()
-      });
-      this.updateJobStatus(requestId, 'FAILED', undefined, errorMessage);
-      throw error;
-    }
-  }
-
-  private async finalizeScan(requestId: string, scanId: string, request: ScanRequest | AppliedScanRequest) {
+  private async finalizeScan(requestId: string, scanId: string, _request: ScanRequest | AppliedScanRequest) {
     this.updateJobStatus(requestId, 'RUNNING', 90, undefined, 'Processing scan results');
 
     const reports = await this.scanExecutor.loadScanResults(requestId);

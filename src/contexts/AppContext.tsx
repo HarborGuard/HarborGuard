@@ -130,99 +130,9 @@ function extractOsInfo(scan: ScanWithImage): { family: string; name: string } | 
   return undefined
 }
 
-interface Repository {
-  id: number
-  name: string
-  url: string
-  description: string
-  tags: string[]
-  lastUpdated: string
-  totalImages: number
-  totalVulnerabilities: number
-  riskScore: number
-  owner: string
-  private: boolean
-  scanSchedule: string
-  compliance: {
-    policyEnabled: boolean
-    autoBlock: boolean
-    allowedSeverity: string
-  }
-}
-
-interface Vulnerability {
-  id: string
-  severity: string
-  cvssScore: number
-  title: string
-  description: string
-  package: string
-  version: string
-  fixedVersion: string
-  publishedDate: string
-  lastModified: string
-  epss: number
-  kev: boolean
-  fixable: boolean
-  affectedImages: number[]
-  cwe: string
-  references: string[]
-}
-
-interface Policy {
-  id: number
-  name: string
-  description: string
-  enabled: boolean
-  rules: Array<{
-    type: string
-    severity?: string
-    action: string
-    threshold: number
-  }>
-  compliance: {
-    dockle: string
-  }
-  createdAt: string
-  updatedAt: string
-  assignedRepositories: number[]
-}
-
-interface User {
-  id: number
-  username: string
-  email: string
-  role: string
-  fullName: string
-  avatar: string
-  department: string
-  permissions: string[]
-  preferences: {
-    theme: string
-    notifications: {
-      email: boolean
-      critical: boolean
-      high: boolean
-      medium: boolean
-      low: boolean
-    }
-    dashboard: {
-      defaultView: string
-      autoRefresh: boolean
-      refreshInterval: number
-    }
-  }
-  lastLogin: string
-  createdAt: string
-}
 
 interface AppState {
   scans: Scan[]
-  repositories: Repository[]
-  vulnerabilities: Vulnerability[]
-  policies: Policy[]
-  users: User[]
-  currentUser: User | null
   loading: boolean
   error: string | null
 }
@@ -231,22 +141,12 @@ type AppAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_SCANS'; payload: Scan[] }
-  | { type: 'SET_REPOSITORIES'; payload: Repository[] }
-  | { type: 'SET_VULNERABILITIES'; payload: Vulnerability[] }
-  | { type: 'SET_POLICIES'; payload: Policy[] }
-  | { type: 'SET_USERS'; payload: User[] }
-  | { type: 'SET_CURRENT_USER'; payload: User | null }
   | { type: 'UPDATE_SCAN'; payload: Scan }
   | { type: 'ADD_SCAN'; payload: Scan }
   | { type: 'DELETE_SCAN'; payload: number }
 
 const initialState: AppState = {
   scans: [],
-  repositories: [],
-  vulnerabilities: [],
-  policies: [],
-  users: [],
-  currentUser: null,
   loading: false,
   error: null
 }
@@ -259,16 +159,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, error: action.payload, loading: false }
     case 'SET_SCANS':
       return { ...state, scans: action.payload, loading: false }
-    case 'SET_REPOSITORIES':
-      return { ...state, repositories: action.payload }
-    case 'SET_VULNERABILITIES':
-      return { ...state, vulnerabilities: action.payload }
-    case 'SET_POLICIES':
-      return { ...state, policies: action.payload }
-    case 'SET_USERS':
-      return { ...state, users: action.payload }
-    case 'SET_CURRENT_USER':
-      return { ...state, currentUser: action.payload }
     case 'UPDATE_SCAN':
       return {
         ...state,
@@ -320,14 +210,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const transformedScans = transformScansForUI(scansData.scans || [])
 
       dispatch({ type: 'SET_SCANS', payload: transformedScans })
-      
-      // Set empty arrays for template data that's no longer needed
-      dispatch({ type: 'SET_REPOSITORIES', payload: [] })
-      dispatch({ type: 'SET_VULNERABILITIES', payload: [] })
-      dispatch({ type: 'SET_POLICIES', payload: [] })
-      dispatch({ type: 'SET_USERS', payload: [] })
-      
-      dispatch({ type: 'SET_CURRENT_USER', payload: null })
     } catch (error) {
       console.error('Failed to load data:', error)
       dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' })

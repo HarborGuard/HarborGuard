@@ -1,7 +1,7 @@
 import Link from "next/link"
-import { Button } from "components/components/ui/button"
-import { Separator } from "components/components/ui/separator"
-import { SidebarTrigger } from "components/components/ui/sidebar"
+import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
+import { SidebarTrigger } from "@/components/ui/sidebar"
 import { IconBrandGithub } from "@tabler/icons-react"
 import {
   Breadcrumb,
@@ -10,7 +10,7 @@ import {
   BreadcrumbLink,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "components/components/ui/breadcrumb"
+} from "@/components/ui/breadcrumb"
 
 interface BreadcrumbItem {
   label: string
