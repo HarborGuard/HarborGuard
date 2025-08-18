@@ -50,8 +50,7 @@ RUN apk add --no-cache \
   && rm /tmp/dive.tgz \
   && chmod +x /usr/local/bin/dive \
   # Install Dockle
-  && DVER="${DOCKLE_VERSION#v}" \
-  && curl -L "https://github.com/goodwithtech/dockle/releases/download/${DOCKLE_VERSION}/dockle_${DVER}_Linux-64bit.tar.gz" -o /tmp/dockle.tgz \
+  && curl -L "https://github.com/goodwithtech/dockle/releases/download/${DOCKLE_VERSION}/dockle_0.4.15_Linux-64bit.tar.gz" -o /tmp/dockle.tgz \
   && tar -xzf /tmp/dockle.tgz -C /usr/local/bin dockle \
   && rm /tmp/dockle.tgz \
   && chmod +x /usr/local/bin/dockle \
