@@ -1,8 +1,8 @@
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import { IconBrandGithub } from "@tabler/icons-react"
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { IconBrandGithub, IconClipboard } from "@tabler/icons-react";
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -10,15 +10,16 @@ import {
   BreadcrumbLink,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+} from "@/components/ui/breadcrumb";
+import { LogsIcon } from "lucide-react";
 
 interface BreadcrumbItem {
-  label: string
-  href?: string
+  label: string;
+  href?: string;
 }
 
 interface SiteHeaderProps {
-  breadcrumbs?: BreadcrumbItem[]
+  breadcrumbs?: BreadcrumbItem[];
 }
 
 export function SiteHeader({ breadcrumbs }: SiteHeaderProps) {
@@ -53,7 +54,26 @@ export function SiteHeader({ breadcrumbs }: SiteHeaderProps) {
           <h1 className="text-base font-medium">Dashboard</h1>
         )}
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="ghost" asChild size="sm" className="hidden sm:flex">
+          <Button
+            variant="secondary"
+            asChild
+            size="sm"
+            className="hidden sm:flex"
+          >
+            <a
+              href="/audit-logs"
+              className="dark:text-foreground flex items-center gap-2"
+            >
+              <LogsIcon />
+            </a>
+          </Button>
+
+          <Button
+            variant="default"
+            asChild
+            size="sm"
+            className="hidden sm:flex"
+          >
             <a
               href="https://github.com/HarborGuard/HarborGuard"
               rel="noopener noreferrer"
@@ -67,5 +87,5 @@ export function SiteHeader({ breadcrumbs }: SiteHeaderProps) {
         </div>
       </div>
     </header>
-  )
+  );
 }

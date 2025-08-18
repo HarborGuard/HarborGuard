@@ -2,6 +2,8 @@
 
 import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
+import { useCveClassifications } from "@/hooks/useCveClassifications"
+import { aggregateVulnerabilitiesWithClassifications } from "@/lib/scan-aggregations"
 import {
   IconCalendarClock,
   IconDownload,
@@ -48,12 +50,81 @@ export default function ImageDetailsPage() {
   const [imageData, setImageData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Legacy single-image classification hook (keeping for backward compatibility)
+  const scanImageId = imageData?.scans?.[0]?.imageId || imageData?.latestImage?.id || "";
+  const { 
+    classifications, 
+    loading: classificationsLoading 
+  } = useCveClassifications(scanImageId)
+
+  // Consolidated classifications for the entire image name (all tags)
+  const [consolidatedClassifications, setConsolidatedClassifications] = useState<any[]>([])
+  
+  useEffect(() => {
+    async function fetchConsolidatedClassifications() {
+      if (!imageName || !imageData?.images) return;
+      
+      try {
+        // Try the new consolidated endpoint first
+        const response = await fetch(`/api/images/name/${encodeURIComponent(imageName)}/cve-classifications`);
+        if (response.ok) {
+          const consolidated = await response.json();
+          console.log(`✅ Loaded ${consolidated.length} consolidated CVE classifications for ${imageName}`);
+          setConsolidatedClassifications(consolidated);
+          return;
+        }
+        
+        // Fallback: fetch from individual images and consolidate client-side
+        console.log('Using fallback: client-side consolidation');
+        const imageIds = new Set<string>();
+        
+        // Add imageIds from scans and images
+        imageData.scans?.forEach((scan: any) => {
+          if (scan.imageId) imageIds.add(scan.imageId);
+        });
+        imageData.images?.forEach((img: any) => {
+          if (img.id) imageIds.add(img.id);
+        });
+        
+        // Fetch classifications for all imageIds and consolidate
+        const allClassifications = new Map<string, any>();
+        
+        for (const imageId of imageIds) {
+          try {
+            const response = await fetch(`/api/images/${imageId}/cve-classifications`);
+            if (response.ok) {
+              const classifications = await response.json();
+              classifications.forEach((classification: any) => {
+                // Use CVE ID as key to avoid duplicates across tags
+                const existing = allClassifications.get(classification.cveId);
+                if (!existing || new Date(classification.updatedAt) > new Date(existing.updatedAt)) {
+                  allClassifications.set(classification.cveId, classification);
+                }
+              });
+            }
+          } catch (error) {
+            console.error(`Failed to fetch classifications for ${imageId}:`, error);
+          }
+        }
+        
+        const consolidated = Array.from(allClassifications.values());
+        console.log(`✅ Fallback: Consolidated ${consolidated.length} CVE classifications for ${imageName}`);
+        setConsolidatedClassifications(consolidated);
+        
+      } catch (error) {
+        console.error('Error fetching consolidated classifications:', error);
+      }
+    }
+    
+    fetchConsolidatedClassifications();
+  }, [imageName, imageData])
 
   useEffect(() => {
     async function fetchImageData() {
       try {
-        // Fetch with a higher scan limit to show more historical data
-        const response = await fetch(`/api/images/name/${encodeURIComponent(imageName)}?scanLimit=50`)
+        // Fetch with a higher scan limit and include reports for CVE classification calculations
+        const response = await fetch(`/api/images/name/${encodeURIComponent(imageName)}?scanLimit=50&includeReports=true`)
         if (!response.ok) {
           if (response.status === 404) {
             setError('No images found with this name')
@@ -75,7 +146,7 @@ export default function ImageDetailsPage() {
     fetchImageData()
   }, [imageName])
 
-  if (loading) {
+  if (loading || (imageData && classificationsLoading)) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>
   }
   
@@ -127,20 +198,73 @@ export default function ImageDetailsPage() {
     )
   }
 
+  // Helper function to get adjusted vulnerability counts for a scan
+  const getAdjustedVulnerabilityCount = (scan: any) => {
+    // Use consolidated classifications that apply across all tags of this image
+    console.log(`🔍 Scan ${scan.id.slice(-6)}: Using ${consolidatedClassifications.length} classifications (${consolidatedClassifications.filter(c => c.isFalsePositive).length} false positives)`)
+    
+    // If no classifications, return original counts
+    if (!consolidatedClassifications || consolidatedClassifications.length === 0) {
+      return scan.vulnerabilityCount ? {
+        critical: scan.vulnerabilityCount.critical || 0,
+        high: scan.vulnerabilityCount.high || 0,
+        medium: scan.vulnerabilityCount.medium || 0,
+        low: scan.vulnerabilityCount.low || 0,
+      } : { critical: 0, high: 0, medium: 0, low: 0 };
+    }
+
+    // If we have scanner reports, use the classification-aware calculation
+    if (scan.trivy || scan.grype) {
+      const adjustedCounts = aggregateVulnerabilitiesWithClassifications({
+        ...scan,
+        scannerReports: {
+          trivy: scan.trivy,
+          grype: scan.grype
+        }
+      }, consolidatedClassifications);
+
+      console.log(`✅ Adjusted vulnerabilities: Critical ${scan.vulnerabilityCount?.critical || 0} → ${adjustedCounts.critical}, High ${scan.vulnerabilityCount?.high || 0} → ${adjustedCounts.high}`);
+
+      return {
+        critical: adjustedCounts.critical,
+        high: adjustedCounts.high,
+        medium: adjustedCounts.medium,
+        low: adjustedCounts.low,
+      };
+    }
+
+    // Fallback to original counts if no scanner reports
+    return {
+      critical: scan.vulnerabilityCount?.critical || 0,
+      high: scan.vulnerabilityCount?.high || 0,
+      medium: scan.vulnerabilityCount?.medium || 0,
+      low: scan.vulnerabilityCount?.low || 0,
+    };
+  };
+
   // Transform scans to historical scans format (now includes all tags)
   const historicalScans = imageData.scans?.map((scan: any, index: number) => {
+    // Add safety checks for scan properties
+    if (!scan || !scan.id || !scan.image) {
+      console.warn('Invalid scan data:', scan);
+      return null;
+    }
+    
     return {
       id: Math.abs(scan.id.split('').reduce((a: number, b: string) => ((a << 5) - a + b.charCodeAt(0)) | 0, 0)),
       scanId: scan.id, // Real scan ID for navigation
       scanDate: scan.startedAt,
       version: `${scan.image.name}:${scan.image.tag}`, // Show specific tag for each scan
       riskScore: scan.riskScore || 0,
-      severities: scan.vulnerabilityCount ? {
-        crit: scan.vulnerabilityCount.critical || 0,
-        high: scan.vulnerabilityCount.high || 0,
-        med: scan.vulnerabilityCount.medium || 0,
-        low: scan.vulnerabilityCount.low || 0,
-      } : { crit: 0, high: 0, med: 0, low: 0 },
+      severities: (() => {
+        const adjustedCounts = getAdjustedVulnerabilityCount(scan);
+        return {
+          crit: adjustedCounts.critical,
+          high: adjustedCounts.high,
+          med: adjustedCounts.medium,
+          low: adjustedCounts.low,
+        };
+      })(),
       fixable: {
         count: 0, // TODO: Calculate from scan data
         percent: 0
@@ -159,7 +283,7 @@ export default function ImageDetailsPage() {
       dbVersion: '1.0', // TODO: Get from scan metadata
       scanEngine: 'Multi-tool' // TODO: Get from scannerVersions
     }
-  }) || []
+  }).filter(Boolean) || []
 
   const breadcrumbs = [
     { label: "Dashboard", href: "/" },

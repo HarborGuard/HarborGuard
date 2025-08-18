@@ -11,7 +11,8 @@ import type {
   OSVPackage,
   SyftReport,
   VulnerabilityCount,
-  ComplianceScore 
+  ComplianceScore,
+  CveClassification 
 } from '@/types';
 
 /**
@@ -85,6 +86,151 @@ export function calculateRiskScore(scan: Scan): number {
   ));
 
   return riskScore;
+}
+
+/**
+ * Aggregate vulnerability data from scanner reports, excluding false positives
+ */
+export function aggregateVulnerabilitiesWithClassifications(
+  scan: Scan, 
+  classifications: CveClassification[]
+): VulnerabilityCount {
+  const stored = scan.vulnerabilityCount as VulnerabilityCount | undefined;
+  
+  // Create set of false positive CVE IDs for quick lookup
+  const falsePositiveSet = new Set(
+    classifications
+      .filter(c => c.isFalsePositive)
+      .map(c => c.cveId)
+  );
+
+  // If no false positives to filter, return stored or calculated vulnerabilities
+  if (falsePositiveSet.size === 0) {
+    return stored || aggregateVulnerabilities(scan);
+  }
+
+  // Calculate vulnerabilities excluding false positives
+  const vulnCount: VulnerabilityCount = {
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+    info: 0,
+  };
+
+  // Process Trivy results (preferred)
+  const trivyReport = scan.scannerReports?.trivy as TrivyReport | undefined;
+  if (trivyReport?.Results) {
+    for (const result of trivyReport.Results) {
+      if (result.Vulnerabilities) {
+        for (const vuln of result.Vulnerabilities) {
+          // Skip if this CVE is marked as false positive
+          if (vuln.VulnerabilityID && falsePositiveSet.has(vuln.VulnerabilityID)) {
+            continue;
+          }
+          
+          const severity = vuln.Severity?.toLowerCase();
+          if (severity && severity in vulnCount) {
+            vulnCount[severity as keyof VulnerabilityCount]++;
+          }
+        }
+      }
+    }
+    return vulnCount;
+  }
+
+  // Fallback: Process Grype results
+  const grypeReport = scan.scannerReports?.grype as GrypeReport | undefined;
+  if (grypeReport?.matches) {
+    for (const match of grypeReport.matches) {
+      // Skip if this CVE is marked as false positive
+      if (match.vulnerability.id && falsePositiveSet.has(match.vulnerability.id)) {
+        continue;
+      }
+      
+      const severity = match.vulnerability.severity?.toLowerCase();
+      if (severity && severity in vulnCount) {
+        vulnCount[severity as keyof VulnerabilityCount]++;
+      }
+    }
+  }
+
+  return vulnCount;
+}
+
+/**
+ * Calculate risk score excluding false positive CVEs
+ */
+export function calculateRiskScoreWithClassifications(
+  scan: Scan, 
+  classifications: CveClassification[]
+): number {
+  const vulnCount = aggregateVulnerabilitiesWithClassifications(scan, classifications);
+  
+  // Calculate weighted risk score (0-100)
+  const riskScore = Math.min(100, Math.round(
+    (vulnCount.critical * 25) +
+    (vulnCount.high * 10) +
+    (vulnCount.medium * 3) +
+    (vulnCount.low * 1) +
+    ((vulnCount.info || 0) * 0.1)
+  ));
+
+  return riskScore;
+}
+
+/**
+ * Recalculate and update risk scores for all scans of an image
+ * This should be called whenever CVE classifications change for an image
+ */
+export async function recalculateImageRiskScores(imageId: string): Promise<void> {
+  const { prisma } = await import('@/lib/prisma');
+  
+  try {
+    // Get all classifications for this image
+    const classifications = await prisma.cveClassification.findMany({
+      where: { imageId }
+    });
+
+    // Get all scans for this image with their scanner reports
+    const scans = await prisma.scan.findMany({
+      where: { imageId },
+      include: {
+        image: true
+      }
+    });
+
+    // Recalculate risk score for each scan
+    const updates = [];
+    for (const scan of scans) {
+      // Only recalculate if we have scanner reports to work with
+      if (scan.trivy || scan.grype) {
+        const newRiskScore = calculateRiskScoreWithClassifications(scan as any, classifications);
+        
+        // Only update if the score changed
+        if (scan.riskScore !== newRiskScore) {
+          updates.push(
+            prisma.scan.update({
+              where: { id: scan.id },
+              data: { 
+                riskScore: newRiskScore,
+                updatedAt: new Date()
+              }
+            })
+          );
+        }
+      }
+    }
+
+    // Execute all updates in parallel
+    if (updates.length > 0) {
+      await Promise.all(updates);
+      console.log(`Updated risk scores for ${updates.length} scans of image ${imageId}`);
+    }
+  } catch (error) {
+    console.error(`Failed to recalculate risk scores for image ${imageId}:`, error);
+    throw error;
+  }
 }
 
 /**

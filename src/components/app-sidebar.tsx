@@ -34,7 +34,7 @@ const data = {
       icon: IconDatabase,
     },
     {
-      title: "Scanned Libs",
+      title: "Vulnerability Library",
       url: "/library",
       icon: IconBook,
     },
@@ -62,14 +62,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <span className="text-base font-semibold">Harbor Guard</span>
                 </a>
               </SidebarMenuButton>
-              <a href="/audit-logs">
-                <SidebarMenuButton
-                  tooltip="Bulk Scan"
-                  className=" text-primary hover:bg-blue-500/70 hover:text-primary-foreground active:bg-blue-600/90 active:text-primary-foreground min-w-8 w-8 h-8 duration-200 ease-linear cursor-pointer p-0 flex items-center justify-center border-1 border-[#888]"
-                >
-                  <IconClipboardList />
-                </SidebarMenuButton>
-              </a>
+
             </div>
           </SidebarMenuItem>
         </SidebarMenu>

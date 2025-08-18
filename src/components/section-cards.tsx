@@ -8,6 +8,7 @@ import {
 } from "@tabler/icons-react"
 
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Card,
   CardAction,
@@ -18,6 +19,7 @@ import {
 } from "@/components/ui/card"
 
 interface SectionCardsProps {
+  loading?: boolean
   scanData: Array<{
     id: number
     riskScore: number
@@ -55,7 +57,7 @@ interface SectionCardsProps {
   }
 }
 
-export function SectionCards({ scanData, stats }: SectionCardsProps) {
+export function SectionCards({ loading = false, scanData, stats }: SectionCardsProps) {
   // Use aggregated stats for unique vulnerability counts
   const totalImages = stats.totalScans
   const completedScans = stats.completeScans
@@ -83,8 +85,75 @@ export function SectionCards({ scanData, stats }: SectionCardsProps) {
   const riskTrend = averageRiskScore > 50 ? "high" : averageRiskScore > 30 ? "medium" : "low"
   const criticalTrend = totalCriticalVulns > 5 ? "up" : "down"
 
+  // Loading state - show skeleton cards matching the actual card design
+  if (loading) {
+    return (
+      <div className="*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+        {/* Total Images Scanned Skeleton */}
+        <Card className="@container/card">
+          <CardHeader>
+            <CardDescription>Total Images Scanned</CardDescription>
+            <Skeleton className="h-8 w-16 @[250px]/card:h-10" />
+            <CardAction>
+              <Skeleton className="h-6 w-24" />
+            </CardAction>
+          </CardHeader>
+          <CardFooter className="flex-col items-start gap-1.5 text-sm">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-28" />
+          </CardFooter>
+        </Card>
+
+        {/* Average Risk Score Skeleton */}
+        <Card className="@container/card">
+          <CardHeader>
+            <CardDescription>Average Risk Score</CardDescription>
+            <Skeleton className="h-8 w-12 @[250px]/card:h-10" />
+            <CardAction>
+              <Skeleton className="h-6 w-20" />
+            </CardAction>
+          </CardHeader>
+          <CardFooter className="flex-col items-start gap-1.5 text-sm">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-4 w-32" />
+          </CardFooter>
+        </Card>
+
+        {/* Critical Vulnerabilities Skeleton */}
+        <Card className="@container/card">
+          <CardHeader>
+            <CardDescription>Critical Vulnerabilities</CardDescription>
+            <Skeleton className="h-8 w-12 @[250px]/card:h-10" />
+            <CardAction>
+              <Skeleton className="h-6 w-16" />
+            </CardAction>
+          </CardHeader>
+          <CardFooter className="flex-col items-start gap-1.5 text-sm">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-28" />
+          </CardFooter>
+        </Card>
+
+        {/* High Vulnerabilities Skeleton */}
+        <Card className="@container/card">
+          <CardHeader>
+            <CardDescription>High Vulnerabilities</CardDescription>
+            <Skeleton className="h-8 w-12 @[250px]/card:h-10" />
+            <CardAction>
+              <Skeleton className="h-6 w-16" />
+            </CardAction>
+          </CardHeader>
+          <CardFooter className="flex-col items-start gap-1.5 text-sm">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-28" />
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+    <div className="*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
       <Card className="@container/card">
         <CardHeader>
           <CardDescription>Total Images Scanned</CardDescription>

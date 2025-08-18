@@ -10,6 +10,9 @@ import {
   IconSortAscending,
   IconSortDescending,
   IconAlertTriangle,
+  IconExternalLink,
+  IconX,
+  IconCheck,
 } from "@tabler/icons-react"
 
 import { AppSidebar } from "@/components/app-sidebar"
@@ -36,227 +39,106 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
-import { useScans } from "@/hooks/useScans"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
-interface LibrarySummary {
-  name: string
-  totalCves: number
-  criticalCves: number
-  highCves: number
-  mediumCves: number
-  lowCves: number
-  affectedVersions: string[]
-  affectedImages: Set<string>
-  maxCvss: number
-  hasFixableVulns: boolean
-  latestVersion?: string
+interface VulnerabilityData {
+  cveId: string
+  severity: string
+  description?: string
+  cvssScore?: number
+  packageName?: string
+  affectedImages: Array<{
+    imageName: string
+    imageId: string
+    isFalsePositive: boolean
+  }>
+  totalAffectedImages: number
+  falsePositiveImages: string[]
+  fixedVersion?: string
+  publishedDate?: string
+  references?: string[]
 }
 
 export default function LibraryHomePage() {
   const router = useRouter()
-  const { scans, loading } = useScans()
   
+  const [vulnerabilities, setVulnerabilities] = React.useState<VulnerabilityData[]>([])
+  const [loading, setLoading] = React.useState(true)
   const [search, setSearch] = React.useState("")
-  const [sortField, setSortField] = React.useState<string>("totalCves")
+  const [severityFilter, setSeverityFilter] = React.useState<string>("")
+  const [sortField, setSortField] = React.useState<string>("severity")
   const [sortOrder, setSortOrder] = React.useState<"asc" | "desc">("desc")
+  const [pagination, setPagination] = React.useState({
+    total: 0,
+    limit: 100,
+    offset: 0,
+    hasMore: false
+  })
 
-  const librariesData = React.useMemo(() => {
-    if (!scans || scans.length === 0) return []
-
-    const libraryMap = new Map<string, LibrarySummary>()
-    
-    // Track unique CVEs per library to avoid double counting
-    const libraryCveMap = new Map<string, Set<string>>() // library -> Set of CVE IDs
-
-    scans.forEach(scan => {
-      const imageName = `${scan.imageName || scan.image.split(':')[0]}:${scan.image.split(':')[1] || 'latest'}`
+  // Fetch vulnerabilities from API
+  const fetchVulnerabilities = React.useCallback(async () => {
+    try {
+      setLoading(true)
+      const params = new URLSearchParams({
+        limit: pagination.limit.toString(),
+        offset: pagination.offset.toString(),
+      })
       
-      // Process Trivy results
-      const trivyResults = scan.scannerReports?.trivy
-      if (trivyResults?.Results) {
-        trivyResults.Results.forEach(result => {
-          result.Vulnerabilities?.forEach(vuln => {
-            if (!vuln.PkgName || !vuln.VulnerabilityID) return
+      if (search) params.append('search', search)
+      if (severityFilter) params.append('severity', severityFilter)
+      
+      const response = await fetch(`/api/vulnerabilities?${params}`)
+      if (!response.ok) throw new Error('Failed to fetch vulnerabilities')
+      
+      const data = await response.json()
+      setVulnerabilities(data.vulnerabilities)
+      setPagination(data.pagination)
+    } catch (error) {
+      console.error('Failed to fetch vulnerabilities:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [search, severityFilter, pagination.limit, pagination.offset])
+  
+  React.useEffect(() => {
+    fetchVulnerabilities()
+  }, [fetchVulnerabilities])
 
-            const libraryName = vuln.PkgName
-            const cveId = vuln.VulnerabilityID
-            
-            let library = libraryMap.get(libraryName)
-            
-            if (!library) {
-              library = {
-                name: libraryName,
-                totalCves: 0,
-                criticalCves: 0,
-                highCves: 0,
-                mediumCves: 0,
-                lowCves: 0,
-                affectedVersions: [],
-                affectedImages: new Set(),
-                maxCvss: 0,
-                hasFixableVulns: false,
-              }
-              libraryMap.set(libraryName, library)
-              libraryCveMap.set(libraryName, new Set())
-            }
-
-            // Only count each CVE once per library
-            const libraryCves = libraryCveMap.get(libraryName)!
-            if (!libraryCves.has(cveId)) {
-              libraryCves.add(cveId)
-              
-              // Count unique vulnerabilities by severity
-              library.totalCves += 1
-              const severity = vuln.Severity?.toLowerCase()
-              switch (severity) {
-                case 'critical':
-                  library.criticalCves += 1
-                  break
-                case 'high':
-                  library.highCves += 1
-                  break
-                case 'medium':
-                  library.mediumCves += 1
-                  break
-                case 'low':
-                  library.lowCves += 1
-                  break
-              }
-            }
-
-            // Track affected versions (can have duplicates as different scans may have different versions)
-            if (vuln.InstalledVersion && !library.affectedVersions.includes(vuln.InstalledVersion)) {
-              library.affectedVersions.push(vuln.InstalledVersion)
-            }
-
-            // Track affected images (unique)
-            library.affectedImages.add(imageName)
-
-            // Track max CVSS score
-            const cvssScore = vuln.CVSS?.nvd?.V3Score || vuln.CVSS?.redhat?.V3Score || 0
-            if (cvssScore > library.maxCvss) {
-              library.maxCvss = cvssScore
-            }
-
-            // Check if fixable
-            if (vuln.FixedVersion) {
-              library.hasFixableVulns = true
-            }
-          })
-        })
-        return // Skip Grype if we have Trivy data
-      }
-
-      // Process Grype results (fallback)
-      const grypeResults = scan.scannerReports?.grype
-      if (grypeResults?.matches) {
-        grypeResults.matches.forEach(match => {
-          const libraryName = match.artifact.name
-          const cveId = match.vulnerability.id
-          if (!libraryName || !cveId) return
-
-          let library = libraryMap.get(libraryName)
-          
-          if (!library) {
-            library = {
-              name: libraryName,
-              totalCves: 0,
-              criticalCves: 0,
-              highCves: 0,
-              mediumCves: 0,
-              lowCves: 0,
-              affectedVersions: [],
-              affectedImages: new Set(),
-              maxCvss: 0,
-              hasFixableVulns: false,
-            }
-            libraryMap.set(libraryName, library)
-            libraryCveMap.set(libraryName, new Set())
-          }
-
-          // Only count each CVE once per library
-          const libraryCves = libraryCveMap.get(libraryName)!
-          if (!libraryCves.has(cveId)) {
-            libraryCves.add(cveId)
-            
-            // Count unique vulnerabilities by severity
-            library.totalCves += 1
-            const severity = match.vulnerability.severity?.toLowerCase()
-            switch (severity) {
-              case 'critical':
-                library.criticalCves += 1
-                break
-              case 'high':
-                library.highCves += 1
-                break
-              case 'medium':
-                library.mediumCves += 1
-                break
-              case 'low':
-                library.lowCves += 1
-                break
-            }
-          }
-
-          // Track affected versions
-          if (match.artifact.version && !library.affectedVersions.includes(match.artifact.version)) {
-            library.affectedVersions.push(match.artifact.version)
-          }
-
-          // Track affected images (unique)
-          library.affectedImages.add(imageName)
-
-          // Track max CVSS score
-          const cvssScore = match.vulnerability.cvss?.[0]?.metrics?.baseScore || 0
-          if (cvssScore > library.maxCvss) {
-            library.maxCvss = cvssScore
-          }
-
-          // Check if fixable
-          if (match.vulnerability.fix?.versions?.[0]) {
-            library.hasFixableVulns = true
-          }
-        })
-      }
-    })
-
-    return Array.from(libraryMap.values())
-      .filter(lib => lib.totalCves > 0) // Only show libraries with vulnerabilities
-      .sort((a, b) => b.totalCves - a.totalCves) // Sort by total CVEs by default
-  }, [scans])
-
-  const filteredLibraries = React.useMemo(() => {
-    let filtered = librariesData.filter(lib =>
-      lib.name.toLowerCase().includes(search.toLowerCase())
-    )
-
-    return filtered.sort((a, b) => {
+  const sortedVulnerabilities = React.useMemo(() => {
+    return [...vulnerabilities].sort((a, b) => {
       let aValue: any, bValue: any
 
       switch (sortField) {
-        case "totalCves":
-          aValue = a.totalCves
-          bValue = b.totalCves
+        case "cveId":
+          aValue = a.cveId
+          bValue = b.cveId
           break
-        case "criticalCves":
-          aValue = a.criticalCves
-          bValue = b.criticalCves
+        case "severity":
+          const severityPriority = { critical: 5, high: 4, medium: 3, low: 2, info: 1, unknown: 0 }
+          aValue = severityPriority[a.severity as keyof typeof severityPriority] || 0
+          bValue = severityPriority[b.severity as keyof typeof severityPriority] || 0
           break
-        case "name":
-          aValue = a.name
-          bValue = b.name
-          break
-        case "maxCvss":
-          aValue = a.maxCvss
-          bValue = b.maxCvss
+        case "cvssScore":
+          aValue = a.cvssScore || 0
+          bValue = b.cvssScore || 0
           break
         case "affectedImages":
-          aValue = a.affectedImages.size
-          bValue = b.affectedImages.size
+          aValue = a.totalAffectedImages
+          bValue = b.totalAffectedImages
           break
-        case "affectedVersions":
-          aValue = a.affectedVersions.length
-          bValue = b.affectedVersions.length
+        case "falsePositives":
+          aValue = a.falsePositiveImages.length
+          bValue = b.falsePositiveImages.length
+          break
+        case "packageName":
+          aValue = a.packageName || ''
+          bValue = b.packageName || ''
           break
         default:
           return 0
@@ -268,7 +150,7 @@ export default function LibraryHomePage() {
         return aValue < bValue ? 1 : -1
       }
     })
-  }, [librariesData, search, sortField, sortOrder])
+  }, [vulnerabilities, sortField, sortOrder])
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -279,8 +161,9 @@ export default function LibraryHomePage() {
     }
   }
 
-  const handleRowClick = (libraryName: string) => {
-    router.push(`/library/${encodeURIComponent(libraryName)}`)
+  const handleRowClick = (cveId: string) => {
+    // Could navigate to a CVE detail page in the future
+    window.open(`https://nvd.nist.gov/vuln/detail/${cveId}`, '_blank')
   }
 
   const getSeverityColor = (severity: 'critical' | 'high' | 'medium' | 'low') => {
@@ -300,29 +183,33 @@ export default function LibraryHomePage() {
 
   const breadcrumbs = [
     { label: "Dashboard", href: "/" },
-    { label: "Library" }
+    { label: "Vulnerability Library" }
   ]
 
   // Calculate overall statistics
   const stats = React.useMemo(() => {
-    const totalLibraries = librariesData.length
-    const totalCves = librariesData.reduce((sum, lib) => sum + lib.totalCves, 0)
-    const criticalLibraries = librariesData.filter(lib => lib.criticalCves > 0).length
-    const fixableLibraries = librariesData.filter(lib => lib.hasFixableVulns).length
-    const highRiskLibraries = librariesData.filter(lib => lib.maxCvss >= 7.0).length
+    const totalCves = vulnerabilities.length
+    const criticalCves = vulnerabilities.filter(v => v.severity === 'critical').length
+    const highCves = vulnerabilities.filter(v => v.severity === 'high').length
+    const fixableCves = vulnerabilities.filter(v => v.fixedVersion).length
+    const totalFalsePositives = vulnerabilities.reduce((sum, v) => sum + v.falsePositiveImages.length, 0)
+    const cvesWithFalsePositives = vulnerabilities.filter(v => v.falsePositiveImages.length > 0).length
+    const highRiskCves = vulnerabilities.filter(v => (v.cvssScore || 0) >= 7.0).length
 
     return {
-      totalLibraries,
       totalCves,
-      criticalLibraries,
-      fixableLibraries,
-      highRiskLibraries,
-      fixablePercent: totalLibraries > 0 ? Math.round((fixableLibraries / totalLibraries) * 100) : 0
+      criticalCves,
+      highCves,
+      fixableCves,
+      totalFalsePositives,
+      cvesWithFalsePositives,
+      highRiskCves,
+      fixablePercent: totalCves > 0 ? Math.round((fixableCves / totalCves) * 100) : 0
     }
-  }, [librariesData])
+  }, [vulnerabilities])
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen">Loading library data...</div>
+    return <div className="flex items-center justify-center h-screen">Loading vulnerabilities...</div>
   }
 
   return (
@@ -341,38 +228,42 @@ export default function LibraryHomePage() {
           <div className="@container/main flex flex-1 flex-col gap-2 overflow-auto">
             <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6 px-4 lg:px-6">
 
-              {/* Library Overview Stats */}
+              {/* Vulnerability Overview Stats */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <IconPackage className="h-5 w-5" />
-                    Library Security Overview
+                    <IconBug className="h-5 w-5" />
+                    Vulnerability Library Overview
                   </CardTitle>
                   <CardDescription>
-                    Security analysis of all libraries across scanned images
+                    All vulnerabilities across scanned images with false positive tracking
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold">{stats.totalLibraries}</p>
-                      <p className="text-sm text-muted-foreground">Vulnerable Libraries</p>
-                    </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                     <div className="text-center">
                       <p className="text-2xl font-bold">{stats.totalCves}</p>
                       <p className="text-sm text-muted-foreground">Total CVEs</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-red-600">{stats.criticalLibraries}</p>
-                      <p className="text-sm text-muted-foreground">Critical Risk</p>
+                      <p className="text-2xl font-bold text-red-600">{stats.criticalCves}</p>
+                      <p className="text-sm text-muted-foreground">Critical</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-orange-600">{stats.highRiskLibraries}</p>
+                      <p className="text-2xl font-bold text-orange-600">{stats.highCves}</p>
+                      <p className="text-sm text-muted-foreground">High</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-orange-600">{stats.highRiskCves}</p>
                       <p className="text-sm text-muted-foreground">High CVSS (≥7.0)</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-green-600">{stats.fixableLibraries}</p>
-                      <p className="text-sm text-muted-foreground">Have Fixes</p>
+                      <p className="text-2xl font-bold text-green-600">{stats.fixableCves}</p>
+                      <p className="text-sm text-muted-foreground">Fixable</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-purple-600">{stats.cvesWithFalsePositives}</p>
+                      <p className="text-sm text-muted-foreground">With False Positives</p>
                     </div>
                     <div className="text-center">
                       <p className="text-2xl font-bold text-blue-600">{stats.fixablePercent}%</p>
@@ -382,32 +273,44 @@ export default function LibraryHomePage() {
                 </CardContent>
               </Card>
 
-              {/* Libraries Table */}
+              {/* Vulnerabilities Table */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <IconBug className="h-5 w-5" />
-                    Vulnerable Libraries
+                    Vulnerability Library
                   </CardTitle>
                   <CardDescription>
-                    All libraries with security vulnerabilities found across scanned images
+                    All vulnerabilities found across scanned images with false positive tracking
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {/* Search Bar */}
+                    {/* Search and Filters */}
                     <div className="flex items-center gap-4">
                       <div className="relative flex-1">
                         <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                         <Input
-                          placeholder="Search libraries..."
+                          placeholder="Search CVEs or descriptions..."
                           value={search}
                           onChange={(e) => setSearch(e.target.value)}
                           className="pl-10"
                         />
                       </div>
+                      <Select value={severityFilter || "all"} onValueChange={(value) => setSeverityFilter(value === "all" ? "" : value)}>
+                        <SelectTrigger className="w-32">
+                          <SelectValue placeholder="Severity" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
+                          <SelectItem value="critical">Critical</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="low">Low</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <div className="text-sm text-muted-foreground">
-                        {filteredLibraries.length} of {librariesData.length} libraries
+                        {vulnerabilities.length} vulnerabilities
                       </div>
                     </div>
 
@@ -420,10 +323,10 @@ export default function LibraryHomePage() {
                               <Button
                                 variant="ghost"
                                 className="h-auto p-0 font-medium"
-                                onClick={() => handleSort("name")}
+                                onClick={() => handleSort("cveId")}
                               >
-                                Library Name
-                                {sortField === "name" && (
+                                CVE ID
+                                {sortField === "cveId" && (
                                   sortOrder === "asc" ? <IconSortAscending className="ml-1 h-4 w-4" /> : <IconSortDescending className="ml-1 h-4 w-4" />
                                 )}
                               </Button>
@@ -432,23 +335,10 @@ export default function LibraryHomePage() {
                               <Button
                                 variant="ghost"
                                 className="h-auto p-0 font-medium"
-                                onClick={() => handleSort("totalCves")}
+                                onClick={() => handleSort("severity")}
                               >
-                                Total CVEs
-                                {sortField === "totalCves" && (
-                                  sortOrder === "asc" ? <IconSortAscending className="ml-1 h-4 w-4" /> : <IconSortDescending className="ml-1 h-4 w-4" />
-                                )}
-                              </Button>
-                            </TableHead>
-                            <TableHead>Severity Breakdown</TableHead>
-                            <TableHead>
-                              <Button
-                                variant="ghost"
-                                className="h-auto p-0 font-medium"
-                                onClick={() => handleSort("maxCvss")}
-                              >
-                                Max CVSS
-                                {sortField === "maxCvss" && (
+                                Severity
+                                {sortField === "severity" && (
                                   sortOrder === "asc" ? <IconSortAscending className="ml-1 h-4 w-4" /> : <IconSortDescending className="ml-1 h-4 w-4" />
                                 )}
                               </Button>
@@ -457,10 +347,22 @@ export default function LibraryHomePage() {
                               <Button
                                 variant="ghost"
                                 className="h-auto p-0 font-medium"
-                                onClick={() => handleSort("affectedVersions")}
+                                onClick={() => handleSort("cvssScore")}
                               >
-                                Affected Versions
-                                {sortField === "affectedVersions" && (
+                                CVSS Score
+                                {sortField === "cvssScore" && (
+                                  sortOrder === "asc" ? <IconSortAscending className="ml-1 h-4 w-4" /> : <IconSortDescending className="ml-1 h-4 w-4" />
+                                )}
+                              </Button>
+                            </TableHead>
+                            <TableHead>
+                              <Button
+                                variant="ghost"
+                                className="h-auto p-0 font-medium"
+                                onClick={() => handleSort("packageName")}
+                              >
+                                Package
+                                {sortField === "packageName" && (
                                   sortOrder === "asc" ? <IconSortAscending className="ml-1 h-4 w-4" /> : <IconSortDescending className="ml-1 h-4 w-4" />
                                 )}
                               </Button>
@@ -471,94 +373,118 @@ export default function LibraryHomePage() {
                                 className="h-auto p-0 font-medium"
                                 onClick={() => handleSort("affectedImages")}
                               >
-                                Found In
+                                Affected Images
                                 {sortField === "affectedImages" && (
                                   sortOrder === "asc" ? <IconSortAscending className="ml-1 h-4 w-4" /> : <IconSortDescending className="ml-1 h-4 w-4" />
                                 )}
                               </Button>
                             </TableHead>
-                            <TableHead>Status</TableHead>
+                            <TableHead>
+                              <Button
+                                variant="ghost"
+                                className="h-auto p-0 font-medium"
+                                onClick={() => handleSort("falsePositives")}
+                              >
+                                False Positives
+                                {sortField === "falsePositives" && (
+                                  sortOrder === "asc" ? <IconSortAscending className="ml-1 h-4 w-4" /> : <IconSortDescending className="ml-1 h-4 w-4" />
+                                )}
+                              </Button>
+                            </TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead>Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {filteredLibraries.map((library) => (
+                          {sortedVulnerabilities.map((vuln) => (
                             <TableRow 
-                              key={library.name}
-                              className="cursor-pointer hover:bg-muted/50"
-                              onClick={() => handleRowClick(library.name)}
+                              key={vuln.cveId}
+                              className="hover:bg-muted/50"
                             >
                               <TableCell>
                                 <div className="flex items-center gap-2">
-                                  <IconPackage className="h-4 w-4 text-muted-foreground" />
-                                  <span className="font-medium font-mono text-sm">{library.name}</span>
+                                  <IconBug className="h-4 w-4 text-muted-foreground" />
+                                  <span className="font-medium font-mono text-sm">{vuln.cveId}</span>
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <Badge variant={library.totalCves > 10 ? "destructive" : library.totalCves > 5 ? "secondary" : "outline"}>
-                                  {library.totalCves}
+                                <Badge variant={getSeverityColor(vuln.severity as 'critical' | 'high' | 'medium' | 'low')}>
+                                  {vuln.severity.charAt(0).toUpperCase() + vuln.severity.slice(1)}
                                 </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex gap-1 flex-wrap">
-                                  {library.criticalCves > 0 && (
-                                    <Badge variant={getSeverityColor('critical')} className="text-xs">
-                                      C: {library.criticalCves}
-                                    </Badge>
-                                  )}
-                                  {library.highCves > 0 && (
-                                    <Badge variant={getSeverityColor('high')} className="text-xs">
-                                      H: {library.highCves}
-                                    </Badge>
-                                  )}
-                                  {library.mediumCves > 0 && (
-                                    <Badge variant={getSeverityColor('medium')} className="text-xs">
-                                      M: {library.mediumCves}
-                                    </Badge>
-                                  )}
-                                  {library.lowCves > 0 && (
-                                    <Badge variant={getSeverityColor('low')} className="text-xs">
-                                      L: {library.lowCves}
-                                    </Badge>
-                                  )}
-                                </div>
                               </TableCell>
                               <TableCell>
                                 <Badge 
-                                  variant={library.maxCvss >= 9.0 ? "destructive" : library.maxCvss >= 7.0 ? "secondary" : "outline"}
+                                  variant={!vuln.cvssScore ? "outline" : vuln.cvssScore >= 9.0 ? "destructive" : vuln.cvssScore >= 7.0 ? "secondary" : "outline"}
                                 >
-                                  {library.maxCvss > 0 ? library.maxCvss.toFixed(1) : "N/A"}
+                                  {vuln.cvssScore ? vuln.cvssScore.toFixed(1) : "N/A"}
                                 </Badge>
                               </TableCell>
                               <TableCell>
+                                <span className="font-mono text-sm">{vuln.packageName || 'N/A'}</span>
+                              </TableCell>
+                              <TableCell>
                                 <div className="flex gap-1 flex-wrap max-w-xs">
-                                  {library.affectedVersions.slice(0, 3).map((version, idx) => (
-                                    <Badge key={`${library.name}-${version}-${idx}`} variant="outline" className="text-xs">
-                                      {version}
+                                  {vuln.affectedImages.slice(0, 3).map((image, idx) => (
+                                    <Badge 
+                                      key={`${vuln.cveId}-${image.imageName}-${idx}`} 
+                                      variant={image.isFalsePositive ? "secondary" : "outline"}
+                                      className="text-xs"
+                                    >
+                                      {image.isFalsePositive && <IconX className="w-3 h-3 mr-1" />}
+                                      {image.imageName}
                                     </Badge>
                                   ))}
-                                  {library.affectedVersions.length > 3 && (
+                                  {vuln.affectedImages.length > 3 && (
                                     <Badge variant="outline" className="text-xs">
-                                      +{library.affectedVersions.length - 3} more
+                                      +{vuln.affectedImages.length - 3} more
                                     </Badge>
                                   )}
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <Badge variant="outline" className="text-xs">
-                                  {library.affectedImages.size} image{library.affectedImages.size !== 1 ? 's' : ''}
-                                </Badge>
+                                {vuln.falsePositiveImages.length > 0 ? (
+                                  <div className="flex gap-1 flex-wrap max-w-xs">
+                                    {vuln.falsePositiveImages.slice(0, 2).map((imageName, idx) => (
+                                      <Badge key={`fp-${vuln.cveId}-${imageName}-${idx}`} variant="secondary" className="text-xs">
+                                        <IconX className="w-3 h-3 mr-1" />
+                                        {imageName}
+                                      </Badge>
+                                    ))}
+                                    {vuln.falsePositiveImages.length > 2 && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        +{vuln.falsePositiveImages.length - 2} more
+                                      </Badge>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs">
+                                    <IconCheck className="w-3 h-3 mr-1" />
+                                    None
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="max-w-xs">
+                                  <p className="text-sm text-muted-foreground truncate" title={vuln.description}>
+                                    {vuln.description || 'No description available'}
+                                  </p>
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-2">
-                                  {library.hasFixableVulns ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRowClick(vuln.cveId)}
+                                    className="text-xs"
+                                  >
+                                    <IconExternalLink className="w-3 h-3 mr-1" />
+                                    View
+                                  </Button>
+                                  {vuln.fixedVersion && (
                                     <Badge variant="default" className="text-xs">
                                       <IconShield className="w-3 h-3 mr-1" />
-                                      Fixable
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="secondary" className="text-xs">
-                                      <IconAlertTriangle className="w-3 h-3 mr-1" />
-                                      No Fix
+                                      Fix: {vuln.fixedVersion}
                                     </Badge>
                                   )}
                                 </div>
@@ -569,9 +495,9 @@ export default function LibraryHomePage() {
                       </Table>
                     </div>
                     
-                    {filteredLibraries.length === 0 && (
+                    {vulnerabilities.length === 0 && !loading && (
                       <div className="text-center py-8 text-muted-foreground">
-                        {search ? `No libraries found matching "${search}"` : "No vulnerable libraries found"}
+                        {search || severityFilter ? `No vulnerabilities found matching current filters` : "No vulnerabilities found"}
                       </div>
                     )}
                   </div>

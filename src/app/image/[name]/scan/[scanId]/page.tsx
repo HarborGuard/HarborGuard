@@ -100,14 +100,104 @@ export default function ScanResultsPage() {
   // Decode the image name in case it has special characters
   const decodedImageName = decodeURIComponent(imageName);
 
-  // CVE Classifications hook - only initialize if we have scanData.image?.id
-  const {
-    saveClassification,
-    deleteClassification,
-    getClassification,
-    isFalsePositive,
-    getComment,
-  } = useCveClassifications(scanData?.image?.id || "");
+  // Image-name-wide CVE Classifications
+  const [consolidatedClassifications, setConsolidatedClassifications] = useState<any[]>([])
+  const [classificationsLoading, setClassificationsLoading] = useState(true)
+  
+  // Helper functions for classifications
+  const getClassification = (cveId: string) => {
+    return consolidatedClassifications.find(c => c.cveId === cveId);
+  };
+  
+  const isFalsePositive = (cveId: string) => {
+    const classification = getClassification(cveId);
+    return classification?.isFalsePositive ?? false;
+  };
+  
+  const getComment = (cveId: string) => {
+    const classification = getClassification(cveId);
+    return classification?.comment || undefined;
+  };
+  
+  const saveClassification = async (classification: any) => {
+    try {
+      // Save to all tags of this image name using the new endpoint
+      const response = await fetch(`/api/images/name/${encodeURIComponent(decodedImageName)}/cve-classifications`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(classification),
+      });
+      
+      if (!response.ok) {
+        // Fallback: save to the specific image only
+        const fallbackResponse = await fetch(`/api/images/${scanData?.image?.id}/cve-classifications`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(classification),
+        });
+        
+        if (!fallbackResponse.ok) {
+          throw new Error("Failed to save classification");
+        }
+      }
+      
+      // Refresh classifications
+      fetchConsolidatedClassifications();
+    } catch (error) {
+      console.error("Failed to save CVE classification:", error);
+      throw error;
+    }
+  };
+  
+  const deleteClassification = async (cveId: string) => {
+    // For deletion, we'll remove from the specific image to maintain existing functionality
+    try {
+      const response = await fetch(`/api/images/${scanData?.image?.id}/cve-classifications/${encodeURIComponent(cveId)}`, {
+        method: "DELETE",
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to delete classification");
+      }
+      
+      // Refresh classifications
+      fetchConsolidatedClassifications();
+    } catch (error) {
+      console.error("Failed to delete CVE classification:", error);
+      throw error;
+    }
+  };
+  
+  const fetchConsolidatedClassifications = async () => {
+    if (!decodedImageName) return;
+    
+    try {
+      setClassificationsLoading(true);
+      
+      // Try the new consolidated endpoint first
+      const response = await fetch(`/api/images/name/${encodeURIComponent(decodedImageName)}/cve-classifications`);
+      if (response.ok) {
+        const consolidated = await response.json();
+        console.log(`✅ Loaded ${consolidated.length} consolidated CVE classifications for ${decodedImageName}`);
+        setConsolidatedClassifications(consolidated);
+        return;
+      }
+      
+      // Fallback: just use the current image's classifications
+      if (scanData?.image?.id) {
+        const fallbackResponse = await fetch(`/api/images/${scanData.image.id}/cve-classifications`);
+        if (fallbackResponse.ok) {
+          const classifications = await fallbackResponse.json();
+          console.log(`📦 Fallback: Loaded ${classifications.length} CVE classifications for current image`);
+          setConsolidatedClassifications(classifications);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching consolidated classifications:', error);
+    } finally {
+      setClassificationsLoading(false);
+    }
+  };
 
   useEffect(() => {
     async function fetchScanData() {
@@ -133,6 +223,13 @@ export default function ScanResultsPage() {
 
     fetchScanData();
   }, [scanId]);
+
+  // Fetch consolidated classifications when scan data is available
+  useEffect(() => {
+    if (scanData && decodedImageName) {
+      fetchConsolidatedClassifications();
+    }
+  }, [scanData, decodedImageName]);
 
   const trivyResults: TrivyReport | null =
     scanData?.scannerReports?.trivy || scanData?.trivy || null;
@@ -360,7 +457,7 @@ export default function ScanResultsPage() {
     });
   }, [dockleResults, dockleSearch, dockleSortField, dockleSortOrder]);
 
-  if (loading) {
+  if (loading || (scanData && classificationsLoading)) {
     return (
       <div className="flex items-center justify-center h-screen">
         Loading scan data...
@@ -1898,7 +1995,7 @@ export default function ScanResultsPage() {
         isOpen={classificationDialogOpen}
         onClose={handleCloseClassificationDialog}
         cveId={selectedCveId}
-        imageId={scanData?.image?.id || ""}
+        imageId={scanData?.image?.id || ""} // Still pass for compatibility, but saveClassification handles image-name-wide logic
         currentClassification={getClassification(selectedCveId)}
         onSave={saveClassification}
       />

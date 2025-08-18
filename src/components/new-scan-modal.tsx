@@ -118,7 +118,7 @@ export function NewScanModal({ children }: NewScanModalProps) {
   }, [state.scans])
   
   const [searchQuery, setSearchQuery] = React.useState("")
-  const [selectedSource, setSelectedSource] = React.useState<string>("")
+  const [selectedSource, setSelectedSource] = React.useState<string>("dockerhub")
   const [imageUrl, setImageUrl] = React.useState("")
   const [githubRepo, setGithubRepo] = React.useState("")
   const [localImageName, setLocalImageName] = React.useState("")

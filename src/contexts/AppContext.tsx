@@ -154,7 +154,7 @@ type AppAction =
 
 const initialState: AppState = {
   scans: [],
-  loading: false,
+  loading: true, // Start with loading true so the loading template shows immediately
   error: null,
   pagination: {
     total: 0,
@@ -245,7 +245,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         digestShort: scan.image.digest?.slice(7, 19) || '',
         platform: 'unknown',
         sizeMb: 0,
-        riskScore: scan.riskScore || 0,
+        riskScore: scan.riskScore || calculateRiskScore({ 
+          vulnerabilityCount: scan.vulnerabilityCount, 
+          scannerReports: scan.scannerReports,
+          riskScore: scan.riskScore 
+        } as any),
         severities: {
           crit: scan.vulnerabilityCount?.critical || 0,
           high: scan.vulnerabilityCount?.high || 0,
