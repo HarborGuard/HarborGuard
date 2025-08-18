@@ -1,6 +1,6 @@
 import { useApp } from '@/contexts/AppContext'
 import { useMemo } from 'react'
-import { calculateDashboardStats } from '@/lib/scan-aggregations'
+import { calculateDashboardStats, aggregateUniqueVulnerabilities } from '@/lib/scan-aggregations'
 
 export function useScans() {
   const { state, dispatch } = useApp()
@@ -10,13 +10,10 @@ export function useScans() {
   const error = state.error
 
   const stats = useMemo(() => {
-    // Calculate stats from legacy format (already transformed in AppContext)
+    // Use unique CVE aggregation to prevent double-counting when same image is scanned multiple times
     const totalScans = scans.length
-    const criticalVulns = scans.reduce((sum, scan) => sum + scan.severities.crit, 0)
-    const highVulns = scans.reduce((sum, scan) => sum + scan.severities.high, 0)
-    const mediumVulns = scans.reduce((sum, scan) => sum + scan.severities.med, 0)
-    const lowVulns = scans.reduce((sum, scan) => sum + scan.severities.low, 0)
-    const totalVulns = criticalVulns + highVulns + mediumVulns + lowVulns
+    const uniqueVulns = aggregateUniqueVulnerabilities(state.rawScans)
+    const totalVulns = uniqueVulns.critical + uniqueVulns.high + uniqueVulns.medium + uniqueVulns.low
     
     const avgRiskScore = scans.length > 0 
       ? scans.reduce((sum, scan) => sum + scan.riskScore, 0) / scans.length 
@@ -28,10 +25,10 @@ export function useScans() {
     return {
       totalScans,
       vulnerabilities: {
-        critical: criticalVulns,
-        high: highVulns,
-        medium: mediumVulns,
-        low: lowVulns,
+        critical: uniqueVulns.critical,
+        high: uniqueVulns.high,
+        medium: uniqueVulns.medium,
+        low: uniqueVulns.low,
         total: totalVulns
       },
       avgRiskScore: Math.round(avgRiskScore),
@@ -39,7 +36,7 @@ export function useScans() {
       completeScans,
       completionRate: totalScans > 0 ? Math.round((completeScans / totalScans) * 100) : 0
     }
-  }, [scans])
+  }, [scans, state.rawScans])
 
   const getScansByRiskLevel = (level: 'low' | 'medium' | 'high' | 'critical') => {
     const thresholds = {

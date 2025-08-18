@@ -116,6 +116,7 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/components/ui/toggle-group"
+import { aggregateUniqueVulnerabilitiesFromLegacyScans } from "@/lib/scan-aggregations"
 
 
 const severityCountsSchema = z.object({
@@ -609,13 +610,14 @@ export function DataTable({
         new Date(current.lastScan) > new Date(latest.lastScan) ? current : latest
       )
       
-      // Aggregate vulnerability counts across all tags
-      const aggregatedSeverities = items.reduce((acc, item) => ({
-        crit: acc.crit + item.severities.crit,
-        high: acc.high + item.severities.high,
-        med: acc.med + item.severities.med,
-        low: acc.low + item.severities.low,
-      }), { crit: 0, high: 0, med: 0, low: 0 })
+      // Aggregate vulnerability counts across all tags using unique CVE deduplication
+      const uniqueVulns = aggregateUniqueVulnerabilitiesFromLegacyScans(items)
+      const aggregatedSeverities = {
+        crit: uniqueVulns.critical,
+        high: uniqueVulns.high,
+        med: uniqueVulns.medium,
+        low: uniqueVulns.low,
+      }
       
       // Calculate aggregated risk score (average weighted by severity)
       const totalVulns = items.reduce((sum, item) => 

@@ -133,6 +133,7 @@ function extractOsInfo(scan: ScanWithImage): { family: string; name: string } | 
 
 interface AppState {
   scans: Scan[]
+  rawScans: ScanWithImage[] // Keep raw scan data for unique aggregation
   loading: boolean
   error: string | null
 }
@@ -140,13 +141,14 @@ interface AppState {
 type AppAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'SET_SCANS'; payload: Scan[] }
+  | { type: 'SET_SCANS'; payload: { scans: Scan[], rawScans: ScanWithImage[] } }
   | { type: 'UPDATE_SCAN'; payload: Scan }
   | { type: 'ADD_SCAN'; payload: Scan }
   | { type: 'DELETE_SCAN'; payload: number }
 
 const initialState: AppState = {
   scans: [],
+  rawScans: [],
   loading: false,
   error: null
 }
@@ -158,7 +160,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'SET_ERROR':
       return { ...state, error: action.payload, loading: false }
     case 'SET_SCANS':
-      return { ...state, scans: action.payload, loading: false }
+      return { ...state, scans: action.payload.scans, rawScans: action.payload.rawScans, loading: false }
     case 'UPDATE_SCAN':
       return {
         ...state,
@@ -207,9 +209,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const scansData = await scansRes.json()
 
       // Transform database scans to legacy format for UI compatibility
-      const transformedScans = transformScansForUI(scansData.scans || [])
+      const rawScans = scansData.scans || []
+      const transformedScans = transformScansForUI(rawScans)
 
-      dispatch({ type: 'SET_SCANS', payload: transformedScans })
+      dispatch({ type: 'SET_SCANS', payload: { scans: transformedScans, rawScans } })
     } catch (error) {
       console.error('Failed to load data:', error)
       dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' })

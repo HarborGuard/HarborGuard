@@ -64,6 +64,9 @@ export default function LibraryHomePage() {
     if (!scans || scans.length === 0) return []
 
     const libraryMap = new Map<string, LibrarySummary>()
+    
+    // Track unique CVEs per library to avoid double counting
+    const libraryCveMap = new Map<string, Set<string>>() // library -> Set of CVE IDs
 
     scans.forEach(scan => {
       const imageName = `${scan.imageName || scan.image.split(':')[0]}:${scan.image.split(':')[1] || 'latest'}`
@@ -73,9 +76,11 @@ export default function LibraryHomePage() {
       if (trivyResults?.Results) {
         trivyResults.Results.forEach(result => {
           result.Vulnerabilities?.forEach(vuln => {
-            if (!vuln.PkgName) return
+            if (!vuln.PkgName || !vuln.VulnerabilityID) return
 
             const libraryName = vuln.PkgName
+            const cveId = vuln.VulnerabilityID
+            
             let library = libraryMap.get(libraryName)
             
             if (!library) {
@@ -92,32 +97,39 @@ export default function LibraryHomePage() {
                 hasFixableVulns: false,
               }
               libraryMap.set(libraryName, library)
+              libraryCveMap.set(libraryName, new Set())
             }
 
-            // Count vulnerabilities by severity
-            library.totalCves += 1
-            const severity = vuln.Severity?.toLowerCase()
-            switch (severity) {
-              case 'critical':
-                library.criticalCves += 1
-                break
-              case 'high':
-                library.highCves += 1
-                break
-              case 'medium':
-                library.mediumCves += 1
-                break
-              case 'low':
-                library.lowCves += 1
-                break
+            // Only count each CVE once per library
+            const libraryCves = libraryCveMap.get(libraryName)!
+            if (!libraryCves.has(cveId)) {
+              libraryCves.add(cveId)
+              
+              // Count unique vulnerabilities by severity
+              library.totalCves += 1
+              const severity = vuln.Severity?.toLowerCase()
+              switch (severity) {
+                case 'critical':
+                  library.criticalCves += 1
+                  break
+                case 'high':
+                  library.highCves += 1
+                  break
+                case 'medium':
+                  library.mediumCves += 1
+                  break
+                case 'low':
+                  library.lowCves += 1
+                  break
+              }
             }
 
-            // Track affected versions
+            // Track affected versions (can have duplicates as different scans may have different versions)
             if (vuln.InstalledVersion && !library.affectedVersions.includes(vuln.InstalledVersion)) {
               library.affectedVersions.push(vuln.InstalledVersion)
             }
 
-            // Track affected images
+            // Track affected images (unique)
             library.affectedImages.add(imageName)
 
             // Track max CVSS score
@@ -132,14 +144,16 @@ export default function LibraryHomePage() {
             }
           })
         })
+        return // Skip Grype if we have Trivy data
       }
 
-      // Process Grype results
+      // Process Grype results (fallback)
       const grypeResults = scan.scannerReports?.grype
       if (grypeResults?.matches) {
         grypeResults.matches.forEach(match => {
           const libraryName = match.artifact.name
-          if (!libraryName) return
+          const cveId = match.vulnerability.id
+          if (!libraryName || !cveId) return
 
           let library = libraryMap.get(libraryName)
           
@@ -157,24 +171,31 @@ export default function LibraryHomePage() {
               hasFixableVulns: false,
             }
             libraryMap.set(libraryName, library)
+            libraryCveMap.set(libraryName, new Set())
           }
 
-          // Count vulnerabilities by severity
-          library.totalCves += 1
-          const severity = match.vulnerability.severity?.toLowerCase()
-          switch (severity) {
-            case 'critical':
-              library.criticalCves += 1
-              break
-            case 'high':
-              library.highCves += 1
-              break
-            case 'medium':
-              library.mediumCves += 1
-              break
-            case 'low':
-              library.lowCves += 1
-              break
+          // Only count each CVE once per library
+          const libraryCves = libraryCveMap.get(libraryName)!
+          if (!libraryCves.has(cveId)) {
+            libraryCves.add(cveId)
+            
+            // Count unique vulnerabilities by severity
+            library.totalCves += 1
+            const severity = match.vulnerability.severity?.toLowerCase()
+            switch (severity) {
+              case 'critical':
+                library.criticalCves += 1
+                break
+              case 'high':
+                library.highCves += 1
+                break
+              case 'medium':
+                library.mediumCves += 1
+                break
+              case 'low':
+                library.lowCves += 1
+                break
+            }
           }
 
           // Track affected versions
@@ -182,7 +203,7 @@ export default function LibraryHomePage() {
             library.affectedVersions.push(match.artifact.version)
           }
 
-          // Track affected images
+          // Track affected images (unique)
           library.affectedImages.add(imageName)
 
           // Track max CVSS score

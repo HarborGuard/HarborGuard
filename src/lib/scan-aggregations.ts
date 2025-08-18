@@ -362,7 +362,86 @@ export function formatScanForTable(scan: ScanWithImage, previousScan?: ScanWithI
 }
 
 /**
- * Calculate dashboard statistics from scan data
+ * Aggregate unique vulnerabilities across all scans by CVE ID
+ * This prevents duplicate counting when the same image is scanned multiple times
+ */
+export function aggregateUniqueVulnerabilities(scans: ScanWithImage[] | Scan[]): VulnerabilityCount {
+  const uniqueCVEs = new Map<string, string>(); // CVE ID -> severity
+  
+  for (const scan of scans) {
+    // Process Trivy results (preferred)
+    const trivyReport = scan.scannerReports?.trivy as TrivyReport | undefined;
+    if (trivyReport?.Results) {
+      for (const result of trivyReport.Results) {
+        if (result.Vulnerabilities) {
+          for (const vuln of result.Vulnerabilities) {
+            if (vuln.VulnerabilityID) {
+              const severity = vuln.Severity?.toLowerCase();
+              if (severity && ['critical', 'high', 'medium', 'low', 'info'].includes(severity)) {
+                // Only add if we haven't seen this CVE before, or if this is a higher severity
+                const existingSeverity = uniqueCVEs.get(vuln.VulnerabilityID);
+                if (!existingSeverity || getSeverityPriority(severity) > getSeverityPriority(existingSeverity)) {
+                  uniqueCVEs.set(vuln.VulnerabilityID, severity);
+                }
+              }
+            }
+          }
+        }
+      }
+      continue; // Skip Grype if we have Trivy data
+    }
+
+    // Fallback: Process Grype results if no Trivy data
+    const grypeReport = scan.scannerReports?.grype as GrypeReport | undefined;
+    if (grypeReport?.matches) {
+      for (const match of grypeReport.matches) {
+        if (match.vulnerability.id) {
+          const severity = match.vulnerability.severity?.toLowerCase();
+          if (severity && ['critical', 'high', 'medium', 'low', 'info'].includes(severity)) {
+            const existingSeverity = uniqueCVEs.get(match.vulnerability.id);
+            if (!existingSeverity || getSeverityPriority(severity) > getSeverityPriority(existingSeverity)) {
+              uniqueCVEs.set(match.vulnerability.id, severity);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Count unique CVEs by severity
+  const vulnCount: VulnerabilityCount = {
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+    info: 0,
+  };
+
+  for (const [_cveId, severity] of uniqueCVEs.entries()) {
+    if (severity in vulnCount) {
+      vulnCount[severity as keyof VulnerabilityCount]++;
+    }
+  }
+
+  return vulnCount;
+}
+
+/**
+ * Get severity priority for comparison (higher number = higher priority)
+ */
+function getSeverityPriority(severity: string): number {
+  const priorities: Record<string, number> = {
+    'info': 1,
+    'low': 2,
+    'medium': 3,
+    'high': 4,
+    'critical': 5,
+  };
+  return priorities[severity] || 0;
+}
+
+/**
+ * Calculate dashboard statistics from scan data with unique CVE aggregation
  */
 export function calculateDashboardStats(scans: ScanWithImage[]) {
   if (scans.length === 0) {
@@ -382,21 +461,14 @@ export function calculateDashboardStats(scans: ScanWithImage[]) {
     };
   }
 
-  let totalCritical = 0;
-  let totalHigh = 0;
-  let totalMedium = 0;
-  let totalLow = 0;
+  // Use unique CVE aggregation instead of simple summation
+  const uniqueVulns = aggregateUniqueVulnerabilities(scans);
+  
   let totalRiskScore = 0;
   let completedScans = 0;
   let blockedScans = 0;
 
-  for (const scan of scans) {
-    const vulns = aggregateVulnerabilities(scan);
-    totalCritical += vulns.critical;
-    totalHigh += vulns.high;
-    totalMedium += vulns.medium;
-    totalLow += vulns.low;
-    
+  for (const scan of scans) {    
     totalRiskScore += calculateRiskScore(scan);
     
     if (scan.status === 'SUCCESS') {
@@ -410,17 +482,17 @@ export function calculateDashboardStats(scans: ScanWithImage[]) {
     }
   }
 
-  const totalVulns = totalCritical + totalHigh + totalMedium + totalLow;
+  const totalVulns = uniqueVulns.critical + uniqueVulns.high + uniqueVulns.medium + uniqueVulns.low;
   const avgRiskScore = Math.round(totalRiskScore / scans.length);
   const completionRate = Math.round((completedScans / scans.length) * 100);
 
   return {
     totalScans: scans.length,
     vulnerabilities: {
-      critical: totalCritical,
-      high: totalHigh,
-      medium: totalMedium,
-      low: totalLow,
+      critical: uniqueVulns.critical,
+      high: uniqueVulns.high,
+      medium: uniqueVulns.medium,
+      low: uniqueVulns.low,
       total: totalVulns,
     },
     avgRiskScore,
@@ -568,4 +640,69 @@ export function getSyftPackageStats(scan: Scan) {
     typeCount,
     languageCount,
   };
+}
+
+/**
+ * Aggregate unique vulnerabilities from legacy scan format (includes scannerReports)
+ * Used by components that work with transformed legacy scan data
+ */
+export function aggregateUniqueVulnerabilitiesFromLegacyScans(scans: any[]): VulnerabilityCount {
+  const uniqueCVEs = new Map<string, string>(); // CVE ID -> severity
+  
+  for (const scan of scans) {
+    // Process Trivy results (preferred)
+    const trivyReport = scan.scannerReports?.trivy as TrivyReport | undefined;
+    if (trivyReport?.Results) {
+      for (const result of trivyReport.Results) {
+        if (result.Vulnerabilities) {
+          for (const vuln of result.Vulnerabilities) {
+            if (vuln.VulnerabilityID) {
+              const severity = vuln.Severity?.toLowerCase();
+              if (severity && ['critical', 'high', 'medium', 'low', 'info'].includes(severity)) {
+                // Only add if we haven't seen this CVE before, or if this is a higher severity
+                const existingSeverity = uniqueCVEs.get(vuln.VulnerabilityID);
+                if (!existingSeverity || getSeverityPriority(severity) > getSeverityPriority(existingSeverity)) {
+                  uniqueCVEs.set(vuln.VulnerabilityID, severity);
+                }
+              }
+            }
+          }
+        }
+      }
+      continue; // Skip Grype if we have Trivy data
+    }
+
+    // Fallback: Process Grype results if no Trivy data
+    const grypeReport = scan.scannerReports?.grype as GrypeReport | undefined;
+    if (grypeReport?.matches) {
+      for (const match of grypeReport.matches) {
+        if (match.vulnerability.id) {
+          const severity = match.vulnerability.severity?.toLowerCase();
+          if (severity && ['critical', 'high', 'medium', 'low', 'info'].includes(severity)) {
+            const existingSeverity = uniqueCVEs.get(match.vulnerability.id);
+            if (!existingSeverity || getSeverityPriority(severity) > getSeverityPriority(existingSeverity)) {
+              uniqueCVEs.set(match.vulnerability.id, severity);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Count unique CVEs by severity
+  const vulnCount: VulnerabilityCount = {
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+    info: 0,
+  };
+
+  for (const [_cveId, severity] of uniqueCVEs.entries()) {
+    if (severity in vulnCount) {
+      vulnCount[severity as keyof VulnerabilityCount]++;
+    }
+  }
+
+  return vulnCount;
 }

@@ -64,58 +64,110 @@ export default function LibraryDetailsPage() {
   const vulnerabilities = React.useMemo(() => {
     if (!scans || scans.length === 0) return []
 
-    const vulns: LibraryVulnerability[] = []
+    const vulnMap = new Map<string, LibraryVulnerability>() // CVE ID -> vulnerability (unique)
+    const imageMap = new Map<string, Set<string>>() // CVE ID -> Set of image names
 
     scans.forEach(scan => {
+      const imageName = scan.imageName || scan.image.split(':')[0] || 'unknown'
+      const imageTag = scan.image.split(':')[1] || 'latest'
+      const fullImageName = `${imageName}:${imageTag}`
+
       // Process Trivy results
       const trivyResults = scan.scannerReports?.trivy
       if (trivyResults?.Results) {
         trivyResults.Results.forEach(result => {
           result.Vulnerabilities?.forEach(vuln => {
-            if (vuln.PkgName === libraryName) {
-              vulns.push({
-                id: vuln.VulnerabilityID,
-                severity: vuln.Severity,
-                description: vuln.Description || vuln.Title || '',
-                installedVersion: vuln.InstalledVersion,
-                fixedVersion: vuln.FixedVersion,
-                cvss: vuln.CVSS?.nvd?.V3Score || vuln.CVSS?.redhat?.V3Score,
-                scanId: scan.id.toString(),
-                imageName: scan.imageName || scan.image.split(':')[0] || 'unknown',
-                imageTag: scan.image.split(':')[1] || 'latest',
-                references: vuln.References || []
-              })
+            if (vuln.PkgName === libraryName && vuln.VulnerabilityID) {
+              const cveId = vuln.VulnerabilityID
+              
+              // Track unique images per CVE
+              if (!imageMap.has(cveId)) {
+                imageMap.set(cveId, new Set())
+              }
+              imageMap.get(cveId)!.add(fullImageName)
+
+              // Only store each CVE once (keep the one with highest severity or most complete data)
+              if (!vulnMap.has(cveId)) {
+                vulnMap.set(cveId, {
+                  id: cveId,
+                  severity: vuln.Severity,
+                  description: vuln.Description || vuln.Title || '',
+                  installedVersion: vuln.InstalledVersion,
+                  fixedVersion: vuln.FixedVersion,
+                  cvss: vuln.CVSS?.nvd?.V3Score || vuln.CVSS?.redhat?.V3Score,
+                  scanId: scan.id.toString(),
+                  imageName: imageName,
+                  imageTag: imageTag,
+                  references: vuln.References || []
+                })
+              } else {
+                // Update with higher severity or better CVSS score if available
+                const existing = vulnMap.get(cveId)!
+                const newCvss = vuln.CVSS?.nvd?.V3Score || vuln.CVSS?.redhat?.V3Score
+                if (newCvss && (!existing.cvss || newCvss > existing.cvss)) {
+                  existing.cvss = newCvss
+                }
+                // Update description if existing one is empty
+                if (!existing.description && (vuln.Description || vuln.Title)) {
+                  existing.description = vuln.Description || vuln.Title || ''
+                }
+                // Update fixed version if not set
+                if (!existing.fixedVersion && vuln.FixedVersion) {
+                  existing.fixedVersion = vuln.FixedVersion
+                }
+              }
             }
           })
         })
+        return // Skip Grype if we have Trivy data
       }
 
-      // Process Grype results
+      // Process Grype results (fallback)
       const grypeResults = scan.scannerReports?.grype
       if (grypeResults?.matches) {
         grypeResults.matches.forEach(match => {
-          if (match.artifact.name === libraryName) {
-            vulns.push({
-              id: match.vulnerability.id,
-              severity: match.vulnerability.severity?.toUpperCase() || 'UNKNOWN',
-              description: match.vulnerability.description || '',
-              installedVersion: match.artifact.version,
-              fixedVersion: match.vulnerability.fix?.versions?.[0],
-              cvss: match.vulnerability.cvss?.[0]?.metrics?.baseScore,
-              scanId: scan.id.toString(),
-              imageName: scan.imageName || scan.image.split(':')[0] || 'unknown',
-              imageTag: scan.image.split(':')[1] || 'latest',
-              references: match.vulnerability.urls || []
-            })
+          if (match.artifact.name === libraryName && match.vulnerability.id) {
+            const cveId = match.vulnerability.id
+            
+            // Track unique images per CVE
+            if (!imageMap.has(cveId)) {
+              imageMap.set(cveId, new Set())
+            }
+            imageMap.get(cveId)!.add(fullImageName)
+
+            // Only store each CVE once
+            if (!vulnMap.has(cveId)) {
+              vulnMap.set(cveId, {
+                id: cveId,
+                severity: match.vulnerability.severity?.toUpperCase() || 'UNKNOWN',
+                description: match.vulnerability.description || '',
+                installedVersion: match.artifact.version,
+                fixedVersion: match.vulnerability.fix?.versions?.[0],
+                cvss: match.vulnerability.cvss?.[0]?.metrics?.baseScore,
+                scanId: scan.id.toString(),
+                imageName: imageName,
+                imageTag: imageTag,
+                references: match.vulnerability.urls || []
+              })
+            }
           }
         })
       }
     })
 
-    // Deduplicate by vulnerability ID while keeping scan context
-    const uniqueVulns = Array.from(
-      new Map(vulns.map(v => [`${v.id}-${v.scanId}`, v])).values()
-    )
+    // Convert to array and add aggregated image information
+    const uniqueVulns = Array.from(vulnMap.values()).map(vuln => {
+      const affectedImages = imageMap.get(vuln.id)
+      const imageCount = affectedImages ? affectedImages.size : 1
+      const imageList = affectedImages ? Array.from(affectedImages).join(', ') : `${vuln.imageName}:${vuln.imageTag}`
+      
+      return {
+        ...vuln,
+        // Override imageName/imageTag with aggregated info when multiple images are affected
+        imageName: imageCount > 1 ? `${imageCount} images` : vuln.imageName,
+        imageTag: imageCount > 1 ? `(${imageList})` : vuln.imageTag,
+      }
+    })
 
     return uniqueVulns
   }, [scans, libraryName])
@@ -199,15 +251,47 @@ export default function LibraryDetailsPage() {
     { label: libraryName }
   ]
 
-  // Calculate statistics
+  // Calculate statistics from the vulnerability data
   const stats = React.useMemo(() => {
+    if (!scans || scans.length === 0) return {
+      total: 0, critical: 0, high: 0, medium: 0, low: 0, 
+      affectedImages: 0, fixableCount: 0, fixablePercent: 0
+    }
+
     const severityCounts = vulnerabilities.reduce((acc, vuln) => {
       const severity = vuln.severity.toLowerCase()
       acc[severity] = (acc[severity] || 0) + 1
       return acc
     }, {} as Record<string, number>)
 
-    const affectedImages = new Set(vulnerabilities.map(v => `${v.imageName}:${v.imageTag}`)).size
+    // Calculate unique affected images from original scan data
+    const affectedImagesSet = new Set<string>()
+    scans.forEach(scan => {
+      const imageName = scan.imageName || scan.image.split(':')[0] || 'unknown'
+      const imageTag = scan.image.split(':')[1] || 'latest'
+      const fullImageName = `${imageName}:${imageTag}`
+      
+      // Check if this scan contains the library we're looking at
+      const trivyResults = scan.scannerReports?.trivy
+      if (trivyResults?.Results) {
+        const hasLibrary = trivyResults.Results.some(result => 
+          result.Vulnerabilities?.some(vuln => vuln.PkgName === libraryName)
+        )
+        if (hasLibrary) {
+          affectedImagesSet.add(fullImageName)
+        }
+        return
+      }
+      
+      const grypeResults = scan.scannerReports?.grype
+      if (grypeResults?.matches) {
+        const hasLibrary = grypeResults.matches.some(match => match.artifact.name === libraryName)
+        if (hasLibrary) {
+          affectedImagesSet.add(fullImageName)
+        }
+      }
+    })
+
     const fixableCount = vulnerabilities.filter(v => v.fixedVersion).length
 
     return {
@@ -216,11 +300,11 @@ export default function LibraryDetailsPage() {
       high: severityCounts.high || 0,
       medium: severityCounts.medium || 0,
       low: severityCounts.low || 0,
-      affectedImages,
+      affectedImages: affectedImagesSet.size,
       fixableCount,
       fixablePercent: vulnerabilities.length > 0 ? Math.round((fixableCount / vulnerabilities.length) * 100) : 0
     }
-  }, [vulnerabilities])
+  }, [vulnerabilities, scans, libraryName])
 
   if (loading) {
     return <div className="flex items-center justify-center h-screen">Loading library data...</div>

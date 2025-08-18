@@ -39,20 +39,32 @@ interface SectionCardsProps {
     osvVulnerable?: number
     osvEcosystems?: string[]
   }>
+  stats: {
+    totalScans: number
+    vulnerabilities: {
+      critical: number
+      high: number
+      medium: number
+      low: number
+      total: number
+    }
+    avgRiskScore: number
+    blockedScans: number
+    completeScans: number
+    completionRate: number
+  }
 }
 
-export function SectionCards({ scanData }: SectionCardsProps) {
-  // Calculate metrics from scan data with safe handling for empty data
-  const totalImages = scanData.length
-  const completedScans = scanData.filter(item => item.status === "Complete").length
-  const averageRiskScore = totalImages > 0 
-    ? Math.round(scanData.reduce((sum, item) => sum + item.riskScore, 0) / totalImages)
-    : 0
+export function SectionCards({ scanData, stats }: SectionCardsProps) {
+  // Use aggregated stats for unique vulnerability counts
+  const totalImages = stats.totalScans
+  const completedScans = stats.completeScans
+  const averageRiskScore = stats.avgRiskScore
   
-  const totalCriticalVulns = scanData.reduce((sum, item) => sum + item.severities.crit, 0)
-  const totalHighVulns = scanData.reduce((sum, item) => sum + item.severities.high, 0)
-  const totalVulns = scanData.reduce((sum, item) => 
-    sum + item.severities.crit + item.severities.high + item.severities.med + item.severities.low, 0)
+  // Use unique vulnerability counts from stats instead of summing duplicates
+  const totalCriticalVulns = stats.vulnerabilities.critical
+  const totalHighVulns = stats.vulnerabilities.high
+  const totalVulns = stats.vulnerabilities.total
   
   const totalFixableVulns = scanData.reduce((sum, item) => sum + item.fixable.count, 0)
   const averageFixablePercent = totalImages > 0 

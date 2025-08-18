@@ -81,5 +81,5 @@ export interface IMockDataGenerator {
 export interface IScanExecutor {
   executeLocalDockerScan(requestId: string, request: any, scanId: string, imageId: string): Promise<void>;
   executeRegistryScan(requestId: string, request: any, scanId: string, imageId: string): Promise<void>;
-  executeMockScan(requestId: string, request: any, scanId: string, imageId: string): Promise<void>;
+  loadScanResults(requestId: string): Promise<ScanReports>;
 }

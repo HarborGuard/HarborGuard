@@ -13,7 +13,7 @@ import {
 import { useScans } from "@/hooks/useScans"
 
 export default function Page() {
-  const { scans, loading, error } = useScans()
+  const { scans, stats, loading, error } = useScans()
 
   if (loading) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>
@@ -37,7 +37,7 @@ export default function Page() {
         <SiteHeader />
         <div className="flex-1 overflow-auto">
           <div className="@container/main flex flex-col gap-2 p-4 lg:p-6">
-            <SectionCards scanData={scans} />
+            <SectionCards scanData={scans} stats={stats} />
             <ScanJobsMonitor />
             <VulnerabilityScatterplot />
             <DataTable data={scans} />
