@@ -52,7 +52,8 @@ export default function ImageDetailsPage() {
   useEffect(() => {
     async function fetchImageData() {
       try {
-        const response = await fetch(`/api/images/name/${encodeURIComponent(imageName)}`)
+        // Fetch with a higher scan limit to show more historical data
+        const response = await fetch(`/api/images/name/${encodeURIComponent(imageName)}?scanLimit=50`)
         if (!response.ok) {
           if (response.status === 404) {
             setError('No images found with this name')
@@ -127,7 +128,7 @@ export default function ImageDetailsPage() {
   }
 
   // Transform scans to historical scans format (now includes all tags)
-  const historicalScans = imageData.allScans?.map((scan: any, index: number) => {
+  const historicalScans = imageData.scans?.map((scan: any, index: number) => {
     return {
       id: Math.abs(scan.id.split('').reduce((a: number, b: string) => ((a << 5) - a + b.charCodeAt(0)) | 0, 0)),
       scanId: scan.id, // Real scan ID for navigation

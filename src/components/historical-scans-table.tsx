@@ -13,8 +13,8 @@ import {
   IconDownload,
 } from "@tabler/icons-react"
 
-import { Badge } from "components/components/ui/badge"
-import { Button } from "components/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -22,11 +22,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "components/components/ui/table"
+} from "@/components/ui/table"
 import {
   ToggleGroup,
   ToggleGroupItem,
-} from "components/components/ui/toggle-group"
+} from "@/components/ui/toggle-group"
 
 // Component handles its own data formatting since historical scans are pre-formatted
 
