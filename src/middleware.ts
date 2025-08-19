@@ -93,6 +93,24 @@ async function logPageView(request: NextRequest, pathname: string) {
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   
+  // Check for demo mode - block all write operations
+  if (process.env.DEMO_MODE === 'true') {
+    const method = request.method;
+    const isApiRoute = pathname.startsWith('/api/');
+    
+    // Block POST, PUT, DELETE, PATCH operations in demo mode
+    if (isApiRoute && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+      return NextResponse.json(
+        { 
+          error: 'Demo mode is enabled. Write operations are not allowed.',
+          message: 'This is a read-only demo environment. POST, PUT, DELETE, and PATCH requests are blocked.',
+          allowedMethods: ['GET', 'HEAD', 'OPTIONS']
+        },
+        { status: 403 }
+      );
+    }
+  }
+  
   // Log page views for relevant routes
   if (shouldLogRoute(pathname)) {
     // Don't await this to avoid slowing down the request
