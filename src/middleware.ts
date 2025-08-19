@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+console.log('🚀 MIDDLEWARE FILE LOADED - Demo mode middleware is active');
+
 // Define routes that should be logged
 const LOGGED_ROUTES = [
   '/',
@@ -94,8 +96,12 @@ export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const method = request.method;
   
+  // Always log middleware execution to verify it's being called
+  console.log(`🔥 MIDDLEWARE EXECUTING: ${method} ${pathname}`);
+  
   // Skip audit-logs to avoid infinite loops
   if (pathname.startsWith('/api/audit-logs')) {
+    console.log(`⏭️  Skipping audit-logs to avoid infinite loop`);
     return NextResponse.next();
   }
   
@@ -133,10 +139,9 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all requests including API routes
-     * Exclude only Next.js internals and audit-logs to avoid loops
-     */
+    // Match all API routes
+    '/api/:path*',
+    // Match all pages
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };
