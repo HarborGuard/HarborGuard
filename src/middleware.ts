@@ -62,7 +62,9 @@ async function logPageView(request: NextRequest, pathname: string) {
     const userAgent = request.headers.get('user-agent') || '';
     
     // Make an API call to log the page view
-    const baseUrl = request.nextUrl.origin;
+    const baseUrl = process.env.HOSTNAME 
+      ? `http://${process.env.HOSTNAME}:3000`
+      : request.nextUrl.origin;
     await fetch(`${baseUrl}/api/audit-logs`, {
       method: 'POST',
       headers: {
@@ -104,10 +106,12 @@ export function middleware(request: NextRequest) {
   if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
     const isApiRoute = pathname.startsWith('/api/');
     const host = request.headers.get('host');
+    const hostname = process.env.HOSTNAME;
     const isLocalhost = host?.includes('localhost') || host?.includes('127.0.0.1');
+    const isContainerHost = hostname && host?.includes(hostname);
     
-    // Block POST, PUT, DELETE, PATCH operations in demo mode (except from localhost)
-    if (isApiRoute && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && !isLocalhost) {
+    // Block POST, PUT, DELETE, PATCH operations in demo mode (except from localhost or container hostname)
+    if (isApiRoute && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && !isLocalhost && !isContainerHost) {
       console.log(`[Demo Mode] Blocking ${method} request to ${pathname}`);
       return NextResponse.json(
         { 

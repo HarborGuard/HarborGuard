@@ -17,7 +17,9 @@ async function initializeDemoMode() {
   setTimeout(async () => {
     try {
       // Trigger a scan of nginx:latest from Docker Hub
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const baseUrl = process.env.HOSTNAME 
+        ? `http://${process.env.HOSTNAME}:3000`
+        : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
       
       console.log('🚀 Starting demo scan: nginx:latest');
       
