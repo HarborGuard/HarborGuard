@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-console.log('🚀 MIDDLEWARE FILE LOADED - Demo mode middleware is active');
 
 // Define routes that should be logged
 const LOGGED_ROUTES = [
@@ -96,29 +95,19 @@ export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const method = request.method;
   
-  // Always log middleware execution to verify it's being called
-  console.log(`🔥 MIDDLEWARE EXECUTING: ${method} ${pathname}`);
-  
   // Skip audit-logs to avoid infinite loops
   if (pathname.startsWith('/api/audit-logs')) {
-    console.log(`⏭️  Skipping audit-logs to avoid infinite loop`);
     return NextResponse.next();
   }
   
-  // Debug logging
-  console.log(`[Middleware] ${method} ${pathname}, NEXT_PUBLIC_DEMO_MODE=${process.env.NEXT_PUBLIC_DEMO_MODE}`);
-  
   // Check for demo mode - block all write operations
-  console.log(`🔍 Demo Mode Check: NEXT_PUBLIC_DEMO_MODE = "${process.env.NEXT_PUBLIC_DEMO_MODE}" (type: ${typeof process.env.NEXT_PUBLIC_DEMO_MODE})`);
-  
   if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
-    console.log(`✅ Demo mode condition matched!`);
     const isApiRoute = pathname.startsWith('/api/');
+    const host = request.headers.get('host');
+    const isLocalhost = host?.includes('localhost') || host?.includes('127.0.0.1');
     
-    console.log(`[Demo Mode] API Route: ${isApiRoute}, Method: ${method}`);
-    
-    // Block POST, PUT, DELETE, PATCH operations in demo mode
-    if (isApiRoute && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+    // Block POST, PUT, DELETE, PATCH operations in demo mode (except from localhost)
+    if (isApiRoute && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && !isLocalhost) {
       console.log(`[Demo Mode] Blocking ${method} request to ${pathname}`);
       return NextResponse.json(
         { 
@@ -128,11 +117,7 @@ export function middleware(request: NextRequest) {
         },
         { status: 403 }
       );
-    } else {
-      console.log(`[Demo Mode] Not blocking: isApiRoute=${isApiRoute}, method=${method}`);
     }
-  } else {
-    console.log(`❌ Demo mode condition NOT matched - no blocking`);
   }
   
   // Log page views for relevant routes
