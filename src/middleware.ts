@@ -94,6 +94,11 @@ export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const method = request.method;
   
+  // Skip audit-logs to avoid infinite loops
+  if (pathname.startsWith('/api/audit-logs')) {
+    return NextResponse.next();
+  }
+  
   // Debug logging
   console.log(`[Middleware] ${method} ${pathname}, DEMO_MODE=${process.env.DEMO_MODE}`);
   
@@ -129,13 +134,9 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths including API routes except:
-     * - api/audit-logs (to avoid infinite loops)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
+     * Match all requests including API routes
+     * Exclude only Next.js internals and audit-logs to avoid loops
      */
-    '/((?!api/audit-logs|_next/static|_next/image|favicon.ico).*)',
-    '/api/((?!audit-logs).*)', // Explicitly include API routes except audit-logs
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };
