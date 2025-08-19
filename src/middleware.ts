@@ -92,14 +92,20 @@ async function logPageView(request: NextRequest, pathname: string) {
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  const method = request.method;
+  
+  // Debug logging
+  console.log(`[Middleware] ${method} ${pathname}, DEMO_MODE=${process.env.DEMO_MODE}`);
   
   // Check for demo mode - block all write operations
   if (process.env.DEMO_MODE === 'true') {
-    const method = request.method;
     const isApiRoute = pathname.startsWith('/api/');
+    
+    console.log(`[Demo Mode] API Route: ${isApiRoute}, Method: ${method}`);
     
     // Block POST, PUT, DELETE, PATCH operations in demo mode
     if (isApiRoute && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+      console.log(`[Demo Mode] Blocking ${method} request to ${pathname}`);
       return NextResponse.json(
         { 
           error: 'Demo mode is enabled. Write operations are not allowed.',
@@ -123,12 +129,13 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
+     * Match all request paths including API routes except:
      * - api/audit-logs (to avoid infinite loops)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      */
     '/((?!api/audit-logs|_next/static|_next/image|favicon.ico).*)',
+    '/api/((?!audit-logs).*)', // Explicitly include API routes except audit-logs
   ],
 };
