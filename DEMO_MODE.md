@@ -4,11 +4,11 @@ Demo mode provides a read-only version of HarborGuard for demonstration purposes
 
 ## Usage
 
-Set the environment variable `DEMO_MODE=true` to enable demo mode:
+Set the environment variable `NEXT_PUBLIC_DEMO_MODE=true` to enable demo mode:
 
 ```bash
 # Enable demo mode
-export DEMO_MODE=true
+export NEXT_PUBLIC_DEMO_MODE=true
 
 # Start the application
 npm start
@@ -17,7 +17,7 @@ npm start
 Or with Docker:
 
 ```bash
-docker run -e DEMO_MODE=true harborguard
+docker run -e NEXT_PUBLIC_DEMO_MODE=true harborguard
 ```
 
 ## Features
@@ -63,7 +63,7 @@ Demo mode is controlled by a single environment variable:
 
 | Variable | Values | Default | Description |
 |----------|--------|---------|-------------|
-| `DEMO_MODE` | `true`/`false` | `false` | Enables read-only demo mode |
+| `NEXT_PUBLIC_DEMO_MODE` | `true`/`false` | `false` | Enables read-only demo mode |
 
 ## Testing
 
@@ -87,6 +87,6 @@ curl -X GET http://localhost:3000/api/scans
 If demo mode is not working:
 
 1. Check the server logs for middleware debug messages
-2. Ensure `DEMO_MODE=true` is set in the environment
+2. Ensure `NEXT_PUBLIC_DEMO_MODE=true` is set in the environment
 3. Verify the request is going to an `/api/*` endpoint
 4. Check that the HTTP method is POST, PUT, DELETE, or PATCH

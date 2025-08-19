@@ -106,12 +106,12 @@ export function middleware(request: NextRequest) {
   }
   
   // Debug logging
-  console.log(`[Middleware] ${method} ${pathname}, DEMO_MODE=${process.env.NEXT_PUBLIC_DEMO_MODE}`);
+  console.log(`[Middleware] ${method} ${pathname}, NEXT_PUBLIC_DEMO_MODE=${process.env.NEXT_PUBLIC_DEMO_MODE}`);
   
   // Check for demo mode - block all write operations
-  console.log(`🔍 Demo Mode Check: process.env.DEMO_MODE = "${process.env.DEMO_MODE}" (type: ${typeof process.env.DEMO_MODE})`);
+  console.log(`🔍 Demo Mode Check: NEXT_PUBLIC_DEMO_MODE = "${process.env.NEXT_PUBLIC_DEMO_MODE}" (type: ${typeof process.env.NEXT_PUBLIC_DEMO_MODE})`);
   
-  if (process.env.DEMO_MODE === 'true') {
+  if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
     console.log(`✅ Demo mode condition matched!`);
     const isApiRoute = pathname.startsWith('/api/');
     
