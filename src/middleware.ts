@@ -106,10 +106,13 @@ export function middleware(request: NextRequest) {
   }
   
   // Debug logging
-  console.log(`[Middleware] ${method} ${pathname}, DEMO_MODE=${process.env.DEMO_MODE}`);
+  console.log(`[Middleware] ${method} ${pathname}, DEMO_MODE=${process.env.NEXT_PUBLIC_DEMO_MODE}`);
   
   // Check for demo mode - block all write operations
+  console.log(`🔍 Demo Mode Check: process.env.DEMO_MODE = "${process.env.DEMO_MODE}" (type: ${typeof process.env.DEMO_MODE})`);
+  
   if (process.env.DEMO_MODE === 'true') {
+    console.log(`✅ Demo mode condition matched!`);
     const isApiRoute = pathname.startsWith('/api/');
     
     console.log(`[Demo Mode] API Route: ${isApiRoute}, Method: ${method}`);
@@ -125,7 +128,11 @@ export function middleware(request: NextRequest) {
         },
         { status: 403 }
       );
+    } else {
+      console.log(`[Demo Mode] Not blocking: isApiRoute=${isApiRoute}, method=${method}`);
     }
+  } else {
+    console.log(`❌ Demo mode condition NOT matched - no blocking`);
   }
   
   // Log page views for relevant routes
