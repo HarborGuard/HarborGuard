@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
+import { EventType, LogCategory, LogAction } from '@/generated/prisma';
 
 const auditLogQuerySchema = z.object({
   page: z.string().optional().default('1'),
@@ -16,7 +17,7 @@ const auditLogQuerySchema = z.object({
 
 const createAuditLogSchema = z.object({
   eventType: z.string(),
-  category: z.enum(['informative', 'action', 'security', 'error']),
+  category: z.enum(['informative', 'action', 'security', 'error', 'INFORMATIVE', 'OPERATIONAL', 'SECURITY', 'ERROR']),
   userIp: z.string(),
   userAgent: z.string().optional(),
   userId: z.string().optional(),
@@ -25,6 +26,58 @@ const createAuditLogSchema = z.object({
   details: z.any().optional(),
   metadata: z.any().optional(),
 });
+
+// Map string event types to Prisma EventType enum
+function mapEventType(eventType: string): EventType {
+  switch (eventType.toLowerCase()) {
+    case 'page_view': return EventType.SYSTEM_EVENT;
+    case 'scan_start': return EventType.SCAN_START;
+    case 'scan_complete': return EventType.SCAN_COMPLETE;
+    case 'scan_failed': return EventType.SCAN_FAILED;
+    case 'cve_classification': return EventType.SYSTEM_EVENT;
+    case 'image_delete': return EventType.IMAGE_REMOVED;
+    case 'image_rescan': return EventType.SYSTEM_EVENT;
+    case 'bulk_scan_start': return EventType.SCAN_START;
+    case 'user_login': return EventType.USER_LOGIN;
+    case 'user_logout': return EventType.SYSTEM_EVENT;
+    case 'system_error': return EventType.SYSTEM_EVENT;
+    // Handle direct enum values
+    case 'system_event': return EventType.SYSTEM_EVENT;
+    case 'scan_start': return EventType.SCAN_START;
+    case 'scan_complete': return EventType.SCAN_COMPLETE;
+    case 'scan_failed': return EventType.SCAN_FAILED;
+    case 'image_removed': return EventType.IMAGE_REMOVED;
+    case 'user_login': return EventType.USER_LOGIN;
+    default: return EventType.SYSTEM_EVENT;
+  }
+}
+
+// Map string categories to Prisma LogCategory enum
+function mapLogCategory(category: string): LogCategory {
+  switch (category.toLowerCase()) {
+    case 'informative': return LogCategory.INFORMATIVE;
+    case 'action': 
+    case 'operational': return LogCategory.OPERATIONAL;
+    case 'security': return LogCategory.SECURITY;
+    case 'error': return LogCategory.ERROR;
+    default: return LogCategory.INFORMATIVE;
+  }
+}
+
+// Map action strings to Prisma LogAction enum
+function mapLogAction(action: string): LogAction {
+  const actionLower = action.toLowerCase();
+  if (actionLower.includes('create')) return LogAction.CREATE;
+  if (actionLower.includes('update')) return LogAction.UPDATE;
+  if (actionLower.includes('delete')) return LogAction.DELETE;
+  if (actionLower.includes('view') || actionLower.includes('read')) return LogAction.VIEW;
+  if (actionLower.includes('scan')) return LogAction.SCAN;
+  if (actionLower.includes('upload')) return LogAction.UPLOAD;
+  if (actionLower.includes('download')) return LogAction.DOWNLOAD;
+  if (actionLower.includes('login')) return LogAction.LOGIN;
+  if (actionLower.includes('logout')) return LogAction.LOGOUT;
+  return LogAction.VIEW; // Default fallback
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -115,13 +168,13 @@ export async function POST(request: NextRequest) {
     }
 
     const auditLogData = {
-      eventType: body.eventType,
-      category: body.category,
+      eventType: mapEventType(body.eventType),
+      category: mapLogCategory(body.category),
       userIp: body.userIp,
       userAgent: body.userAgent || null,
       userId: body.userId || null,
       resource: body.resource || null,
-      action: body.action,
+      action: mapLogAction(body.action),
       details: body.details || null,
       metadata: body.metadata || null,
     };

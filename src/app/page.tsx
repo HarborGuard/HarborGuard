@@ -21,7 +21,6 @@ export default function Page() {
     id: i,
     riskScore: 0,
     severities: { crit: 0, high: 0, med: 0, low: 0 },
-    fixable: { count: 0, percent: 0 },
     status: "Loading",
     misconfigs: 0,
     secrets: 0,

@@ -42,10 +42,6 @@ interface HistoricalScan {
     med: number
     low: number
   }
-  fixable: {
-    count: number
-    percent: number
-  }
   status: string
   scanDuration: string
   newVulns: number

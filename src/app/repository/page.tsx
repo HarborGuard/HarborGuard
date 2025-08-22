@@ -9,6 +9,7 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar"
 import { useScans } from "@/hooks/useScans"
+import { FullPageLoading } from "@/components/ui/loading"
 
 export default function ImageRepositoryPage() {
   const { scans, loading } = useScans()
@@ -18,7 +19,12 @@ export default function ImageRepositoryPage() {
   ]
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>
+    return (
+      <FullPageLoading 
+        message="Loading Image Repository" 
+        description="Fetching container images and scan results..."
+      />
+    )
   }
 
   return (

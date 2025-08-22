@@ -30,29 +30,32 @@ export async function GET(
     let reportData: any = null
     let filename: string = ''
 
+    // Get scan results from the new schema structure
+    const scanResults = (scan as any).metadata?.scanResults;
+    
     switch (reportType.toLowerCase()) {
       case 'trivy':
-        reportData = (scan as any).scannerReports?.trivy || (scan as any).trivy
+        reportData = scanResults?.trivy || (scan as any).scannerReports?.trivy || (scan as any).trivy
         filename = `${decodedImageName.replace('/', '_')}_${scanId}_trivy.json`
         break
       case 'grype':
-        reportData = (scan as any).scannerReports?.grype || (scan as any).grype
+        reportData = scanResults?.grype || (scan as any).scannerReports?.grype || (scan as any).grype
         filename = `${decodedImageName.replace('/', '_')}_${scanId}_grype.json`
         break
       case 'syft':
-        reportData = (scan as any).scannerReports?.syft || (scan as any).syft
+        reportData = scanResults?.syft || (scan as any).scannerReports?.syft || (scan as any).syft
         filename = `${decodedImageName.replace('/', '_')}_${scanId}_syft.json`
         break
       case 'dockle':
-        reportData = (scan as any).scannerReports?.dockle || (scan as any).dockle
+        reportData = scanResults?.dockle || (scan as any).scannerReports?.dockle || (scan as any).dockle
         filename = `${decodedImageName.replace('/', '_')}_${scanId}_dockle.json`
         break
       case 'osv':
-        reportData = (scan as any).scannerReports?.osv || (scan as any).osv
+        reportData = scanResults?.osv || (scan as any).scannerReports?.osv || (scan as any).osv
         filename = `${decodedImageName.replace('/', '_')}_${scanId}_osv.json`
         break
       case 'dive':
-        reportData = (scan as any).scannerReports?.dive || (scan as any).dive
+        reportData = scanResults?.dive || (scan as any).scannerReports?.dive || (scan as any).dive
         filename = `${decodedImageName.replace('/', '_')}_${scanId}_dive.json`
         break
       default:

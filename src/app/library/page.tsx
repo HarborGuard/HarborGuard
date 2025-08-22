@@ -46,6 +46,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { FullPageLoading, StatsLoadingSkeleton, TableLoadingSkeleton } from "@/components/ui/loading"
 
 interface VulnerabilityData {
   cveId: string
@@ -209,7 +210,50 @@ export default function LibraryHomePage() {
   }, [vulnerabilities])
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen">Loading vulnerabilities...</div>
+    return (
+      <SidebarProvider
+        style={
+          {
+            "--sidebar-width": "calc(var(--spacing) * 72)",
+            "--header-height": "calc(var(--spacing) * 12)",
+          } as React.CSSProperties
+        }
+      >
+        <AppSidebar variant="inset" />
+        <SidebarInset className="flex flex-col flex-grow">
+          <SiteHeader breadcrumbs={breadcrumbs} />
+          <div className="flex flex-1 flex-col">
+            <div className="@container/main flex flex-1 flex-col gap-2 overflow-auto">
+              <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6 px-4 lg:px-6">
+                {/* Stats skeleton */}
+                <StatsLoadingSkeleton />
+                
+                {/* Table skeleton */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <div className="animate-pulse">
+                        <IconBug className="h-5 w-5" />
+                      </div>
+                      Loading Vulnerability Library
+                    </CardTitle>
+                    <CardDescription>
+                      Loading all vulnerabilities found across scanned images...
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <TableLoadingSkeleton
+                      columns={8}
+                      rows={10}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    )
   }
 
   return (

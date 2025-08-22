@@ -1,6 +1,3 @@
-import { schedulerService } from './scheduler/SchedulerService';
-import { scanTemplateService } from './templates/ScanTemplateService';
-
 let initialized = false;
 
 export async function initializeServices(): Promise<void> {
@@ -11,12 +8,7 @@ export async function initializeServices(): Promise<void> {
   console.log('Initializing HarborGuard services...');
 
   try {
-    // Initialize scan templates
-    await scanTemplateService.initializeDefaultTemplates();
-
-    // Initialize scheduled scans
-    await schedulerService.initializeSchedules();
-
+    // Services initialization is now handled by individual components as needed
     initialized = true;
     console.log('HarborGuard services initialized successfully');
 
@@ -32,8 +24,6 @@ export function setupGracefulShutdown(): void {
     console.log('Shutting down HarborGuard services...');
     
     try {
-      // Stop all scheduled scans
-      schedulerService.destroy();
       console.log('Services shut down successfully');
     } catch (error) {
       console.error('Error during shutdown:', error);

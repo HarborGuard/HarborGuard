@@ -37,12 +37,7 @@ const data = {
       title: "Vulnerability Library",
       url: "/library",
       icon: IconBook,
-    },
-    {
-      title: "Scan Setup",
-      url: "/scan-setup",
-      icon: IconSettings,
-    },
+    }
   ],
 };
 

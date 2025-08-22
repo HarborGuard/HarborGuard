@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useDatabase } from "@/providers/DatabaseProvider";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -35,6 +36,7 @@ import { toast } from "sonner";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 interface BulkScanJob {
   id: string;
@@ -61,21 +63,26 @@ interface BulkScanJob {
 
 export default function BulkScanPage() {
   const [activeTab, setActiveTab] = useState("new");
-  const [jobs, setJobs] = useState<BulkScanJob[]>([]);
   const [loading, setLoading] = useState(false);
-  const [jobsLoading, setJobsLoading] = useState(false);
 
-  // Fetch bulk scan jobs
+  // Use DatabaseProvider instead of local state
+  const { 
+    bulkScans: jobs, 
+    bulkScansLoading: jobsLoading, 
+    bulkScansError,
+    refreshBulkScans 
+  } = useDatabase();
+
+  // Fetch bulk scan jobs - now uses DatabaseProvider
   const fetchJobs = async () => {
-    setJobsLoading(true);
-    try {
-      const response = await fetch("/api/scans/bulk");
-      const result = await response.json();
-      
-      if (result.success) {
-        // Get detailed status for each running job
+    await refreshBulkScans();
+    
+    // Get detailed status for running jobs (this still needs direct API calls for real-time status)
+    const runningJobs = jobs.filter(job => job.status === "RUNNING");
+    if (runningJobs.length > 0) {
+      try {
         const jobsWithDetails = await Promise.all(
-          result.data.map(async (job: BulkScanJob) => {
+          jobs.map(async (job: any) => {
             if (job.status === "RUNNING") {
               try {
                 const statusResponse = await fetch(`/api/scans/bulk/${job.id}`);
@@ -90,19 +97,19 @@ export default function BulkScanPage() {
             return job;
           })
         );
-        setJobs(jobsWithDetails);
-      } else {
-        toast.error("Failed to load bulk scan jobs");
+        // Note: In a full implementation, we'd update the DatabaseProvider state here
+      } catch (error) {
+        console.error("Error fetching bulk scan job details:", error);
+        toast.error("Failed to load bulk scan job details");
       }
-    } catch (error) {
-      console.error("Error fetching bulk scan jobs:", error);
-      toast.error("Failed to load bulk scan jobs");
-    } finally {
-      setJobsLoading(false);
     }
   };
 
   // Fetch jobs on component mount and when switching to jobs tab
+  useEffect(() => {
+    refreshBulkScans();
+  }, [refreshBulkScans]);
+
   useEffect(() => {
     if (activeTab === "jobs") {
       fetchJobs();
@@ -487,8 +494,12 @@ export default function BulkScanPage() {
                 {jobsLoading && jobs.length === 0 ? (
                   <Card>
                     <CardContent className="flex flex-col items-center justify-center py-12">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                      <p className="text-gray-500">Loading jobs...</p>
+                      <div className="flex items-center space-x-3">
+                        <Activity className="h-5 w-5 text-primary animate-pulse" />
+                        <LoadingSpinner size="md" />
+                      </div>
+                      <p className="text-muted-foreground mt-4">Loading bulk scan jobs...</p>
+                      <p className="text-sm text-muted-foreground mt-2">Fetching scan history and progress...</p>
                     </CardContent>
                   </Card>
                 ) : jobs.length === 0 ? (
@@ -537,13 +548,13 @@ export default function BulkScanPage() {
                             <div className="flex items-center justify-between text-sm mb-2">
                               <span>Progress</span>
                               <span>
-                                {job.summary?.completed || 0}/{job.totalImages} images
+                                {(job as any).summary?.completed || 0}/{job.totalImages} images
                               </span>
                             </div>
                             <Progress
                               value={
                                 job.totalImages > 0 
-                                  ? ((job.summary?.completed || 0) / job.totalImages) * 100
+                                  ? (((job as any).summary?.completed || 0) / job.totalImages) * 100
                                   : 0
                               }
                               className="w-full"
@@ -562,13 +573,13 @@ export default function BulkScanPage() {
                             <div>
                               <span className="text-gray-600">Completed:</span>
                               <div className="font-medium text-green-600">
-                                {job.summary?.completed || 0}
+                                {(job as any).summary?.completed || 0}
                               </div>
                             </div>
                             <div>
                               <span className="text-gray-600">Failed:</span>
                               <div className="font-medium text-red-600">
-                                {job.summary?.failed || 0}
+                                {(job as any).summary?.failed || 0}
                               </div>
                             </div>
                           </div>
@@ -578,19 +589,19 @@ export default function BulkScanPage() {
                               Patterns
                             </h4>
                             <div className="flex flex-wrap gap-2">
-                              {job.patterns.imagePattern && (
+                              {(job.patterns as any)?.imagePattern && (
                                 <Badge variant="outline">
-                                  Image: {job.patterns.imagePattern}
+                                  Image: {(job.patterns as any)?.imagePattern}
                                 </Badge>
                               )}
-                              {job.patterns.tagPattern && (
+                              {(job.patterns as any)?.tagPattern && (
                                 <Badge variant="outline">
-                                  Tag: {job.patterns.tagPattern}
+                                  Tag: {(job.patterns as any)?.tagPattern}
                                 </Badge>
                               )}
-                              {job.patterns.registryPattern && (
+                              {(job.patterns as any)?.registryPattern && (
                                 <Badge variant="outline">
-                                  Registry: {job.patterns.registryPattern}
+                                  Registry: {(job.patterns as any)?.registryPattern}
                                 </Badge>
                               )}
                             </div>

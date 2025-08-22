@@ -11,7 +11,6 @@ import {
   countMisconfigurations,
   countSecrets,
   calculateScanDuration,
-  calculateFixable,
   getHighestCVSS,
   getOSVPackageStats,
   countOSVVulnerabilities,
@@ -26,7 +25,6 @@ function transformScansForUI(scans: ScanWithImage[]): LegacyScan[] {
     const vulnerabilities = aggregateVulnerabilities(scan)
     const compliance = aggregateCompliance(scan)
     const riskScore = calculateRiskScore(scan)
-    const fixable = calculateFixable(scan)
     const duration = calculateScanDuration(scan)
     
     return {
@@ -38,7 +36,7 @@ function transformScansForUI(scans: ScanWithImage[]): LegacyScan[] {
       source: scan.source || undefined, // Add source information
       digestShort: scan.image.digest?.slice(7, 19) || '',
       platform: scan.image.platform || 'unknown',
-      sizeMb: scan.sizeBytes ? Math.round(parseInt(scan.sizeBytes) / 1024 / 1024) : 0,
+      sizeMb: scan.image.sizeBytes ? Math.round(Number(scan.image.sizeBytes) / 1024 / 1024) : 0,
       riskScore,
       
       severities: {
@@ -48,7 +46,6 @@ function transformScansForUI(scans: ScanWithImage[]): LegacyScan[] {
         low: vulnerabilities.low,
       },
       
-      fixable,
       highestCvss: getHighestCVSS(scan),
       misconfigs: countMisconfigurations(scan),
       secrets: countSecrets(scan),
@@ -89,7 +86,7 @@ function transformScansForUI(scans: ScanWithImage[]): LegacyScan[] {
       target: undefined,
       limit: undefined,
       
-      scannerReports: scan.scannerReports,
+      scannerReports: undefined, // TODO: Extract from scan.scanResults in new schema
       digest: scan.image.digest,
       layers: [], // Would extract from metadata
       osInfo: extractOsInfo(scan),
@@ -120,13 +117,7 @@ function mapScanStatus(status: string): "Complete" | "Queued" | "Error" | "Prior
 }
 
 function extractOsInfo(scan: ScanWithImage): { family: string; name: string } | undefined {
-  const trivyReport = scan.scannerReports?.trivy
-  if (trivyReport?.Metadata?.OS) {
-    return {
-      family: trivyReport.Metadata.OS.Family,
-      name: trivyReport.Metadata.OS.Name,
-    }
-  }
+  // TODO: Extract OS info from scan.scanResults.rawOutput in new schema
   return undefined
 }
 
@@ -266,17 +257,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         misconfiguration: { pass: 0, warn: 0, info: 0 },
         secretsData: { count: 0, results: [] }, // Rename to avoid conflict
         fixed: 0,
-        fixable: {
-          count: 0,
-          percent: 0
-        },
         misconfigs: 0,
         secrets: 0, // This should be a number for the reduce operation
         osvPackages: 0,
         osvVulnerable: 0,
         osvEcosystems: [],
         baseImage: extractBaseImage(scan.image.name),
-        osInfo: undefined
+        osInfo: undefined,
+        lastScan: scan.finishedAt || scan.startedAt,
+        registry: scan.image.registry
       })) || []
 
       const actionType = loadMore ? 'APPEND_SCANS' : 'SET_SCANS'
@@ -329,10 +318,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          eventType: 'scan_complete',
-          category: 'informative',
+          eventType: 'SCAN_COMPLETE',
+          category: 'OPERATIONAL',
           userIp: 'system',
-          action: `Completed scan for ${imageName}`,
+          action: 'SCAN',
           resource: imageName,
           details: { scanId, imageName }
         }),

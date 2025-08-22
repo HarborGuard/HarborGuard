@@ -71,12 +71,12 @@ async function logPageView(request: NextRequest, pathname: string) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        eventType: 'page_view',
-        category: 'informative',
+        eventType: 'SYSTEM_EVENT',
+        category: 'INFORMATIVE',
         userIp,
         userAgent,
         resource: pathname,
-        action: `User loaded ${pathname}`,
+        action: 'VIEW',
         details: { pathname },
         metadata: {
           method: request.method,

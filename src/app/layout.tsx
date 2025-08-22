@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AppProvider } from "@/contexts/AppContext";
 import { ScanningProvider } from "@/providers/ScanningProvider";
+import { DatabaseProvider } from "@/providers/DatabaseProvider";
 import { ScanCompletionSync } from "@/components/ScanCompletionSync";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -32,11 +33,13 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
       >
         <AppProvider>
-          <ScanningProvider>
-            <ScanCompletionSync />
-            {children}
-            <Toaster />
-          </ScanningProvider>
+          <DatabaseProvider>
+            <ScanningProvider>
+              <ScanCompletionSync />
+              {children}
+              <Toaster />
+            </ScanningProvider>
+          </DatabaseProvider>
         </AppProvider>
       </body>
     </html>

@@ -30,10 +30,9 @@ export async function GET(request: NextRequest) {
           startedAt: true,
           finishedAt: true,
           status: true,
-          vulnerabilityCount: true,
           riskScore: true,
-          complianceScore: true,
           source: true,
+          metadata: true,
           image: {
             select: {
               id: true,
@@ -53,7 +52,28 @@ export async function GET(request: NextRequest) {
     
     // Process and serialize the data
     const serializedData = scans.map((scan: any) => {
-      const vulnCount = scan.vulnerabilityCount || {}
+      // Extract vulnerability counts from scan metadata (like vulnerabilities API does)
+      let vulnCount = { total: 0, critical: 0, high: 0, medium: 0, low: 0 }
+      
+      const scanResults = (scan.metadata as any)?.scanResults
+      const trivyResults = scanResults?.trivy
+      
+      if (trivyResults?.Results) {
+        for (const result of trivyResults.Results) {
+          if (result.Vulnerabilities) {
+            for (const vuln of result.Vulnerabilities) {
+              const severity = (vuln.Severity || 'unknown').toLowerCase()
+              
+              if (severity === 'critical') vulnCount.critical++
+              else if (severity === 'high') vulnCount.high++
+              else if (severity === 'medium') vulnCount.medium++
+              else if (severity === 'low' || severity === 'info') vulnCount.low++
+              vulnCount.total++
+            }
+          }
+        }
+      }
+
       return {
         id: scan.id,
         requestId: scan.requestId,
@@ -63,14 +83,14 @@ export async function GET(request: NextRequest) {
         status: scan.status,
         riskScore: scan.riskScore,
         source: scan.source,
-        image: scan.image,
-        vulnerabilityCount: {
-          total: vulnCount.total || 0,
-          critical: vulnCount.critical || 0,
-          high: vulnCount.high || 0,
-          medium: vulnCount.medium || 0,
-          low: vulnCount.low || 0
+        image: {
+          id: scan.image.id,
+          name: scan.image.name,
+          tag: scan.image.tag,
+          registry: scan.image.registry,
+          digest: scan.image.digest
         },
+        vulnerabilityCount: vulnCount,
         complianceScore: scan.complianceScore
       }
     })

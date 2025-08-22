@@ -29,10 +29,6 @@ interface SectionCardsProps {
       med: number
       low: number
     }
-    fixable: {
-      count: number
-      percent: number
-    }
     status: string
     misconfigs: number
     secrets: number
@@ -68,10 +64,6 @@ export function SectionCards({ loading = false, scanData, stats }: SectionCardsP
   const totalHighVulns = stats.vulnerabilities.high
   const totalVulns = stats.vulnerabilities.total
   
-  const totalFixableVulns = scanData.reduce((sum, item) => sum + item.fixable.count, 0)
-  const averageFixablePercent = totalImages > 0 
-    ? Math.round(scanData.reduce((sum, item) => sum + item.fixable.percent, 0) / totalImages)
-    : 0
   
   const totalMisconfigs = scanData.reduce((sum, item) => sum + item.misconfigs, 0)
   const totalSecrets = scanData.reduce((sum, item) => sum + item.secrets, 0)
@@ -218,7 +210,7 @@ export function SectionCards({ loading = false, scanData, stats }: SectionCardsP
             {totalCriticalVulns > 0 ? "Immediate action needed" : "No critical issues"} <IconAlertTriangle className="size-4" />
           </div>
           <div className="text-muted-foreground">
-            {totalFixableVulns} fixable ({averageFixablePercent}% avg)
+            View details for breakdown
           </div>
         </CardFooter>
       </Card>
@@ -241,7 +233,7 @@ export function SectionCards({ loading = false, scanData, stats }: SectionCardsP
             {totalMisconfigs} misconfigurations detected <IconAlertTriangle className="size-4" />
           </div>
           <div className="text-muted-foreground">
-            {totalOSVPackages > 0 ? `${totalOSVVulnerable} of ${totalOSVPackages} packages vulnerable` : `${totalFixableVulns} vulnerabilities can be fixed`}
+            {totalOSVPackages > 0 ? `${totalOSVVulnerable} of ${totalOSVPackages} packages vulnerable` : `View details for breakdown`}
           </div>
         </CardFooter>
       </Card>

@@ -49,7 +49,6 @@ import {
   useReactTable,
   VisibilityState,
 } from "@tanstack/react-table"
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -66,12 +65,6 @@ import {
 } from "@/components/ui/context-menu"
 import { DeleteImageDialog } from "@/components/delete-image-dialog"
 import { useScanning } from "@/providers/ScanningProvider"
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Drawer,
@@ -112,11 +105,6 @@ import {
   Tabs,
   TabsContent,
 } from "@/components/ui/tabs"
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group"
-import { aggregateUniqueVulnerabilitiesFromLegacyScans } from "@/lib/scan-aggregations"
 
 
 const severityCountsSchema = z.object({
@@ -144,47 +132,20 @@ export const schema = z.object({
   // Risk & vuln summary
   riskScore: z.number().int().min(0).max(100),          // 0–100
   severities: severityCountsSchema,                      // {crit, high, med, low}
-  fixable: z.object({
-    count: z.number().int().nonnegative(),
-    percent: z.number().min(0).max(100),
-  }),
   highestCvss: z.number().min(0).max(10).optional(),
   misconfigs: z.number().int().nonnegative().default(0),
   secrets: z.number().int().nonnegative().default(0),
 
   // Compliance / policy
   compliance: complianceSchema.optional(),
-  policy: z.enum(["Pass", "Warn", "Blocked"]).optional(),
 
-  // Usage / deltas
-  delta: z.object({
-    newCrit: z.number().int().nonnegative().optional(),
-    resolvedTotal: z.number().int().nonnegative().optional(),
-  }).optional(),
-  inUse: z.object({
-    clusters: z.number().int().nonnegative(),
-    pods: z.number().int().nonnegative(),
-  }).optional(),
-
-  // Metadata
-  baseImage: z.string().optional(),
-  baseUpdate: z.string().optional(),                     // e.g., "12.7 available"
-  signed: z.boolean().optional(),
-  attested: z.boolean().optional(),
-  sbomFormat: z.enum(["spdx", "cyclonedx"]).optional(),
-  dbAge: z.string().optional(),                     // e.g., "2h"
+  // Metadata  
   registry: z.string().optional(),
-  project: z.string().optional(),
 
   // Timestamps / status
   lastScan: z.string().datetime(),                     // ISO 8601
   status: z.enum(["Complete", "Queued", "Error", "Prior"]),
 
-  // Legacy (kept optional for compatibility)
-  header: z.string().optional(),
-  type: z.string().optional(),
-  target: z.string().optional(),
-  limit: z.string().optional(),
   
   // Metadata for grouped images
   _tagCount: z.number().optional(),
@@ -214,12 +175,8 @@ function DragHandle({ id }: { id: number }) {
   )
 }
 
-const columns: ColumnDef<z.infer<typeof schema>>[] = [
-  {
-    id: "drag",
-    header: () => null,
-    cell: ({ row }) => <DragHandle id={row.original.id} />,
-  },
+function createColumns(handleDeleteClick: (imageName: string) => void): ColumnDef<z.infer<typeof schema>>[] {
+  return [
   {
     id: "select",
     header: ({ table }) => (
@@ -249,7 +206,22 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   // Identity / basics
   {
     accessorKey: "image",
-    header: "Image",
+    header: ({ column }) => {
+      return (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-auto p-0 hover:bg-transparent font-medium"
+        >
+          Image
+          {column.getIsSorted() === "asc" ? (
+            <IconChevronDown className="ml-2 h-4 w-4 rotate-180" />
+          ) : column.getIsSorted() === "desc" ? (
+            <IconChevronDown className="ml-2 h-4 w-4" />
+          ) : null}
+        </Button>
+      )
+    },
     cell: ({ row }) => {
       const imageName = row.original.image;
       const tagCount = (row.original as any)._tagCount || 1;
@@ -267,6 +239,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
       );
     },
     enableHiding: false,
+    enableSorting: true,
   },
   {
     accessorKey: "digestShort",
@@ -286,7 +259,22 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
   {
     accessorKey: "status",
-    header: "Status",
+    header: ({ column }) => {
+      return (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-auto p-0 hover:bg-transparent font-medium"
+        >
+          Status
+          {column.getIsSorted() === "asc" ? (
+            <IconChevronDown className="ml-2 h-4 w-4 rotate-180" />
+          ) : column.getIsSorted() === "desc" ? (
+            <IconChevronDown className="ml-2 h-4 w-4" />
+          ) : null}
+        </Button>
+      )
+    },
     cell: ({ row }) => (
       <ImageStatusCell 
         imageName={row.original.imageName || row.original.image.split(':')[0]}
@@ -305,7 +293,22 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   // Risk & vuln summary
   {
     accessorKey: "riskScore",
-    header: "Risk Score",
+    header: ({ column }) => {
+      return (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-auto p-0 hover:bg-transparent font-medium"
+        >
+          Risk Score
+          {column.getIsSorted() === "asc" ? (
+            <IconChevronDown className="ml-2 h-4 w-4 rotate-180" />
+          ) : column.getIsSorted() === "desc" ? (
+            <IconChevronDown className="ml-2 h-4 w-4" />
+          ) : null}
+        </Button>
+      )
+    },
     cell: ({ row }) => (
       <Badge variant={row.original.riskScore > 70 ? "destructive" : row.original.riskScore > 40 ? "secondary" : "default"}>
         {row.original.riskScore}
@@ -316,54 +319,41 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     accessorKey: "severities",
     header: "Findings",
     cell: ({ row }) => {
-      const { crit, high, med, low } = row.original.severities;
+      // Check both possible data structures
+      const severities = row.original.severities || {};
+      const { crit = 0, high = 0, med = 0, low = 0 } = severities;
+      const total = crit + high + med + low;
+      
+      
+      if (total === 0) {
+        return <Badge variant="outline" className="text-xs">No vulnerabilities</Badge>
+      }
+      
       return (
-        <ToggleGroup type="multiple" variant="outline">
+        <div className="flex flex-wrap gap-1">
           {crit > 0 && (
-            <ToggleGroupItem
-              value="critical"
-              className="bg-red-500/10 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-500/20 px-2 py-1 text-xs"
-            >
+            <Badge variant="destructive" className="text-xs px-1.5 py-0.5">
               C: {crit}
-            </ToggleGroupItem>
+            </Badge>
           )}
           {high > 0 && (
-            <ToggleGroupItem
-              value="high"
-              className="bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-500/20 px-2 py-1 text-xs"
-            >
+            <Badge variant="destructive" className="text-xs px-1.5 py-0.5 !bg-orange-500">
               H: {high}
-            </ToggleGroupItem>
+            </Badge>
           )}
           {med > 0 && (
-            <ToggleGroupItem
-              value="medium"
-              className="bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800 hover:bg-yellow-500/20 px-2 py-1 text-xs"
-            >
+            <Badge variant="secondary" className="text-xs px-1.5 py-0.5 border-1">
               M: {med}
-            </ToggleGroupItem>
+            </Badge>
           )}
           {low > 0 && (
-            <ToggleGroupItem
-              value="low"
-              className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-500/20 px-2 py-1 text-xs"
-            >
+            <Badge variant="outline" className="text-xs px-1.5 py-0.5">
               L: {low}
-            </ToggleGroupItem>
+            </Badge>
           )}
-        </ToggleGroup>
+        </div>
       );
     },
-  },
-  {
-    accessorKey: "fixable.count",
-    header: "Fixable Count",
-    cell: ({ row }) => row.original.fixable.count,
-  },
-  {
-    accessorKey: "fixable.percent",
-    header: "Fixable %",
-    cell: ({ row }) => `${row.original.fixable.percent}%`,
   },
   {
     accessorKey: "highestCvss",
@@ -384,131 +374,68 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
     accessorKey: "compliance.dockle",
     header: "Dockle",
-    cell: ({ row }) => row.original.compliance?.dockle || "N/A",
-  },
-  {
-    accessorKey: "policy",
-    header: "Policy",
-    cell: ({ row }) => (
-      <Badge variant={row.original.policy === "Blocked" ? "destructive" : row.original.policy === "Warn" ? "secondary" : "default"}>
-        {row.original.policy || "N/A"}
-      </Badge>
-    ),
-  },
-
-  // Usage / deltas
-  {
-    accessorKey: "delta.newCrit",
-    header: "New Critical",
-    cell: ({ row }) => row.original.delta?.newCrit || "N/A",
-  },
-  {
-    accessorKey: "delta.resolvedTotal",
-    header: "Resolved Total",
-    cell: ({ row }) => row.original.delta?.resolvedTotal || "N/A",
-  },
-  {
-    accessorKey: "inUse.clusters",
-    header: "Clusters",
-    cell: ({ row }) => row.original.inUse?.clusters || "N/A",
-  },
-  {
-    accessorKey: "inUse.pods",
-    header: "Pods",
-    cell: ({ row }) => row.original.inUse?.pods || "N/A",
-  },
-
-  // Metadata
-  {
-    accessorKey: "baseImage",
-    header: "Base Image",
-    cell: ({ row }) => row.original.baseImage || "N/A",
-  },
-  {
-    accessorKey: "baseUpdate",
-    header: "Base Update",
-    cell: ({ row }) => row.original.baseUpdate || "N/A",
-  },
-  {
-    accessorKey: "signed",
-    header: "Signed",
-    cell: ({ row }) => row.original.signed ? "Yes" : "No",
-  },
-  {
-    accessorKey: "attested",
-    header: "Attested",
-    cell: ({ row }) => row.original.attested ? "Yes" : "No",
-  },
-  {
-    accessorKey: "sbomFormat",
-    header: "SBOM Format",
-    cell: ({ row }) => row.original.sbomFormat || "N/A",
-  },
-  {
-    accessorKey: "dbAge",
-    header: "DB Age",
-    cell: ({ row }) => row.original.dbAge || "N/A",
+    cell: ({ row }) => {
+      const dockleGrade = row.original.compliance?.dockle;
+      if (!dockleGrade) {
+        return <Badge variant="outline" className="text-xs">Not scanned</Badge>;
+      }
+      const variant = dockleGrade === "A" ? "default" : 
+                     dockleGrade === "B" ? "secondary" : "destructive";
+      return <Badge variant={variant} className="text-xs">{dockleGrade}</Badge>;
+    },
   },
   {
     accessorKey: "registry",
     header: "Registry",
-    cell: ({ row }) => row.original.registry || "N/A",
+    cell: ({ row }) => {
+      const registry = row.original.registry;
+      
+      if (!registry || registry === "docker.io" || registry === null) {
+        return <Badge variant="outline" className="text-xs">Docker Hub</Badge>;
+      }
+      return <Badge variant="secondary" className="text-xs">{registry}</Badge>;
+    },
   },
-  {
-    accessorKey: "project",
-    header: "Project",
-    cell: ({ row }) => row.original.project || "N/A",
-  },
+
+
 
   // Timestamps / status
   {
     accessorKey: "lastScan",
-    header: "Last Scan",
-    cell: ({ row }) => new Date(row.original.lastScan).toLocaleDateString(),
-  },
-
-  // Legacy fields
-  {
-    accessorKey: "header",
-    header: "Header",
-    cell: ({ row }) => row.original.header || "N/A",
-  },
-  {
-    accessorKey: "type",
-    header: "Type",
-    cell: ({ row }) => row.original.type || "N/A",
-  },
-  {
-    accessorKey: "target",
-    header: "Target",
-    cell: ({ row }) => row.original.target || "N/A",
-  },
-  {
-    accessorKey: "limit",
-    header: "Limit",
-    cell: ({ row }) => row.original.limit || "N/A",
-  },
-  {
-    id: "actions",
-    cell: () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
-            size="icon"
-          >
-            <IconDotsVertical />
-            <span className="sr-only">Open menu</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-32">
-          <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
-  },
+    header: ({ column }) => {
+      return (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-auto p-0 hover:bg-transparent font-medium"
+        >
+          Last Scan
+          {column.getIsSorted() === "asc" ? (
+            <IconChevronDown className="ml-2 h-4 w-4 rotate-180" />
+          ) : column.getIsSorted() === "desc" ? (
+            <IconChevronDown className="ml-2 h-4 w-4" />
+          ) : null}
+        </Button>
+      )
+    },
+    cell: ({ row }) => {
+      const lastScan = row.original.lastScan;
+      
+      if (!lastScan) return "N/A";
+      
+      try {
+        const date = new Date(lastScan);
+        if (isNaN(date.getTime())) {
+          return "Invalid Date";
+        }
+        return date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } catch (error) {
+        return "Invalid Date";
+      }
+    },
+  }
 ]
+}
 
 function DraggableRow({ 
   row, 
@@ -610,14 +537,9 @@ export function DataTable({
         new Date(current.lastScan) > new Date(latest.lastScan) ? current : latest
       )
       
-      // Aggregate vulnerability counts across all tags using unique CVE deduplication
-      const uniqueVulns = aggregateUniqueVulnerabilitiesFromLegacyScans(items)
-      const aggregatedSeverities = {
-        crit: uniqueVulns.critical,
-        high: uniqueVulns.high,
-        med: uniqueVulns.medium,
-        low: uniqueVulns.low,
-      }
+      // Use the actual severities from the most recent scan instead of broken aggregation
+      // TODO: Fix aggregateUniqueVulnerabilitiesFromLegacyScans function when CVE deduplication is needed
+      const aggregatedSeverities = baseItem.severities
       
       // Calculate aggregated risk score (average weighted by severity)
       const totalVulns = items.reduce((sum, item) => 
@@ -630,13 +552,6 @@ export function DataTable({
           }, 0) / totalVulns)
         : baseItem.riskScore
       
-      // Aggregate other metrics
-      const totalFixable = items.reduce((sum, item) => sum + item.fixable.count, 0)
-      const totalVulnerabilities = aggregatedSeverities.crit + aggregatedSeverities.high + aggregatedSeverities.med + aggregatedSeverities.low
-      const aggregatedFixable = {
-        count: totalFixable,
-        percent: totalVulnerabilities > 0 ? Math.round((totalFixable / totalVulnerabilities) * 100) : 0
-      }
       
       return {
         ...baseItem,
@@ -645,7 +560,6 @@ export function DataTable({
         imageName, // For navigation
         severities: aggregatedSeverities,
         riskScore: weightedRiskScore,
-        fixable: aggregatedFixable,
         misconfigs: items.reduce((sum, item) => sum + item.misconfigs, 0),
         secrets: items.reduce((sum, item) => sum + item.secrets, 0),
         // Keep the most recent scan date
@@ -669,37 +583,30 @@ export function DataTable({
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({
-      // Hide excessive/detailed fields by default
+      // Default: Show only 6 most important columns
+      // Keep visible: image, status, riskScore, severities, lastScan, registry (6 columns)
+      
+      // Hide additional data columns 
       digestShort: false,
+      platform: false,
       sizeMb: false,
-      "fixable.percent": false,
       highestCvss: false,
       misconfigs: false,
       secrets: false,
       "compliance.dockle": false,
-      "delta.newCrit": false,
-      "delta.resolvedTotal": false,
-      baseImage: false,
-      baseUpdate: false,
-      signed: false,
-      attested: false,
-      sbomFormat: false,
-      dbAge: false,
-      registry: false,
-      project: false,
-      header: false,
-      type: false,
-      target: false,
-      limit: false,
+      registry: true,
     })
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   )
-  const [sorting, setSorting] = React.useState<SortingState>([])
+  const [sorting, setSorting] = React.useState<SortingState>([
+    { id: "lastScan", desc: true } // Default sort by most recent scan
+  ])
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
     pageSize: isFullPage ? 25 : 10,
   })
+  const [showExpanded, setShowExpanded] = React.useState(false)
   const sortableId = React.useId()
   const sensors = useSensors(
     useSensor(MouseSensor, {}),
@@ -707,10 +614,17 @@ export function DataTable({
     useSensor(KeyboardSensor, {})
   )
 
+  const handleDeleteClick = (imageName: string) => {
+    setImageToDelete(imageName)
+    setDeleteDialogOpen(true)
+  }
+
   const dataIds = React.useMemo<UniqueIdentifier[]>(
     () => data?.map(({ image }) => image) || [],
     [data]
   )
+
+  const columns = React.useMemo(() => createColumns(handleDeleteClick), [handleDeleteClick])
 
   const table = useReactTable({
     data,
@@ -806,11 +720,6 @@ export function DataTable({
       toast.dismiss(loadingToastId)
       toast.error('Failed to start rescan')
     }
-  }
-
-  const handleDeleteClick = (imageName: string) => {
-    setImageToDelete(imageName)
-    setDeleteDialogOpen(true)
   }
 
   const handleDeleteConfirm = async () => {
@@ -959,6 +868,21 @@ export function DataTable({
             {table.getFilteredSelectedRowModel().rows.length} of{" "}
             {table.getFilteredRowModel().rows.length} row(s) selected.
           </div>
+          {!isFullPage && table.getFilteredRowModel().rows.length > 10 && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const newSize = showExpanded ? 10 : Math.min(25, table.getFilteredRowModel().rows.length)
+                  setShowExpanded(!showExpanded)
+                  table.setPageSize(newSize)
+                }}
+              >
+                {showExpanded ? "Show Less" : `Show All (${table.getFilteredRowModel().rows.length})`}
+              </Button>
+            </div>
+          )}
           <div className="flex w-full items-center gap-8 lg:w-fit">
             <div className="hidden items-center gap-2 lg:flex">
               <Label htmlFor="rows-per-page" className="text-sm font-medium">
@@ -1059,166 +983,4 @@ export function DataTable({
   )
 }
 
-const chartData = [
-  { month: "January", desktop: 186, mobile: 80 },
-  { month: "February", desktop: 305, mobile: 200 },
-  { month: "March", desktop: 237, mobile: 120 },
-  { month: "April", desktop: 73, mobile: 190 },
-  { month: "May", desktop: 209, mobile: 130 },
-  { month: "June", desktop: 214, mobile: 140 },
-]
 
-const chartConfig = {
-  desktop: {
-    label: "Desktop",
-    color: "var(--primary)",
-  },
-  mobile: {
-    label: "Mobile",
-    color: "var(--primary)",
-  },
-} satisfies ChartConfig
-
-function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
-  const isMobile = useIsMobile()
-
-  return (
-    <Drawer direction={isMobile ? "bottom" : "right"}>
-      <DrawerTrigger asChild>
-        <Button variant="link" className="text-foreground w-fit px-0 text-left">
-          {item.header}
-        </Button>
-      </DrawerTrigger>
-      <DrawerContent>
-        <DrawerHeader className="gap-1">
-          <DrawerTitle>{item.header}</DrawerTitle>
-          <DrawerDescription>
-            Showing total visitors for the last 6 months
-          </DrawerDescription>
-        </DrawerHeader>
-        <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
-          {!isMobile && (
-            <>
-              <ChartContainer config={chartConfig}>
-                <AreaChart
-                  accessibilityLayer
-                  data={chartData}
-                  margin={{
-                    left: 0,
-                    right: 10,
-                  }}
-                >
-                  <CartesianGrid vertical={false} />
-                  <XAxis
-                    dataKey="month"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    tickFormatter={(value) => value.slice(0, 3)}
-                    hide
-                  />
-                  <ChartTooltip
-                    cursor={false}
-                    content={<ChartTooltipContent indicator="dot" />}
-                  />
-                  <Area
-                    dataKey="mobile"
-                    type="natural"
-                    fill="var(--color-mobile)"
-                    fillOpacity={0.6}
-                    stroke="var(--color-mobile)"
-                    stackId="a"
-                  />
-                  <Area
-                    dataKey="desktop"
-                    type="natural"
-                    fill="var(--color-desktop)"
-                    fillOpacity={0.4}
-                    stroke="var(--color-desktop)"
-                    stackId="a"
-                  />
-                </AreaChart>
-              </ChartContainer>
-              <Separator />
-              <div className="grid gap-2">
-                <div className="flex gap-2 leading-none font-medium">
-                  Trending up by 5.2% this month{" "}
-                  <IconTrendingUp className="size-4" />
-                </div>
-                <div className="text-muted-foreground">
-                  Showing total visitors for the last 6 months. This is just
-                  some random text to test the layout. It spans multiple lines
-                  and should wrap around.
-                </div>
-              </div>
-              <Separator />
-            </>
-          )}
-          <form className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3">
-              <Label htmlFor="header">Header</Label>
-              <Input id="header" defaultValue={item.header} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="type">Type</Label>
-                <Select defaultValue={item.type}>
-                  <SelectTrigger id="type" className="w-full">
-                    <SelectValue placeholder="Select a type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Table of Contents">
-                      Table of Contents
-                    </SelectItem>
-                    <SelectItem value="Executive Summary">
-                      Executive Summary
-                    </SelectItem>
-                    <SelectItem value="Technical Approach">
-                      Technical Approach
-                    </SelectItem>
-                    <SelectItem value="Design">Design</SelectItem>
-                    <SelectItem value="Capabilities">Capabilities</SelectItem>
-                    <SelectItem value="Focus Documents">
-                      Focus Documents
-                    </SelectItem>
-                    <SelectItem value="Narrative">Narrative</SelectItem>
-                    <SelectItem value="Cover Page">Cover Page</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="status">Status</Label>
-                <Select defaultValue={item.status}>
-                  <SelectTrigger id="status" className="w-full">
-                    <SelectValue placeholder="Select a status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Done">Done</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Not Started">Not Started</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="target">Target</Label>
-                <Input id="target" defaultValue={item.target} />
-              </div>
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="limit">Limit</Label>
-                <Input id="limit" defaultValue={item.limit} />
-              </div>
-            </div>
-          </form>
-        </div>
-        <DrawerFooter>
-          <Button>Submit</Button>
-          <DrawerClose asChild>
-            <Button variant="outline">Done</Button>
-          </DrawerClose>
-        </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
-  )
-}

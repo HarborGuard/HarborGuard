@@ -31,15 +31,16 @@ export async function GET(
     const zip = new JSZip()
     const reportsFolder = zip.folder('reports')
 
-    // Add available reports to the ZIP
-    const scannerReports = (scan as any).scannerReports || {}
+    // Add available reports to the ZIP - check both new and old schema locations
+    const scanResults = (scan as any).metadata?.scanResults || {};
+    const scannerReports = (scan as any).scannerReports || {};
     const reports = [
-      { name: 'trivy', data: scannerReports.trivy || (scan as any).trivy },
-      { name: 'grype', data: scannerReports.grype || (scan as any).grype },
-      { name: 'syft', data: scannerReports.syft || (scan as any).syft },
-      { name: 'dockle', data: scannerReports.dockle || (scan as any).dockle },
-      { name: 'osv', data: scannerReports.osv || (scan as any).osv },
-      { name: 'dive', data: scannerReports.dive || (scan as any).dive }
+      { name: 'trivy', data: scanResults.trivy || scannerReports.trivy || (scan as any).trivy },
+      { name: 'grype', data: scanResults.grype || scannerReports.grype || (scan as any).grype },
+      { name: 'syft', data: scanResults.syft || scannerReports.syft || (scan as any).syft },
+      { name: 'dockle', data: scanResults.dockle || scannerReports.dockle || (scan as any).dockle },
+      { name: 'osv', data: scanResults.osv || scannerReports.osv || (scan as any).osv },
+      { name: 'dive', data: scanResults.dive || scannerReports.dive || (scan as any).dive }
     ]
 
     let hasReports = false

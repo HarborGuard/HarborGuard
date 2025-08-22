@@ -2,40 +2,96 @@
 // Uses Prisma-generated types as the foundation
 
 import type { 
-  Scan as PrismaScan, 
   Image as PrismaImage,
-  ScanStatus as PrismaScanStatus,
-  CveClassification as PrismaCveClassification
+  Scan as PrismaScan,
+  ScanResult as PrismaScanResult,
+  Scanner as PrismaScanner,
+  BulkScanBatch as PrismaBulkScanBatch,
+  BulkScanItem as PrismaBulkScanItem,
+  Vulnerability as PrismaVulnerability,
+  ImageVulnerability as PrismaImageVulnerability,
+  CveClassification as PrismaCveClassification,
+  PolicyRule as PrismaPolicyRule,
+  PolicyViolation as PrismaPolicyViolation,
+  AuditLog as PrismaAuditLog,
+  ScanStatus,
+  ScanResultStatus,
+  ScannerType,
+  BatchStatus,
+  ItemStatus,
+  Severity,
+  VulnerabilityStatus,
+  PolicyCategory,
+  EventType,
+  LogCategory,
+  LogAction
 } from '@/generated/prisma';
 
-// Re-export Prisma types as the canonical types
-export type ScanStatus = PrismaScanStatus;
-export type Image = PrismaImage;
-export type CveClassification = PrismaCveClassification;
-
-// Base Scan type from Prisma with proper typing for JSON fields
-export type Scan = Omit<PrismaScan, 'sizeBytes'> & {
-  // Convert BigInt to string for JSON serialization
-  sizeBytes: string | null;
-  // Type the JSON fields properly
-  scannerReports?: {
-    dockle?: DockleReport;
-    trivy?: TrivyReport;
-    grype?: GrypeReport;
-    syft?: SyftReport;
-    osv?: OSVReport;
-    metadata?: ImageMetadata;
-  };
-  vulnerabilityCount?: VulnerabilityCount;
-  complianceScore?: ComplianceScore;
-  scannerVersions?: Record<string, string>;
-  scanConfig?: Record<string, any>;
+// Re-export Prisma types and enums as canonical types
+export type {
+  ScanStatus,
+  ScanResultStatus,
+  ScannerType,
+  BatchStatus,
+  ItemStatus,
+  Severity,
+  VulnerabilityStatus,
+  PolicyCategory,
+  EventType,
+  LogCategory,
+  LogAction
 };
 
-// Scan with Image relation included (for API responses)
+// Core database types with proper JSON field typing
+export type Image = PrismaImage;
+export type Scanner = PrismaScanner;
+export type BulkScanBatch = PrismaBulkScanBatch;
+export type BulkScanItem = PrismaBulkScanItem;
+export type Vulnerability = PrismaVulnerability;
+export type ImageVulnerability = PrismaImageVulnerability;
+export type CveClassification = PrismaCveClassification;
+export type PolicyRule = PrismaPolicyRule;
+export type PolicyViolation = PrismaPolicyViolation;
+export type AuditLog = PrismaAuditLog;
+
+// Enhanced types with proper JSON field typing
+export type Scan = Omit<PrismaScan, 'metadata'> & {
+  metadata?: ImageMetadata;
+};
+
+export type ScanResult = Omit<PrismaScanResult, 'rawOutput'> & {
+  rawOutput?: ScannerReport;
+};
+
+// Comprehensive types with relations for API responses
 export type ScanWithImage = Scan & {
   image: Image;
 };
+
+export type ScanWithFullRelations = Scan & {
+  image: Image;
+  scanResults: (ScanResult & { scanner: Scanner })[];
+  policyViolations: (PolicyViolation & { policyRule: PolicyRule })[];
+};
+
+export type ImageWithScans = Image & {
+  scans: Scan[];
+  imageVulnerabilities: (ImageVulnerability & { vulnerability: Vulnerability })[];
+};
+
+export type VulnerabilityWithImages = Vulnerability & {
+  imageVulnerabilities: (ImageVulnerability & { image: Image })[];
+};
+
+// Union type for all scanner reports
+export type ScannerReport = 
+  | DockleReport 
+  | TrivyReport 
+  | GrypeReport 
+  | SyftReport 
+  | OSVReport 
+  | DiveReport 
+  | ImageMetadata;
 
 // Scanner Report Types
 export interface DockleReport {
@@ -369,6 +425,36 @@ export interface DockerInfo {
   error?: string;
 }
 
+// Database Provider Types
+export interface DatabaseContextType {
+  // Images
+  images: Image[];
+  imagesLoading: boolean;
+  imagesError: string | null;
+  
+  // Scans
+  scans: ScanWithImage[];
+  scansLoading: boolean;
+  scansError: string | null;
+  
+  // Vulnerabilities
+  vulnerabilities: VulnerabilityWithImages[];
+  vulnerabilitiesLoading: boolean;
+  vulnerabilitiesError: string | null;
+  
+  // Bulk Scans
+  bulkScans: BulkScanBatch[];
+  bulkScansLoading: boolean;
+  bulkScansError: string | null;
+  
+  // Actions
+  refreshAll: () => Promise<void>;
+  refreshImages: () => Promise<void>;
+  refreshScans: () => Promise<void>;
+  refreshVulnerabilities: () => Promise<void>;
+  refreshBulkScans: () => Promise<void>;
+}
+
 // API Request/Response Types
 export interface ScanRequest {
   image: string;
@@ -376,6 +462,40 @@ export interface ScanRequest {
   registry?: string;
   source?: ScanSource; // 'registry' or 'local'
   dockerImageId?: string; // For local Docker images
+}
+
+export interface CreateScanRequest extends ScanRequest {
+  templateId?: string;
+}
+
+export interface CreateImageRequest {
+  name: string;
+  tag: string;
+  registry?: string;
+  source?: 'REGISTRY' | 'LOCAL_DOCKER' | 'FILE_UPLOAD' | 'REGISTRY_PRIVATE';
+  digest: string;
+  platform?: string;
+  sizeBytes?: number;
+}
+
+export interface CreateVulnerabilityRequest {
+  cveId: string;
+  title?: string;
+  description?: string;
+  severity: Severity;
+  cvssScore?: number;
+  source?: string;
+  publishedAt?: string;
+  modifiedAt?: string;
+}
+
+export interface CreateImageVulnerabilityRequest {
+  imageId: string;
+  vulnerabilityId: string;
+  packageName: string;
+  installedVersion?: string;
+  fixedVersion?: string;
+  status?: VulnerabilityStatus;
 }
 
 export interface ScanJob {
@@ -403,20 +523,17 @@ export interface ScanUploadRequest {
   scan: {
     startedAt: string;
     finishedAt?: string;
-    sizeBytes?: number;
     status: ScanStatus;
     reportsDir?: string;
     errorMessage?: string;
-    scannerVersions?: Record<string, string>;
-    scanConfig?: Record<string, any>;
+    riskScore?: number;
   };
-  reports?: {
-    trivy?: any;
-    grype?: any;
-    syft?: any;
-    dockle?: any;
-    metadata?: any;
-  };
+  scanResults?: Array<{
+    scannerId: string;
+    rawOutput?: any;
+    status?: ScanResultStatus;
+    errorMessage?: string;
+  }>;
 }
 
 // Legacy types for compatibility (to be phased out)
@@ -436,10 +553,6 @@ export interface LegacyScan {
     high: number;
     med: number;
     low: number;
-  };
-  fixable: {
-    count: number;
-    percent: number;
   };
   highestCvss?: number;
   misconfigs: number;

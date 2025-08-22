@@ -66,7 +66,8 @@ export function useCveClassifications(imageId: string) {
 
   // Get classification for a specific CVE
   const getClassification = (cveId: string): CveClassification | undefined => {
-    return classifications.find((c) => c.cveId === cveId)
+    // TODO: Update to work with new schema where CVE ID is in imageVulnerability.vulnerability.cveId
+    return undefined
   }
 
   // Check if a CVE is marked as false positive

@@ -28,16 +28,15 @@ export async function GET(
       )
     }
     
-    // Convert BigInt to string for JSON serialization
+    // Convert BigInt to string for JSON serialization (if needed)
     const serializedImage = {
       ...image,
-      sizeBytes: image.sizeBytes?.toString() || null,
+      sizeBytes: image.sizeBytes || null,
       scans: image.scans.map(scan => ({
         ...scan,
-        sizeBytes: scan.sizeBytes?.toString() || null,
         image: {
           ...scan.image,
-          sizeBytes: scan.image.sizeBytes?.toString() || null
+          sizeBytes: scan.image.sizeBytes || null
         }
       }))
     }

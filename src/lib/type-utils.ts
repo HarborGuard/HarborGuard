@@ -2,57 +2,122 @@
 // This provides a clean migration path from legacy types to Prisma types
 
 import type { 
+  Image as PrismaImage,
   Scan as PrismaScan,
-  Image as PrismaImage 
+  ScanResult as PrismaScanResult,
+  Scanner as PrismaScanner,
+  Vulnerability as PrismaVulnerability,
+  ImageVulnerability as PrismaImageVulnerability,
+  ScanStatus,
+  Severity
 } from '@/generated/prisma';
 import type { 
   Scan,
   ScanWithImage,
+  ScanWithFullRelations,
   LegacyScan,
   VulnerabilityCount,
-  ComplianceScore 
+  ComplianceScore,
+  ScannerReport,
+  ImageMetadata 
 } from '@/types';
 
 /**
- * Convert Prisma Scan to UI Scan (handling BigInt serialization)
+ * Convert Prisma Scan to UI Scan with proper type handling
  */
-export function prismaToScan(prismaData: PrismaScan & { image?: PrismaImage }): Scan {
-  const { sizeBytes, ...rest } = prismaData;
-  
+export function prismaToScan(prismaData: PrismaScan): Scan {
   return {
-    ...rest,
-    sizeBytes: sizeBytes ? sizeBytes.toString() : null,
-  } as Scan;
+    ...prismaData,
+    metadata: prismaData.metadata as unknown as ImageMetadata | undefined,
+  };
 }
 
 /**
  * Convert Prisma Scan with Image relation to ScanWithImage
  */
-export function prismaToScanWithImage(prismaData: PrismaScan & { image: PrismaImage }): ScanWithImage {
-  const scan = prismaToScan(prismaData);
+export function prismaToScanWithImage(prismaData: PrismaScan & { 
+  image: PrismaImage;
+  scanResults?: (PrismaScanResult & { scanner: PrismaScanner })[];
+}): ScanWithImage {
   return {
-    ...scan,
+    ...prismaData,
     image: prismaData.image,
-    // Transform scanner reports from separate JSON fields to nested object
-    scannerReports: {
-      trivy: prismaData.trivy as any,
-      grype: prismaData.grype as any,
-      syft: prismaData.syft as any,
-      dockle: prismaData.dockle as any,
-      osv: prismaData.osv as any,
-      dive: prismaData.dive as any,
-      metadata: prismaData.metadata as any,
-    } as any,
+    metadata: prismaData.metadata as unknown as ImageMetadata | undefined,
   };
+}
+
+/**
+ * Convert Prisma data to ScanWithFullRelations
+ */
+export function prismaToScanWithFullRelations(prismaData: PrismaScan & { 
+  image: PrismaImage;
+  scanResults: (PrismaScanResult & { scanner: PrismaScanner })[];
+  policyViolations: any[];
+}): ScanWithFullRelations {
+  return {
+    ...prismaData,
+    image: prismaData.image,
+    scanResults: prismaData.scanResults.map(result => ({
+      ...result,
+      rawOutput: result.rawOutput as unknown as ScannerReport | undefined,
+    })),
+    policyViolations: prismaData.policyViolations,
+    metadata: prismaData.metadata as unknown as ImageMetadata | undefined,
+  };
+}
+
+/**
+ * Extract scanner reports from scan results
+ */
+export function extractScannerReports(scanResults: (PrismaScanResult & { scanner: PrismaScanner })[]): {
+  trivy?: any;
+  grype?: any;
+  syft?: any;
+  dockle?: any;
+  osv?: any;
+  dive?: any;
+  metadata?: any;
+} {
+  const reports: any = {};
+  
+  for (const result of scanResults) {
+    const scannerName = result.scanner.name.toLowerCase();
+    reports[scannerName] = result.rawOutput;
+  }
+  
+  return reports;
+}
+
+/**
+ * Calculate vulnerability counts from image vulnerabilities
+ */
+export function calculateVulnerabilityCount(
+  imageVulnerabilities: (PrismaImageVulnerability & { vulnerability: PrismaVulnerability })[]
+): VulnerabilityCount {
+  const counts = {
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+    info: 0
+  };
+  
+  for (const imageVuln of imageVulnerabilities) {
+    const severity = imageVuln.vulnerability.severity.toLowerCase();
+    if (severity in counts) {
+      (counts as any)[severity]++;
+    }
+  }
+  
+  return counts;
 }
 
 /**
  * Convert modern Scan to Legacy Scan format for UI compatibility
  */
-export function scanToLegacyScan(scan: ScanWithImage): LegacyScan {
-  // Extract vulnerability counts from the scan
-  const vulnCount = scan.vulnerabilityCount as VulnerabilityCount | undefined;
-  const complianceScore = scan.complianceScore as ComplianceScore | undefined;
+export function scanToLegacyScan(scan: ScanWithImage, vulnCount?: VulnerabilityCount): LegacyScan {
+  // Use provided vulnerability count or default to zeros
+  const vulnerabilities = vulnCount || { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
   
   return {
     // Map new fields to legacy fields
@@ -61,33 +126,25 @@ export function scanToLegacyScan(scan: ScanWithImage): LegacyScan {
     image: scan.image?.name || 'unknown',
     digestShort: scan.image?.digest?.slice(7, 19) || '', // First 12 chars after "sha256:"
     platform: scan.image?.platform || 'unknown',
-    sizeMb: scan.sizeBytes ? Math.round(parseInt(scan.sizeBytes) / 1024 / 1024) : 0,
+    sizeMb: scan.image?.sizeBytes ? Math.round(scan.image.sizeBytes / 1024 / 1024) : 0,
     riskScore: scan.riskScore || 0,
     
     // Map vulnerability counts
     severities: {
-      crit: vulnCount?.critical || 0,
-      high: vulnCount?.high || 0,
-      med: vulnCount?.medium || 0,
-      low: vulnCount?.low || 0,
+      crit: vulnerabilities.critical,
+      high: vulnerabilities.high,
+      med: vulnerabilities.medium,
+      low: vulnerabilities.low,
     },
     
-    // Calculate fixable vulnerabilities (placeholder logic)
-    fixable: {
-      count: Math.floor((vulnCount?.critical || 0) * 0.7 + (vulnCount?.high || 0) * 0.5),
-      percent: vulnCount ? Math.round(
-        ((vulnCount.critical + vulnCount.high) * 0.6 / 
-         (vulnCount.critical + vulnCount.high + vulnCount.medium + vulnCount.low)) * 100
-      ) || 0 : 0
-    },
     
     highestCvss: 0, // Would need to extract from scanner reports
     misconfigs: 0, // Would need to extract from scanner reports  
     secrets: 0, // Would need to extract from scanner reports
     
-    // Map compliance scores
+    // Map compliance scores (would need to extract from scan results)
     compliance: {
-      dockle: complianceScore?.dockle?.grade,
+      dockle: undefined,
     },
     
     policy: "Pass", // Default placeholder
@@ -112,28 +169,28 @@ export function scanToLegacyScan(scan: ScanWithImage): LegacyScan {
     dbAge: "0h",
     registry: scan.image?.registry || undefined,
     project: undefined,
-    lastScan: typeof scan.finishedAt === 'string' ? scan.finishedAt : scan.finishedAt?.toISOString() || (typeof scan.createdAt === 'string' ? scan.createdAt : scan.createdAt.toISOString()),
+    lastScan: scan.finishedAt?.toISOString() || scan.createdAt.toISOString(),
     status: mapScanStatus(scan.status),
     header: undefined,
     type: undefined,
     target: undefined,
     limit: undefined,
     
-    // Pass through scanner reports
-    scannerReports: scan.scannerReports,
+    // Pass through scanner reports (would need to extract from scan results)
+    scannerReports: undefined,
     
     // Additional fields
     digest: scan.image?.digest,
-    layers: scan.image?.digest ? [] : undefined, // Would need to extract from metadata
-    osInfo: extractOsInfo(scan),
+    layers: [], // Would need to extract from metadata
+    osInfo: undefined, // Would need to extract from scan results
   };
 }
 
 /**
  * Convert array of Prisma scans to legacy scans
  */
-export function scansToLegacyScans(scans: ScanWithImage[]): LegacyScan[] {
-  return scans.map(scanToLegacyScan);
+export function scansToLegacyScans(scans: ScanWithImage[], vulnCounts?: VulnerabilityCount[]): LegacyScan[] {
+  return scans.map((scan, index) => scanToLegacyScan(scan, vulnCounts?.[index]));
 }
 
 /**
@@ -171,8 +228,10 @@ function mapScanStatus(status: string): "Complete" | "Queued" | "Error" | "Prior
   }
 }
 
-function extractOsInfo(scan: ScanWithImage): { family: string; name: string } | undefined {
-  const trivyReport = scan.scannerReports?.trivy;
+// Helper function to extract OS info from scan results
+export function extractOsInfo(scanResults: (PrismaScanResult & { scanner: PrismaScanner })[]): { family: string; name: string } | undefined {
+  const trivyResult = scanResults.find(result => result.scanner.name.toLowerCase() === 'trivy');
+  const trivyReport = trivyResult?.rawOutput as any; // Cast to avoid JsonValue restriction
   if (trivyReport?.Metadata?.OS) {
     return {
       family: trivyReport.Metadata.OS.Family,

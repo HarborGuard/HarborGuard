@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
           registry: validatedData.image.registry,
           digest: validatedData.image.digest,
           platform: validatedData.image.platform,
-          sizeBytes: validatedData.image.sizeBytes ? BigInt(validatedData.image.sizeBytes) : null,
+          sizeBytes: validatedData.image.sizeBytes || null,
         }
       })
     }
@@ -98,17 +98,13 @@ export async function POST(request: NextRequest) {
         imageId: image.id,
         startedAt: new Date(validatedData.scan.startedAt),
         finishedAt: validatedData.scan.finishedAt ? new Date(validatedData.scan.finishedAt) : null,
-        sizeBytes: validatedData.scan.sizeBytes ? BigInt(validatedData.scan.sizeBytes) : null,
         status: validatedData.scan.status,
         reportsDir: validatedData.scan.reportsDir,
         errorMessage: validatedData.scan.errorMessage,
-        scannerVersions: validatedData.scan.scannerVersions as any,
-        scanConfig: validatedData.scan.scanConfig as any,
-        trivy: validatedData.reports?.trivy as any,
-        grype: validatedData.reports?.grype as any,
-        syft: validatedData.reports?.syft as any,
-        dockle: validatedData.reports?.dockle as any,
-        metadata: validatedData.reports?.metadata as any,
+        metadata: {
+          ...(validatedData.reports?.metadata || {}),
+          scannerVersions: validatedData.scan.scannerVersions
+        } as any,
       }
     })
 

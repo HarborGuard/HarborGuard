@@ -10,6 +10,7 @@ import { ArrowLeft, Activity, CheckCircle, XCircle } from "lucide-react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { LoadingState } from "@/components/ui/loading";
 
 interface BulkScanDetails {
   id: string;
@@ -115,12 +116,12 @@ export default function BulkScanDetailsPage() {
           <SiteHeader />
           <div className="flex-1 overflow-auto">
             <div className="container mx-auto py-8">
-              <div className="flex items-center justify-center min-h-[400px]">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-500">Loading bulk scan details...</p>
-                </div>
-              </div>
+              <LoadingState 
+                message="Loading Bulk Scan Details" 
+                description="Fetching scan progress and results..."
+                size="lg"
+                className="min-h-[400px]"
+              />
             </div>
           </div>
         </SidebarInset>

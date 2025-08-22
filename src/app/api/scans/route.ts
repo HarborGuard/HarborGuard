@@ -21,23 +21,21 @@ export async function GET(request: NextRequest) {
       where.imageId = imageId
     }
     
-    // Selective field loading - exclude large JSON reports by default
+    // Selective field loading - exclude large JSON fields by default
     const selectFields = includeReports ? undefined : {
       id: true,
       requestId: true,
       imageId: true,
       startedAt: true,
       finishedAt: true,
-      sizeBytes: true,
       status: true,
       errorMessage: true,
-      vulnerabilityCount: true,
       riskScore: true,
-      complianceScore: true,
+      reportsDir: true,
       createdAt: true,
       updatedAt: true,
       source: true,
-      // Exclude large JSON fields: trivy, grype, syft, dockle, metadata, osv, dive
+      // Exclude large JSON fields: metadata
       image: {
         select: {
           id: true,
@@ -45,6 +43,7 @@ export async function GET(request: NextRequest) {
           tag: true,
           registry: true,
           digest: true,
+          sizeBytes: true,
           createdAt: true,
           updatedAt: true
         }
@@ -80,7 +79,6 @@ export async function GET(request: NextRequest) {
         // When using select, convert manually
         return {
           ...scan,
-          sizeBytes: scan.sizeBytes?.toString() || null,
           image: scan.image ? {
             ...scan.image,
             sizeBytes: scan.image.sizeBytes?.toString() || null

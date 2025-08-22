@@ -10,53 +10,47 @@ datasource db {
 }
 
 model Image {
-  id                 String              @id @default(cuid())
-  name               String
-  tag                String
-  registry           String?
-  digest             String              @unique
-  platform           String?
-  sizeBytes          BigInt?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  bulkScanItems      BulkScanItem[]
-  cveClassifications CveClassification[]
-  scans              Scan[]
+  id                   String               @id @default(cuid())
+  name                 String
+  tag                  String
+  registry             String?
+  source               ImageSource          @default("REGISTRY")
+  digest               String               @unique
+  platform             String?
+  sizeBytes            Int?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  bulkScanItems        BulkScanItem[]
+  cveClassifications   CveClassification[]
+  imageVulnerabilities ImageVulnerability[]
+  scans                Scan[]
 
   @@index([name, tag])
   @@index([registry, name, tag])
   @@index([digest])
+  @@index([registry])
+  @@index([source])
   @@map("images")
 }
 
 model Scan {
-  id                  String                   @id @default(cuid())
-  requestId           String                   @unique
-  imageId             String
-  startedAt           DateTime
-  finishedAt          DateTime?
-  sizeBytes           BigInt?
-  status              ScanStatus               @default(RUNNING)
-  trivy               Json?
-  grype               Json?
-  syft                Json?
-  dockle              Json?
-  metadata            Json?
-  reportsDir          String?
-  scannerVersions     Json?
-  scanConfig          Json?
-  errorMessage        String?
-  vulnerabilityCount  Json?
-  riskScore           Int?
-  complianceScore     Json?
-  createdAt           DateTime                 @default(now())
-  updatedAt           DateTime                 @updatedAt
-  osv                 Json?
-  dive                Json?
-  source              String?
-  bulkScanItems       BulkScanItem[]
-  image               Image                    @relation(fields: [imageId], references: [id], onDelete: Cascade)
-  scheduledExecutions ScheduledScanExecution[]
+  id               String            @id @default(cuid())
+  requestId        String            @unique
+  imageId          String
+  startedAt        DateTime
+  finishedAt       DateTime?
+  status           ScanStatus        @default("RUNNING")
+  reportsDir       String?
+  errorMessage     String?
+  riskScore        Int?
+  metadata         Json?
+  source           String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  bulkScanItems    BulkScanItem[]
+  policyViolations PolicyViolation[]
+  scanResults      ScanResult[]
+  image            Image             @relation(fields: [imageId], references: [id], onDelete: Cascade)
 
   @@index([requestId])
   @@index([status])
@@ -68,61 +62,44 @@ model Scan {
   @@map("scans")
 }
 
-model ScanSchedule {
-  id             String                   @id @default(cuid())
-  name           String
-  cronExpression String
-  scanRequest    Json
-  isActive       Boolean                  @default(true)
-  createdAt      DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
-  lastRunAt      DateTime?
-  nextRunAt      DateTime?
-  createdBy      String?
-  executions     ScheduledScanExecution[]
+model ScanResult {
+  id           String           @id @default(cuid())
+  scanId       String
+  scannerId    String
+  rawOutput    Json?
+  status       ScanResultStatus @default("SUCCESS")
+  errorMessage String?
+  createdAt    DateTime         @default(now())
+  scanner      Scanner          @relation(fields: [scannerId], references: [id])
+  scan         Scan             @relation(fields: [scanId], references: [id], onDelete: Cascade)
 
-  @@index([isActive])
-  @@index([nextRunAt])
-  @@map("scan_schedules")
+  @@index([scanId])
+  @@index([scannerId])
+  @@index([status])
+  @@map("scan_results")
 }
 
-model ScheduledScanExecution {
+model Scanner {
   id            String       @id @default(cuid())
-  scheduleId    String
-  scanId        String?
-  executionTime DateTime     @default(now())
-  status        String
-  errorMessage  String?
-  scan          Scan?        @relation(fields: [scanId], references: [id])
-  schedule      ScanSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  name          String       @unique
+  version       String
+  type          ScannerType
+  isActive      Boolean      @default(true)
+  defaultConfig Json?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  scanResults   ScanResult[]
 
-  @@index([scheduleId])
-  @@index([executionTime])
-  @@map("scheduled_scan_executions")
-}
-
-model ScanTemplate {
-  id                 String   @id @default(cuid())
-  name               String
-  description        String?
-  environment        String
-  scannerConfig      Json
-  policyConfig       Json?
-  notificationConfig Json?
-  isDefault          Boolean  @default(false)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  createdBy          String?
-
-  @@index([environment])
-  @@index([isDefault])
-  @@map("scan_templates")
+  @@index([name])
+  @@index([type])
+  @@index([isActive])
+  @@map("scanners")
 }
 
 model BulkScanBatch {
   id           String         @id @default(cuid())
   totalImages  Int
-  status       String
+  status       BatchStatus
   patterns     Json
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
@@ -141,7 +118,7 @@ model BulkScanItem {
   batchId String
   scanId  String
   imageId String
-  status  String
+  status  ItemStatus
   image   Image         @relation(fields: [imageId], references: [id], onDelete: Cascade)
   scan    Scan          @relation(fields: [scanId], references: [id], onDelete: Cascade)
   batch   BulkScanBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
@@ -151,36 +128,111 @@ model BulkScanItem {
   @@map("bulk_scan_items")
 }
 
-model CveClassification {
-  id              String   @id @default(cuid())
-  cveId           String
-  imageId         String
-  isFalsePositive Boolean  @default(false)
-  comment         String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  createdBy       String?
-  image           Image    @relation(fields: [imageId], references: [id], onDelete: Cascade)
+model Vulnerability {
+  id                   String               @id @default(cuid())
+  cveId                String               @unique
+  title                String?
+  description          String?
+  severity             Severity
+  cvssScore            Float?
+  source               String?
+  publishedAt          DateTime?
+  modifiedAt           DateTime?
+  imageVulnerabilities ImageVulnerability[]
 
-  @@unique([cveId, imageId])
   @@index([cveId])
+  @@index([severity])
+  @@index([cvssScore])
+  @@map("vulnerabilities")
+}
+
+model ImageVulnerability {
+  id                 String              @id @default(cuid())
+  imageId            String
+  vulnerabilityId    String
+  packageName        String
+  installedVersion   String?
+  fixedVersion       String?
+  status             VulnerabilityStatus @default("DETECTED")
+  detectedAt         DateTime            @default(now())
+  cveClassifications CveClassification[]
+  vulnerability      Vulnerability       @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
+  image              Image               @relation(fields: [imageId], references: [id], onDelete: Cascade)
+
+  @@unique([imageId, vulnerabilityId, packageName])
+  @@index([imageId])
+  @@index([vulnerabilityId])
+  @@index([status])
+  @@index([packageName])
+  @@map("image_vulnerabilities")
+}
+
+model CveClassification {
+  id                   String             @id @default(cuid())
+  imageVulnerabilityId String
+  isFalsePositive      Boolean            @default(false)
+  comment              String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  createdBy            String?
+  imageId              String
+  image                Image              @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  imageVulnerability   ImageVulnerability @relation(fields: [imageVulnerabilityId], references: [id], onDelete: Cascade)
+
+  @@index([imageVulnerabilityId])
   @@index([imageId])
   @@index([isFalsePositive])
   @@map("cve_classifications")
 }
 
+model PolicyRule {
+  id               String            @id @default(cuid())
+  name             String
+  description      String?
+  category         PolicyCategory
+  severity         Severity
+  conditions       Json
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  policyViolations PolicyViolation[]
+
+  @@index([category])
+  @@index([severity])
+  @@index([isActive])
+  @@map("policy_rules")
+}
+
+model PolicyViolation {
+  id           String     @id @default(cuid())
+  scanId       String
+  policyRuleId String
+  description  String?
+  severity     Severity
+  details      Json?
+  detectedAt   DateTime   @default(now())
+  policyRule   PolicyRule @relation(fields: [policyRuleId], references: [id], onDelete: Cascade)
+  scan         Scan       @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  @@index([scanId])
+  @@index([policyRuleId])
+  @@index([severity])
+  @@index([detectedAt])
+  @@map("policy_violations")
+}
+
 model AuditLog {
-  id        String   @id @default(cuid())
-  eventType String
-  category  String
+  id        String      @id @default(cuid())
+  eventType EventType
+  category  LogCategory
   userIp    String
   userAgent String?
   userId    String?
   resource  String?
-  action    String
+  action    LogAction
   details   Json?
   metadata  Json?
-  timestamp DateTime @default(now())
+  timestamp DateTime    @default(now())
 
   @@index([eventType])
   @@index([category])
@@ -196,4 +248,92 @@ enum ScanStatus {
   PARTIAL
   FAILED
   CANCELLED
+}
+
+enum ScanResultStatus {
+  SUCCESS
+  FAILED
+  PARTIAL
+}
+
+enum ScannerType {
+  VULNERABILITY
+  COMPLIANCE
+  SBOM
+  ANALYSIS
+}
+
+enum BatchStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ItemStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+enum Severity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  INFO
+}
+
+enum VulnerabilityStatus {
+  DETECTED
+  FIXED
+  IGNORED
+  FALSE_POSITIVE
+}
+
+enum ImageSource {
+  REGISTRY
+  LOCAL_DOCKER
+  FILE_UPLOAD
+  REGISTRY_PRIVATE
+}
+
+enum PolicyCategory {
+  SECURITY
+  COMPLIANCE
+  BEST_PRACTICES
+  CUSTOM
+}
+
+enum EventType {
+  SCAN_START
+  SCAN_COMPLETE
+  SCAN_FAILED
+  IMAGE_ADDED
+  IMAGE_REMOVED
+  USER_LOGIN
+  CONFIG_CHANGE
+  SYSTEM_EVENT
+}
+
+enum LogCategory {
+  SECURITY
+  OPERATIONAL
+  INFORMATIVE
+  ERROR
+}
+
+enum LogAction {
+  CREATE
+  UPDATE
+  DELETE
+  VIEW
+  SCAN
+  UPLOAD
+  DOWNLOAD
+  LOGIN
+  LOGOUT
 }

@@ -31,7 +31,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge"
+import { ScanDetailsSkeleton } from "@/components/image-loading";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import {
   Table,
@@ -106,7 +107,12 @@ export default function ScanResultsPage() {
   
   // Helper functions for classifications
   const getClassification = (cveId: string) => {
-    return consolidatedClassifications.find(c => c.cveId === cveId);
+    return consolidatedClassifications.find(c => {
+      // Check both direct cveId and nested structure
+      const directCveId = c.cveId;
+      const nestedCveId = c.imageVulnerability?.vulnerability?.cveId;
+      return directCveId === cveId || nestedCveId === cveId;
+    });
   };
   
   const isFalsePositive = (cveId: string) => {
@@ -232,21 +238,32 @@ export default function ScanResultsPage() {
   }, [scanData, decodedImageName]);
 
   const trivyResults: TrivyReport | null =
-    scanData?.scannerReports?.trivy || scanData?.trivy || null;
+    scanData?.metadata?.scanResults?.trivy || scanData?.scannerReports?.trivy || scanData?.trivy || null;
   const grypResults: GrypeReport | null =
-    scanData?.scannerReports?.grype || scanData?.grype || null;
+    scanData?.metadata?.scanResults?.grype || scanData?.scannerReports?.grype || scanData?.grype || null;
   const syftResults: SyftReport | null =
-    scanData?.scannerReports?.syft || scanData?.syft || null;
+    scanData?.metadata?.scanResults?.syft || scanData?.scannerReports?.syft || scanData?.syft || null;
   const dockleResults: DockleReport | null =
-    scanData?.scannerReports?.dockle || scanData?.dockle || null;
+    scanData?.metadata?.scanResults?.dockle || scanData?.scannerReports?.dockle || scanData?.dockle || null;
   const osvResults: OSVReport | null =
-    scanData?.scannerReports?.osv || scanData?.osv || null;
+    scanData?.metadata?.scanResults?.osv || scanData?.scannerReports?.osv || scanData?.osv || null;
   const diveResults: DiveReport | null =
-    scanData?.scannerReports?.dive || scanData?.dive || null;
+    scanData?.metadata?.scanResults?.dive || scanData?.scannerReports?.dive || scanData?.dive || null;
 
   // Debug: Log scanner results to console
+  console.log("🔍 Debug Scan Data Structure:", {
+    scanData: scanData ? Object.keys(scanData) : 'null',
+    hasMetadata: !!scanData?.metadata,
+    hasScanResults: !!scanData?.metadata?.scanResults,
+    scanResultsKeys: scanData?.metadata?.scanResults ? Object.keys(scanData.metadata.scanResults) : 'none',
+    hasTrivyDirect: !!scanData?.trivy,
+    hasGrypeDirect: !!scanData?.grype,
+    hasScannerReports: !!scanData?.scannerReports
+  });
   console.log("OSV Results:", osvResults);
   console.log("Dive Results:", diveResults);
+  console.log("Trivy Results:", trivyResults);
+  console.log("Grype Results:", grypResults);
 
   const breadcrumbs = [
     { label: "Dashboard", href: "/" },
@@ -457,11 +474,28 @@ export default function ScanResultsPage() {
     });
   }, [dockleResults, dockleSearch, dockleSortField, dockleSortOrder]);
 
-  if (loading || (scanData && classificationsLoading)) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        Loading scan data...
-      </div>
+      <SidebarProvider
+        style={
+          {
+            "--sidebar-width": "calc(var(--spacing) * 72)",
+            "--header-height": "calc(var(--spacing) * 12)",
+          } as React.CSSProperties
+        }
+      >
+        <AppSidebar variant="inset" />
+        <SidebarInset className="flex flex-col">
+          <SiteHeader breadcrumbs={[
+            { label: "Dashboard", href: "/" },
+            { label: decodeURIComponent(imageName) || "Loading...", href: `/image/${imageName}` },
+            { label: "Scan Details" }
+          ]} />
+          <div className="flex-1 overflow-auto">
+            <ScanDetailsSkeleton />
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
     );
   }
 
@@ -892,7 +926,11 @@ export default function ScanResultsPage() {
                             setShowFalsePositives(!showFalsePositives)
                           }
                           className="flex items-center gap-2"
+                          disabled={classificationsLoading}
                         >
+                          {classificationsLoading && (
+                            <div className="animate-spin h-3 w-3 border border-current border-t-transparent rounded-full" />
+                          )}
                           {showFalsePositives ? "Hide" : "Show"} False Positives
                         </Button>
                         <div className="text-sm text-muted-foreground">
@@ -1163,7 +1201,11 @@ export default function ScanResultsPage() {
                             setShowFalsePositives(!showFalsePositives)
                           }
                           className="flex items-center gap-2"
+                          disabled={classificationsLoading}
                         >
+                          {classificationsLoading && (
+                            <div className="animate-spin h-3 w-3 border border-current border-t-transparent rounded-full" />
+                          )}
                           {showFalsePositives ? "Hide" : "Show"} False Positives
                         </Button>
                         <div className="text-sm text-muted-foreground">

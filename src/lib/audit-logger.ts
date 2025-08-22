@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { NextRequest } from 'next/server';
+import { EventType, LogCategory, LogAction } from '@/generated/prisma';
 
 export type AuditEventType = 
   | 'page_view'
@@ -13,6 +14,50 @@ export type AuditEventType =
   | 'user_login'
   | 'user_logout'
   | 'system_error';
+
+// Map our custom event types to Prisma EventType enum
+function mapEventType(eventType: AuditEventType): EventType {
+  switch (eventType) {
+    case 'page_view': return EventType.SYSTEM_EVENT
+    case 'scan_start': return EventType.SCAN_START
+    case 'scan_complete': return EventType.SCAN_COMPLETE
+    case 'scan_failed': return EventType.SCAN_FAILED
+    case 'cve_classification': return EventType.SYSTEM_EVENT
+    case 'image_delete': return EventType.IMAGE_REMOVED
+    case 'image_rescan': return EventType.SYSTEM_EVENT
+    case 'bulk_scan_start': return EventType.SCAN_START
+    case 'user_login': return EventType.USER_LOGIN
+    case 'user_logout': return EventType.SYSTEM_EVENT
+    case 'system_error': return EventType.SYSTEM_EVENT
+    default: return EventType.SYSTEM_EVENT
+  }
+}
+
+// Map our custom category types to Prisma LogCategory enum
+function mapLogCategory(category: AuditCategory): LogCategory {
+  switch (category) {
+    case 'informative': return LogCategory.INFORMATIVE
+    case 'action': return LogCategory.OPERATIONAL
+    case 'security': return LogCategory.SECURITY
+    case 'error': return LogCategory.ERROR
+    default: return LogCategory.INFORMATIVE
+  }
+}
+
+// Map common action strings to Prisma LogAction enum
+function mapLogAction(action: string): LogAction {
+  const actionLower = action.toLowerCase()
+  if (actionLower.includes('create')) return LogAction.CREATE
+  if (actionLower.includes('update')) return LogAction.UPDATE
+  if (actionLower.includes('delete')) return LogAction.DELETE
+  if (actionLower.includes('view') || actionLower.includes('read')) return LogAction.VIEW
+  if (actionLower.includes('scan')) return LogAction.SCAN
+  if (actionLower.includes('upload')) return LogAction.UPLOAD
+  if (actionLower.includes('download')) return LogAction.DOWNLOAD
+  if (actionLower.includes('login')) return LogAction.LOGIN
+  if (actionLower.includes('logout')) return LogAction.LOGOUT
+  return LogAction.VIEW // Default fallback
+}
 
 export type AuditCategory = 'informative' | 'action' | 'security' | 'error';
 
@@ -73,13 +118,13 @@ export async function logAuditEvent(data: AuditLogData): Promise<void> {
   try {
     await prisma.auditLog.create({
       data: {
-        eventType: data.eventType,
-        category: data.category,
+        eventType: mapEventType(data.eventType),
+        category: mapLogCategory(data.category),
         userIp: data.userIp,
         userAgent: data.userAgent,
         userId: data.userId,
         resource: data.resource,
-        action: data.action,
+        action: data.action ? mapLogAction(data.action) : LogAction.VIEW,
         details: data.details,
         metadata: data.metadata,
       },

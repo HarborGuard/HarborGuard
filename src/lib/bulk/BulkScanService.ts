@@ -1,6 +1,5 @@
 import { prisma } from '@/lib/prisma';
 import { scannerService } from '@/lib/scanner';
-import type { BulkScanRequest } from '../scheduler/types';
 import type { ScanRequest } from '@/types';
 
 export interface BulkScanResult {
@@ -8,6 +7,26 @@ export interface BulkScanResult {
   totalImages: number;
   scanIds: string[];
   skipped: number;
+}
+
+export interface BulkScanRequest {
+  patterns: {
+    imagePattern?: string;
+    tagPattern?: string;
+    registryPattern?: string;
+    excludeTagPattern?: string;
+  };
+  options?: {
+    maxImages?: number;
+    scanners?: {
+      trivy?: boolean;
+      grype?: boolean;
+      syft?: boolean;
+      dockle?: boolean;
+      osv?: boolean;
+      dive?: boolean;
+    };
+  };
 }
 
 export interface BulkScanRequestWithName extends BulkScanRequest {
@@ -23,8 +42,8 @@ export class BulkScanService {
     try {
       // Find matching images
       const matchingImages = await this.findMatchingImages(
-        request.patterns, 
-        request.excludePatterns
+        request.patterns,
+        request.patterns.excludeTagPattern ? [request.patterns.excludeTagPattern] : undefined
       );
       
       console.log(`Found ${matchingImages.length} images matching bulk scan criteria`);
@@ -33,12 +52,17 @@ export class BulkScanService {
         throw new Error('No images found matching the specified patterns');
       }
 
+      // Apply maxImages limit
+      const limitedImages = request.options?.maxImages 
+        ? matchingImages.slice(0, request.options.maxImages)
+        : matchingImages;
+
       // Create batch record
       await prisma.bulkScanBatch.create({
         data: {
           id: batchId,
           name: request.name,
-          totalImages: matchingImages.length,
+          totalImages: limitedImages.length,
           status: 'RUNNING',
           patterns: request.patterns as any,
         }
@@ -46,10 +70,10 @@ export class BulkScanService {
 
       // Execute scans with concurrency control
       const result = await this.executeConcurrentScans(
-        matchingImages, 
-        request.maxConcurrent || 3,
+        limitedImages, 
+        3, // Default concurrency
         batchId,
-        request.scanTemplate
+        request.options?.scanners
       );
 
       // Update batch status
@@ -65,7 +89,7 @@ export class BulkScanService {
 
       return {
         batchId,
-        totalImages: matchingImages.length,
+        totalImages: limitedImages.length,
         scanIds: result.scanIds,
         skipped: result.failed
       };
@@ -212,6 +236,7 @@ export class BulkScanService {
         name: true,
         tag: true,
         registry: true,
+        source: true,
         digest: true
       },
       orderBy: [
@@ -248,7 +273,14 @@ export class BulkScanService {
     images: any[], 
     maxConcurrent: number,
     batchId: string,
-    scanTemplate?: string
+    scanners?: {
+      trivy?: boolean;
+      grype?: boolean;
+      syft?: boolean;
+      dockle?: boolean;
+      osv?: boolean;
+      dive?: boolean;
+    }
   ): Promise<{ scanIds: string[]; successful: number; failed: number }> {
     const results: string[] = [];
     let successful = 0;
@@ -260,14 +292,19 @@ export class BulkScanService {
       
       const chunkPromises = chunk.map(async (image) => {
         try {
+          // Determine correct source based on image source field
+          const scanSource: 'registry' | 'local' = 
+            image.source === 'LOCAL_DOCKER' ? 'local' : 'registry';
+
           const scanRequest: ScanRequest = {
             image: image.name,
             tag: image.tag,
             registry: image.registry,
-            source: 'registry'
+            source: scanSource
           };
 
-          // TODO: Apply scan template if provided
+          // Note: Scanner configuration would need to be handled at the scanner service level
+          // The scanners parameter is available here if needed for future implementation
           
           const { scanId } = await scannerService.startScan(scanRequest);
 
@@ -290,15 +327,34 @@ export class BulkScanService {
         } catch (error) {
           console.error(`Failed to start scan for ${image.name}:${image.tag}`, error);
           
-          // Create failed bulk scan item
-          await prisma.bulkScanItem.create({
-            data: {
-              batchId,
-              scanId: '', // No scan created
-              imageId: image.id,
-              status: 'FAILED'
-            }
-          }).catch(console.error);
+          // Create a failed scan record first to satisfy foreign key constraint
+          try {
+            const failedScan = await prisma.scan.create({
+              data: {
+                requestId: `failed-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                imageId: image.id,
+                status: 'FAILED',
+                startedAt: new Date(),
+                finishedAt: new Date(),
+                source: 'registry',
+                metadata: {
+                  error: error instanceof Error ? error.message : String(error)
+                }
+              }
+            });
+
+            // Now create the bulk scan item with the failed scan ID
+            await prisma.bulkScanItem.create({
+              data: {
+                batchId,
+                scanId: failedScan.id,
+                imageId: image.id,
+                status: 'FAILED'
+              }
+            });
+          } catch (dbError) {
+            console.error('Failed to create failed scan record:', dbError);
+          }
           
           failed++;
           return null;

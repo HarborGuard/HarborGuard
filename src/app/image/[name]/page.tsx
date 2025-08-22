@@ -1,7 +1,8 @@
 "use client"
 
 import { useParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
+import { useDatabase } from "@/providers/DatabaseProvider"
 import { useCveClassifications } from "@/hooks/useCveClassifications"
 import { aggregateVulnerabilitiesWithClassifications } from "@/lib/scan-aggregations"
 import {
@@ -42,14 +43,54 @@ import {
 } from "@/components/ui/table"
 import { Separator } from "@/components/ui/separator"
 import { HistoricalScansTable } from "@/components/historical-scans-table"
+import { ImagePageSkeleton } from "@/components/image-loading"
 
 export default function ImageDetailsPage() {
   const params = useParams()
   const rawImageName = params.name as string
   const imageName = decodeURIComponent(rawImageName) // Decode the URL-encoded name
-  const [imageData, setImageData] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  
+  // Use DatabaseProvider instead of local state
+  const { 
+    images, 
+    scans, 
+    imagesLoading, 
+    scansLoading, 
+    imagesError, 
+    scansError,
+    refreshImages,
+    refreshScans 
+  } = useDatabase()
+  
+  // Filter data for the specific image name
+  const imageData = useMemo(() => {
+    const imagesByName = images.filter(img => img.name === imageName)
+    const scansForImages = scans.filter(scan => 
+      imagesByName.some(img => img.id === scan.imageId)
+    )
+    
+    if (imagesByName.length === 0) return null
+    
+    const latestImage = imagesByName.sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )[0]
+    
+    const tags = [...new Set(imagesByName.map(img => img.tag))]
+    const registries = [...new Set(imagesByName.map(img => img.registry).filter(Boolean))]
+    
+    return {
+      name: imageName,
+      images: imagesByName,
+      scans: scansForImages,
+      latestImage,
+      tags,
+      registries,
+      totalScans: scansForImages.length
+    }
+  }, [images, scans, imageName])
+  
+  const loading = imagesLoading || scansLoading
+  const error = imagesError || scansError || (imageData === null && !loading ? 'No images found with this name' : null)
   
   // Legacy single-image classification hook (keeping for backward compatibility)
   const scanImageId = imageData?.scans?.[0]?.imageId || imageData?.latestImage?.id || "";
@@ -118,36 +159,36 @@ export default function ImageDetailsPage() {
     }
     
     fetchConsolidatedClassifications();
-  }, [imageName, imageData])
-
+  }, [imageName]) // Only depend on imageName to prevent imageData refresh loops
+  
+  // Refresh data when component mounts
   useEffect(() => {
-    async function fetchImageData() {
-      try {
-        // Fetch with a higher scan limit and include reports for CVE classification calculations
-        const response = await fetch(`/api/images/name/${encodeURIComponent(imageName)}?scanLimit=50&includeReports=true`)
-        if (!response.ok) {
-          if (response.status === 404) {
-            setError('No images found with this name')
-          } else {
-            setError('Failed to load image data')
-          }
-          return
-        }
-        const data = await response.json()
-        setImageData(data)
-      } catch (err) {
-        setError('Failed to load image data')
-        console.error('Error fetching image data:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchImageData()
-  }, [imageName])
+    refreshImages()
+    refreshScans()
+  }, []) // Remove dependencies to prevent infinite loop
 
   if (loading || (imageData && classificationsLoading)) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>
+    return (
+      <SidebarProvider
+        style={
+          {
+            "--sidebar-width": "calc(var(--spacing) * 72)",
+            "--header-height": "calc(var(--spacing) * 12)",
+          } as React.CSSProperties
+        }
+      >
+        <AppSidebar variant="inset" />
+        <SidebarInset className="flex flex-col">
+          <SiteHeader breadcrumbs={[
+            { label: "Dashboard", href: "/" },
+            { label: imageName || "Loading..." }
+          ]} />
+          <div className="flex-1 overflow-auto">
+            <ImagePageSkeleton />
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    )
   }
   
   if (error || !imageData) {
@@ -348,7 +389,7 @@ export default function ImageDetailsPage() {
                         <p className="text-sm font-medium text-muted-foreground">Size (Latest)</p>
                         <p className="text-sm">
                           {imageData.latestImage?.sizeBytes ? 
-                            Math.round(parseInt(imageData.latestImage.sizeBytes) / 1024 / 1024) : 0} MB
+                            Math.round((imageData.latestImage.sizeBytes || 0) / 1024 / 1024) : 0} MB
                         </p>
                       </div>
                       <div>
@@ -426,7 +467,7 @@ export default function ImageDetailsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <HistoricalScansTable data={historicalScans} imageId={imageData.name} />
+                  <HistoricalScansTable data={historicalScans.filter(Boolean) as any} imageId={imageData.name} />
                 </CardContent>
               </Card>
           </div>

@@ -18,7 +18,17 @@ export class DatabaseAdapter implements IDatabaseAdapter {
   }
 
   private isLocalDockerScan(request: ScanRequest): boolean {
-    return request.source === 'local';
+    // Check if explicitly set to local source
+    if (request.source === 'local') {
+      return true;
+    }
+    
+    // Legacy check: if registry is 'local', treat as local Docker scan
+    if (request.registry === 'local') {
+      return true;
+    }
+    
+    return false;
   }
 
   private async initializeLocalDockerScanRecord(requestId: string, request: ScanRequest) {
@@ -36,9 +46,10 @@ export class DatabaseAdapter implements IDatabaseAdapter {
             name: request.image,
             tag: request.tag,
             registry: 'local',
+            source: 'LOCAL_DOCKER',
             digest,
             platform: `${imageData.Os}/${imageData.Architecture}`,
-            sizeBytes: BigInt(imageData.Size || 0),
+            sizeBytes: Number(imageData.Size || 0),
           }
         });
       }
@@ -85,9 +96,10 @@ export class DatabaseAdapter implements IDatabaseAdapter {
             name: request.image,
             tag: request.tag,
             registry: request.registry,
+            source: request.registry && request.registry !== 'docker.io' ? 'REGISTRY_PRIVATE' : 'REGISTRY',
             digest,
             platform: `${metadata.Os}/${metadata.Architecture}`,
-            sizeBytes: BigInt(metadata.Size || 0),
+            sizeBytes: Number(metadata.Size || 0),
           }
         });
       }
@@ -118,16 +130,21 @@ export class DatabaseAdapter implements IDatabaseAdapter {
   }
 
   async uploadScanResults(scanId: string, reports: ScanReports): Promise<void> {
+    // Update scan record with completion status and metadata
     const updateData: any = {
       status: 'SUCCESS',
       finishedAt: new Date(),
-      trivy: reports.trivy as any,
-      grype: reports.grype as any,
-      syft: reports.syft as any,
-      dockle: reports.dockle as any,
-      osv: reports.osv as any,
-      dive: reports.dive as any,
-      metadata: reports.metadata as any,
+      metadata: {
+        ...reports.metadata,
+        scanResults: {
+          trivy: reports.trivy,
+          grype: reports.grype,
+          syft: reports.syft,
+          dockle: reports.dockle,
+          osv: reports.osv,
+          dive: reports.dive,
+        }
+      } as any,
     };
 
     await this.updateScanRecord(scanId, updateData);
@@ -189,7 +206,28 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     }
 
     if (Object.keys(aggregates).length > 0) {
-      await this.updateScanRecord(scanId, aggregates);
+      // Get current scan to merge metadata
+      const currentScan = await prisma.scan.findUnique({
+        where: { id: scanId },
+        select: { metadata: true }
+      });
+      
+      const currentMetadata = currentScan?.metadata as any || {};
+      
+      // Store aggregated data in metadata field and riskScore directly
+      const updateData: any = {
+        metadata: {
+          ...currentMetadata,
+          aggregatedData: aggregates
+        } as any
+      };
+      
+      // Extract riskScore to store in the dedicated field
+      if (aggregates.riskScore !== undefined) {
+        updateData.riskScore = aggregates.riskScore;
+      }
+      
+      await this.updateScanRecord(scanId, updateData);
     }
   }
 }

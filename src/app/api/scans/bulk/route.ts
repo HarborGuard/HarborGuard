@@ -4,15 +4,23 @@ import { z } from 'zod';
 
 const BulkScanRequestSchema = z.object({
   name: z.string().optional(),
-  type: z.literal('bulk'),
   patterns: z.object({
     imagePattern: z.string().optional(),
     registryPattern: z.string().optional(),
     tagPattern: z.string().optional(),
+    excludeTagPattern: z.string().optional(),
   }),
-  excludePatterns: z.array(z.string()).optional(),
-  maxConcurrent: z.number().min(1).max(10).optional(),
-  scanTemplate: z.string().optional(),
+  options: z.object({
+    maxImages: z.number().min(1).max(1000).optional(),
+    scanners: z.object({
+      trivy: z.boolean().optional(),
+      grype: z.boolean().optional(),
+      syft: z.boolean().optional(),
+      dockle: z.boolean().optional(),
+      osv: z.boolean().optional(),
+      dive: z.boolean().optional(),
+    }).optional(),
+  }).optional(),
 });
 
 export async function POST(request: NextRequest) {
