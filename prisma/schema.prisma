@@ -14,7 +14,7 @@ model Image {
   name                 String
   tag                  String
   registry             String?
-  source               ImageSource          @default("REGISTRY")
+  source               ImageSource          @default(REGISTRY)
   digest               String               @unique
   platform             String?
   sizeBytes            Int?
@@ -39,7 +39,7 @@ model Scan {
   imageId          String
   startedAt        DateTime
   finishedAt       DateTime?
-  status           ScanStatus        @default("RUNNING")
+  status           ScanStatus        @default(RUNNING)
   reportsDir       String?
   errorMessage     String?
   riskScore        Int?
@@ -67,7 +67,7 @@ model ScanResult {
   scanId       String
   scannerId    String
   rawOutput    Json?
-  status       ScanResultStatus @default("SUCCESS")
+  status       ScanResultStatus @default(SUCCESS)
   errorMessage String?
   createdAt    DateTime         @default(now())
   scanner      Scanner          @relation(fields: [scannerId], references: [id])
@@ -153,7 +153,7 @@ model ImageVulnerability {
   packageName        String
   installedVersion   String?
   fixedVersion       String?
-  status             VulnerabilityStatus @default("DETECTED")
+  status             VulnerabilityStatus @default(DETECTED)
   detectedAt         DateTime            @default(now())
   cveClassifications CveClassification[]
   vulnerability      Vulnerability       @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
