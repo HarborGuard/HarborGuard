@@ -78,8 +78,23 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     const imageRef = `${fullImageName}:${request.tag}`;
 
     try {
+      // Get authentication arguments if repository ID is provided
+      let authArgs = await this.getAuthenticationArgsFromRepository(request.repositoryId);
+      
+      // If no repositoryId provided but image appears to be private, try to find matching repository
+      if (!authArgs && !request.repositoryId && this.isLikelyPrivateImage(request.image)) {
+        const matchingRepositoryId = await this.findMatchingRepositoryForImage(request.image);
+        if (matchingRepositoryId) {
+          authArgs = await this.getAuthenticationArgsFromRepository(matchingRepositoryId);
+        }
+      }
+      
+      // Use --no-creds flag to explicitly disable Docker config auth when no repository credentials
+      const noCredsFlag = request.repositoryId ? '' : '--no-creds';
+      const finalAuthArgs = authArgs || noCredsFlag;
+      
       const { stdout: digestOutput } = await execAsync(
-        `skopeo inspect --format '{{.Digest}}' docker://${imageRef}`
+        `skopeo inspect ${finalAuthArgs} --format '{{.Digest}}' docker://${imageRef}`
       );
       const digest = digestOutput.trim();
 
@@ -87,7 +102,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       
       if (!image) {
         const { stdout: metadataOutput } = await execAsync(
-          `skopeo inspect docker://${imageRef}`
+          `skopeo inspect ${finalAuthArgs} docker://${imageRef}`
         );
         const metadata = JSON.parse(metadataOutput);
 
@@ -228,6 +243,94 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       }
       
       await this.updateScanRecord(scanId, updateData);
+    }
+  }
+
+  /**
+   * Check if an image name appears to be a private repository
+   */
+  private isLikelyPrivateImage(imageName: string): boolean {
+    // Images with usernames (like username/repo) are likely private
+    return imageName.includes('/') && !imageName.startsWith('library/');
+  }
+
+  /**
+   * Find a repository that might contain the given image
+   */
+  private async findMatchingRepositoryForImage(imageName: string): Promise<string | null> {
+    try {
+      const repositories = await prisma.repository.findMany({
+        where: {
+          status: 'ACTIVE'
+        }
+      });
+
+      for (const repo of repositories) {
+        // For Docker Hub repositories, check if the image matches the organization/username pattern
+        if (repo.type === 'DOCKERHUB') {
+          const username = repo.organization || repo.username;
+          if (username && imageName.startsWith(`${username}/`)) {
+            return repo.id;
+          }
+        }
+        // For GitHub Container Registry, check ghcr.io pattern
+        else if (repo.type === 'GHCR' && repo.registryUrl?.includes('ghcr.io')) {
+          const username = repo.organization || repo.username;
+          if (username && imageName.startsWith(`ghcr.io/${username}/`)) {
+            return repo.id;
+          }
+        }
+        // For generic registries, check if the registry URL matches
+        else if (repo.type === 'GENERIC' && repo.registryUrl) {
+          const registryHost = repo.registryUrl.replace(/^https?:\/\//, '').split('/')[0];
+          if (imageName.startsWith(`${registryHost}/`)) {
+            return repo.id;
+          }
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Failed to find matching repository:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get authentication arguments for skopeo commands using repository credentials
+   */
+  private async getAuthenticationArgsFromRepository(repositoryId?: string): Promise<string> {
+    if (!repositoryId) {
+      return '';
+    }
+
+    try {
+      const repository = await prisma.repository.findUnique({
+        where: { id: repositoryId },
+      });
+
+      if (!repository || repository.status !== 'ACTIVE') {
+        console.warn(`Repository ${repositoryId} not found or inactive`);
+        return '';
+      }
+
+      // For now, treating encryptedPassword as plaintext password
+      // In production, this should be properly decrypted
+      const username = repository.username;
+      const password = repository.encryptedPassword;
+
+      if (username && password) {
+        // Escape credentials to prevent command injection
+        const escapedUsername = username.replace(/"/g, '\\"');
+        const escapedPassword = password.replace(/"/g, '\\"');
+        return `--creds "${escapedUsername}:${escapedPassword}"`;
+      }
+
+      console.warn(`Invalid or missing credentials for repository ${repositoryId}`);
+      return '';
+    } catch (error) {
+      console.error(`Failed to get authentication for repository ${repositoryId}:`, error);
+      return '';
     }
   }
 }

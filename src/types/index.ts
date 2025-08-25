@@ -462,6 +462,7 @@ export interface ScanRequest {
   registry?: string;
   source?: ScanSource; // 'registry' or 'local'
   dockerImageId?: string; // For local Docker images
+  repositoryId?: string; // For private repositories
 }
 
 export interface CreateScanRequest extends ScanRequest {

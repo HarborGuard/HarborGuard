@@ -467,7 +467,17 @@ export default function ImageDetailsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <HistoricalScansTable data={historicalScans.filter(Boolean) as any} imageId={imageData.name} />
+                  <HistoricalScansTable 
+                    data={historicalScans.filter(Boolean) as any} 
+                    imageId={imageData.name}
+                    onScanDeleted={() => {
+                      refreshScans()
+                      // Also refresh consolidated classifications after deletion
+                      setTimeout(() => {
+                        window.location.reload()
+                      }, 500)
+                    }}
+                  />
                 </CardContent>
               </Card>
           </div>

@@ -5,6 +5,7 @@ import { exec } from 'child_process';
 import { exportDockerImage, inspectDockerImage } from '@/lib/docker';
 import { IScanExecutor, ScanReports } from './types';
 import { AVAILABLE_SCANNERS } from './scanners';
+import { prisma } from '@/lib/prisma';
 import type { ScanRequest } from '@/types';
 
 const execAsync = promisify(exec);
@@ -62,9 +63,12 @@ export class ScanExecutor implements IScanExecutor {
     const imageRef = `${fullImageName}:${request.tag}`;
 
     const env = this.setupEnvironmentVariables(cacheDir);
+    
+    // Get authentication arguments for inspect command
+    const inspectAuthArgs = await this.getInspectAuthArgs(request.repositoryId, request.image);
 
     const { stdout: digestOutput } = await execAsync(
-      `skopeo inspect --format '{{.Digest}}' docker://${imageRef}`,
+      `skopeo inspect ${inspectAuthArgs} --format '{{.Digest}}' docker://${imageRef}`,
       { env }
     );
     const digest = digestOutput.trim();
@@ -76,8 +80,11 @@ export class ScanExecutor implements IScanExecutor {
 
     this.progressTracker.updateProgress(requestId, 1, 'Starting image download');
     
-    console.log(`skopeo copy docker://${imageRef} docker-archive:${tarPath}`);
-    await execAsync(`skopeo copy docker://${imageRef} docker-archive:${tarPath}`, { env });
+    // Get authentication arguments for copy command
+    const copyAuthArgs = await this.getCopyAuthArgs(request.repositoryId, request.image);
+    
+    console.log(`skopeo copy ${copyAuthArgs} docker://${imageRef} docker-archive:${tarPath}`);
+    await execAsync(`skopeo copy ${copyAuthArgs} docker://${imageRef} docker-archive:${tarPath}`, { env });
     
     this.progressTracker.updateProgress(requestId, 50, 'Image download completed');
 
@@ -166,5 +173,130 @@ export class ScanExecutor implements IScanExecutor {
     }
 
     return reports;
+  }
+
+  /**
+   * Check if an image name appears to be a private repository
+   */
+  private isLikelyPrivateImage(imageName: string): boolean {
+    return imageName.includes('/') && !imageName.startsWith('library/');
+  }
+
+  /**
+   * Find a repository that might contain the given image
+   */
+  private async findMatchingRepositoryForImage(imageName: string): Promise<string | null> {
+    try {
+      const repositories = await prisma.repository.findMany({
+        where: { status: 'ACTIVE' }
+      });
+
+      for (const repo of repositories) {
+        if (repo.type === 'DOCKERHUB') {
+          const username = repo.organization || repo.username;
+          if (username && imageName.startsWith(`${username}/`)) {
+            return repo.id;
+          }
+        } else if (repo.type === 'GHCR' && repo.registryUrl?.includes('ghcr.io')) {
+          const username = repo.organization || repo.username;
+          if (username && imageName.startsWith(`ghcr.io/${username}/`)) {
+            return repo.id;
+          }
+        } else if (repo.type === 'GENERIC' && repo.registryUrl) {
+          const registryHost = repo.registryUrl.replace(/^https?:\/\//, '').split('/')[0];
+          if (imageName.startsWith(`${registryHost}/`)) {
+            return repo.id;
+          }
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to find matching repository:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get authentication arguments for skopeo inspect commands
+   */
+  private async getInspectAuthArgs(repositoryId?: string, imageName?: string): Promise<string> {
+    let repoId = repositoryId;
+    
+    // If no repositoryId provided but image appears private, try to find matching repository
+    if (!repoId && imageName && this.isLikelyPrivateImage(imageName)) {
+      const foundRepoId = await this.findMatchingRepositoryForImage(imageName);
+      repoId = foundRepoId || undefined;
+    }
+    
+    if (!repoId) {
+      return '--no-creds';
+    }
+
+    try {
+      const repository = await prisma.repository.findUnique({
+        where: { id: repoId },
+      });
+
+      if (!repository || repository.status !== 'ACTIVE') {
+        console.warn(`Repository ${repoId} not found or inactive`);
+        return '--no-creds';
+      }
+
+      const username = repository.username;
+      const password = repository.encryptedPassword;
+
+      if (username && password) {
+        const escapedUsername = username.replace(/"/g, '\\"');
+        const escapedPassword = password.replace(/"/g, '\\"');
+        return `--creds "${escapedUsername}:${escapedPassword}"`;
+      }
+
+      return '--no-creds';
+    } catch (error) {
+      console.error(`Failed to get authentication for repository ${repoId}:`, error);
+      return '--no-creds';
+    }
+  }
+
+  /**
+   * Get authentication arguments for skopeo copy commands
+   */
+  private async getCopyAuthArgs(repositoryId?: string, imageName?: string): Promise<string> {
+    let repoId = repositoryId;
+    
+    // If no repositoryId provided but image appears private, try to find matching repository
+    if (!repoId && imageName && this.isLikelyPrivateImage(imageName)) {
+      const foundRepoId = await this.findMatchingRepositoryForImage(imageName);
+      repoId = foundRepoId || undefined;
+    }
+    
+    if (!repoId) {
+      return '--src-no-creds';
+    }
+
+    try {
+      const repository = await prisma.repository.findUnique({
+        where: { id: repoId },
+      });
+
+      if (!repository || repository.status !== 'ACTIVE') {
+        console.warn(`Repository ${repoId} not found or inactive`);
+        return '--src-no-creds';
+      }
+
+      const username = repository.username;
+      const password = repository.encryptedPassword;
+
+      if (username && password) {
+        const escapedUsername = username.replace(/"/g, '\\"');
+        const escapedPassword = password.replace(/"/g, '\\"');
+        return `--src-creds "${escapedUsername}:${escapedPassword}"`;
+      }
+
+      return '--src-no-creds';
+    } catch (error) {
+      console.error(`Failed to get authentication for repository ${repoId}:`, error);
+      return '--src-no-creds';
+    }
   }
 }

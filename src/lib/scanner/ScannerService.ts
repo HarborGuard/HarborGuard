@@ -3,21 +3,31 @@ import { ProgressTracker } from './ProgressTracker';
 import { DatabaseAdapter } from './DatabaseAdapter';
 import { ScanExecutor } from './ScanExecutor';
 import { getScannerVersions } from './scanners';
-import type { ScanRequest, ScanJob } from '@/types';
+import type { ScanRequest, ScanJob, ScanStatus } from '@/types';
 // Template types removed - using basic ScanRequest
 
+// Global shared state to work around Next.js development mode module reloading
+declare global {
+  var scannerJobs: Map<string, ScanJob> | undefined;
+}
+
+const globalJobs = globalThis.scannerJobs || (globalThis.scannerJobs = new Map<string, ScanJob>());
+
 export class ScannerService {
-  private jobs = new Map<string, ScanJob>();
   private progressTracker: ProgressTracker;
   private databaseAdapter: DatabaseAdapter;
   private scanExecutor: ScanExecutor;
+  private instanceId: string;
 
   constructor() {
-    this.progressTracker = new ProgressTracker(this.jobs, this.updateJobStatus.bind(this));
+    this.instanceId = Math.random().toString(36).substring(2, 8);
+    this.progressTracker = new ProgressTracker(globalJobs, this.updateJobStatus.bind(this));
     this.databaseAdapter = new DatabaseAdapter();
     this.scanExecutor = new ScanExecutor({
       updateProgress: this.progressTracker.updateProgress.bind(this.progressTracker)
     });
+    
+    console.log(`[ScannerService] Created new instance ${this.instanceId}`);
   }
 
   async startScan(
@@ -29,13 +39,14 @@ export class ScannerService {
 
     const { scanId, imageId } = await this.databaseAdapter.initializeScanRecord(requestId, request);
 
-    this.jobs.set(requestId, {
+    const job: ScanJob = {
       requestId,
       scanId,
       imageId,
-      status: 'RUNNING',
+      status: 'RUNNING' as ScanStatus,
       progress: 0
-    });
+    };
+    globalJobs.set(requestId, job);
 
     this.executeScan(requestId, request, scanId, imageId).catch(error => {
       console.error(`Scan ${requestId} failed:`, error);
@@ -97,6 +108,7 @@ export class ScannerService {
     await this.databaseAdapter.uploadScanResults(scanId, reports);
 
     this.updateJobStatus(requestId, 'SUCCESS', 100, undefined, 'Scan completed successfully');
+    
   }
 
   private isLocalDockerScan(request: ScanRequest): boolean {
@@ -108,12 +120,12 @@ export class ScannerService {
   }
 
   private updateJobStatus(requestId: string, status: ScanJob['status'], progress?: number, error?: string, step?: string) {
-    const job = this.jobs.get(requestId);
+    const job = globalJobs.get(requestId);
     if (job) {
       job.status = status;
       if (progress !== undefined) job.progress = progress;
       if (error) job.error = error;
-      this.jobs.set(requestId, job);
+      globalJobs.set(requestId, job);
 
       if (status === 'RUNNING' || status === 'SUCCESS' || status === 'FAILED' || status === 'CANCELLED') {
         const progressEvent: ScanProgressEvent = {
@@ -132,11 +144,11 @@ export class ScannerService {
   }
 
   getScanJob(requestId: string): ScanJob | undefined {
-    return this.jobs.get(requestId);
+    return globalJobs.get(requestId);
   }
 
   getAllJobs(): ScanJob[] {
-    return Array.from(this.jobs.values());
+    return globalThis.scannerJobs ? Array.from(globalThis.scannerJobs.values()) : [];
   }
 
   addProgressListener(listener: (event: ScanProgressEvent) => void) {
@@ -148,7 +160,7 @@ export class ScannerService {
   }
 
   async cancelScan(requestId: string): Promise<boolean> {
-    const job = this.jobs.get(requestId);
+    const job = globalJobs.get(requestId);
     if (job && job.status === 'RUNNING') {
       this.progressTracker.cleanup(requestId);
       this.updateJobStatus(requestId, 'CANCELLED');

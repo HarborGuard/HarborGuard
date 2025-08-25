@@ -1,0 +1,374 @@
+"use client"
+
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { IconBrandDocker, IconBrandGithub, IconServer, IconCheck, IconX, IconLoader } from "@tabler/icons-react"
+import { toast } from "sonner"
+
+interface AddRepositoryDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onRepositoryAdded: () => void
+}
+
+type RepositoryType = 'dockerhub' | 'ghcr' | 'generic'
+
+interface RepositoryConfig {
+  name: string
+  type: RepositoryType
+  registryUrl: string
+  username: string
+  password: string
+  organization?: string
+}
+
+export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: AddRepositoryDialogProps) {
+  const [step, setStep] = useState<'select' | 'configure' | 'test'>('select')
+  const [selectedType, setSelectedType] = useState<RepositoryType>('dockerhub')
+  const [config, setConfig] = useState<RepositoryConfig>({
+    name: '',
+    type: 'dockerhub',
+    registryUrl: '',
+    username: '',
+    password: '',
+    organization: '',
+  })
+  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
+  const [testResult, setTestResult] = useState<{ repositoryCount?: number; error?: string } | null>(null)
+
+  const repositoryTypes = [
+    {
+      type: 'dockerhub' as const,
+      title: 'Docker Hub',
+      description: 'Connect to Docker Hub private repositories',
+      icon: <IconBrandDocker className="h-8 w-8" />,
+      registryUrl: 'docker.io',
+    },
+    {
+      type: 'ghcr' as const,
+      title: 'GitHub Container Registry',
+      description: 'Connect to GitHub Container Registry (ghcr.io)',
+      icon: <IconBrandGithub className="h-8 w-8" />,
+      registryUrl: 'ghcr.io',
+    },
+    {
+      type: 'generic' as const,
+      title: 'Generic Registry',
+      description: 'Connect to any OCI-compliant container registry',
+      icon: <IconServer className="h-8 w-8" />,
+      registryUrl: '',
+    },
+  ]
+
+  const handleTypeSelect = (type: RepositoryType) => {
+    setSelectedType(type)
+    const registryInfo = repositoryTypes.find(t => t.type === type)
+    setConfig(prev => ({
+      ...prev,
+      type,
+      registryUrl: registryInfo?.registryUrl || '',
+      name: registryInfo?.title || '',
+    }))
+    setStep('configure')
+  }
+
+  const handleTestConnection = async () => {
+    setTestStatus('testing')
+    setTestResult(null)
+
+    try {
+      const response = await fetch('/api/repositories/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(config),
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        setTestStatus('success')
+        setTestResult({ repositoryCount: result.repositoryCount })
+        toast.success(`Connection successful! Found ${result.repositoryCount} repositories.`)
+      } else {
+        setTestStatus('error')
+        setTestResult({ error: result.error || 'Connection test failed' })
+        toast.error(result.error || 'Connection test failed')
+      }
+    } catch (error) {
+      console.error('Test connection failed:', error)
+      setTestStatus('error')
+      setTestResult({ error: 'Failed to test connection' })
+      toast.error('Failed to test connection')
+    }
+  }
+
+  const handleAddRepository = async () => {
+    try {
+      const response = await fetch('/api/repositories', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(config),
+      })
+
+      if (response.ok) {
+        toast.success('Repository added successfully')
+        handleClose()
+        onRepositoryAdded()
+      } else {
+        const error = await response.json()
+        toast.error(error.message || 'Failed to add repository')
+      }
+    } catch (error) {
+      console.error('Failed to add repository:', error)
+      toast.error('Failed to add repository')
+    }
+  }
+
+  const handleClose = () => {
+    setStep('select')
+    setSelectedType('dockerhub')
+    setConfig({
+      name: '',
+      type: 'dockerhub',
+      registryUrl: '',
+      username: '',
+      password: '',
+      organization: '',
+    })
+    setTestStatus('idle')
+    setTestResult(null)
+    onOpenChange(false)
+  }
+
+  const canTestConnection = config.name && config.username && config.password && 
+    (config.type !== 'generic' || config.registryUrl)
+
+  const canAddRepository = testStatus === 'success'
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Add Repository</DialogTitle>
+          <DialogDescription>
+            {step === 'select' && 'Choose a repository type to get started'}
+            {step === 'configure' && 'Configure your repository credentials'}
+            {step === 'test' && 'Test connection and add repository'}
+          </DialogDescription>
+        </DialogHeader>
+
+        {step === 'select' && (
+          <div className="grid gap-4 py-4">
+            {repositoryTypes.map((type) => (
+              <Card 
+                key={type.type}
+                className="cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => handleTypeSelect(type.type)}
+              >
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    {type.icon}
+                    <div>
+                      <CardTitle className="text-base">{type.title}</CardTitle>
+                      <CardDescription>{type.description}</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {step === 'configure' && (
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Repository Name</Label>
+              <Input
+                id="name"
+                value={config.name}
+                onChange={(e) => setConfig(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter a name for this repository"
+              />
+            </div>
+
+            {config.type === 'generic' && (
+              <div className="space-y-2">
+                <Label htmlFor="registryUrl">Registry URL</Label>
+                <Input
+                  id="registryUrl"
+                  value={config.registryUrl}
+                  onChange={(e) => setConfig(prev => ({ ...prev, registryUrl: e.target.value }))}
+                  placeholder="e.g., registry.company.com"
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="username">
+                {config.type === 'dockerhub' ? 'Docker Hub Username' : 
+                 config.type === 'ghcr' ? 'GitHub Username' : 'Username'}
+              </Label>
+              <Input
+                id="username"
+                value={config.username}
+                onChange={(e) => setConfig(prev => ({ ...prev, username: e.target.value }))}
+                placeholder="Enter username"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">
+                {config.type === 'dockerhub' ? 'Personal Access Token' : 
+                 config.type === 'ghcr' ? 'GitHub Personal Access Token' : 'Password/Token'}
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                value={config.password}
+                onChange={(e) => setConfig(prev => ({ ...prev, password: e.target.value }))}
+                placeholder={
+                  config.type === 'dockerhub' ? 'Enter Docker Hub PAT' :
+                  config.type === 'ghcr' ? 'Enter GitHub PAT with packages:read scope' :
+                  'Enter password or token'
+                }
+              />
+            </div>
+
+            {config.type === 'ghcr' && (
+              <div className="space-y-2">
+                <Label htmlFor="organization">Organization (optional)</Label>
+                <Input
+                  id="organization"
+                  value={config.organization}
+                  onChange={(e) => setConfig(prev => ({ ...prev, organization: e.target.value }))}
+                  placeholder="Enter organization name for org packages"
+                />
+              </div>
+            )}
+
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <div className="text-sm text-blue-800">
+                <strong>Important:</strong> You must test the connection before adding the repository.
+                This ensures your credentials are valid and we can access your repositories.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 'test' && (
+          <div className="space-y-4 py-4">
+            <div className="border rounded-lg p-4">
+              <h3 className="font-medium mb-2">Repository Configuration</h3>
+              <div className="space-y-2 text-sm">
+                <div><strong>Name:</strong> {config.name}</div>
+                <div><strong>Type:</strong> {repositoryTypes.find(t => t.type === config.type)?.title}</div>
+                <div><strong>Registry:</strong> {config.registryUrl}</div>
+                <div><strong>Username:</strong> {config.username}</div>
+              </div>
+            </div>
+
+            <div className="border rounded-lg p-4">
+              <h3 className="font-medium mb-2">Connection Test</h3>
+              <div className="flex items-center gap-2 mb-3">
+                {testStatus === 'idle' && <Badge variant="secondary">Not tested</Badge>}
+                {testStatus === 'testing' && (
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                    <IconLoader className="mr-1 h-3 w-3 animate-spin" />
+                    Testing...
+                  </Badge>
+                )}
+                {testStatus === 'success' && (
+                  <Badge variant="default" className="bg-green-100 text-green-800">
+                    <IconCheck className="mr-1 h-3 w-3" />
+                    Success
+                  </Badge>
+                )}
+                {testStatus === 'error' && (
+                  <Badge variant="destructive">
+                    <IconX className="mr-1 h-3 w-3" />
+                    Failed
+                  </Badge>
+                )}
+              </div>
+
+              {testResult?.repositoryCount !== undefined && (
+                <div className="text-sm text-green-700">
+                  Found {testResult.repositoryCount} repositories
+                </div>
+              )}
+
+              {testResult?.error && (
+                <div className="text-sm text-red-600">
+                  {testResult.error}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose}>
+            Cancel
+          </Button>
+          
+          {step === 'configure' && (
+            <>
+              <Button variant="outline" onClick={() => setStep('select')}>
+                Back
+              </Button>
+              <Button onClick={() => setStep('test')}>
+                Next
+              </Button>
+            </>
+          )}
+
+          {step === 'test' && (
+            <>
+              <Button variant="outline" onClick={() => setStep('configure')}>
+                Back
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleTestConnection}
+                disabled={!canTestConnection || testStatus === 'testing'}
+              >
+                {testStatus === 'testing' ? (
+                  <>
+                    <IconLoader className="mr-2 h-4 w-4 animate-spin" />
+                    Testing...
+                  </>
+                ) : (
+                  'Test Connection'
+                )}
+              </Button>
+              <Button
+                onClick={handleAddRepository}
+                disabled={!canAddRepository}
+              >
+                Add Repository
+              </Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}

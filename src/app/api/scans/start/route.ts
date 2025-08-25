@@ -16,6 +16,7 @@ const ScanStartSchema = z.object({
   tag: z.string().min(1).optional(),
   source: z.enum(['registry', 'local']).optional(),
   dockerImageId: z.string().optional(),
+  repositoryId: z.string().optional(), // For private repositories
 }).refine(
   (data) => 
     // Either legacy format or new format must be provided
@@ -45,6 +46,7 @@ export async function POST(request: NextRequest) {
       registry: validatedData.registry,
       source: validatedData.source,
       dockerImageId: validatedData.dockerImageId,
+      repositoryId: validatedData.repositoryId,
     }
     
     // Start scan

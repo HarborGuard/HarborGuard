@@ -7,6 +7,7 @@ import {
   IconSettings,
   IconBook,
   IconClipboardList,
+  IconGitBranch,
 } from "@tabler/icons-react";
 
 import { NavMain } from "@/components/nav-main";
@@ -29,15 +30,20 @@ const data = {
       icon: IconDashboard,
     },
     {
-      title: "Image Repository",
-      url: "/repository",
+      title: "Images",
+      url: "/images",
       icon: IconDatabase,
     },
     {
-      title: "Vulnerability Library",
+      title: "Vulnerabilities",
       url: "/library",
       icon: IconBook,
-    }
+    },
+    {
+      title: "Repositories",
+      url: "/repositories",
+      icon: IconGitBranch,
+    },
   ],
 };
 

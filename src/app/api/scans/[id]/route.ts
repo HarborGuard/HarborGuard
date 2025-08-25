@@ -91,3 +91,41 @@ export async function PATCH(
     )
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    
+    // Find scan by ID or requestId
+    let scan = await prisma.scan.findUnique({ where: { id } })
+    if (!scan) {
+      scan = await prisma.scan.findUnique({ where: { requestId: id } })
+    }
+    
+    if (!scan) {
+      return NextResponse.json(
+        { error: 'Scan not found' },
+        { status: 404 }
+      )
+    }
+    
+    // Delete the scan and all related data (Prisma will handle cascading)
+    await prisma.scan.delete({
+      where: { id: scan.id }
+    })
+    
+    return NextResponse.json(
+      { success: true, message: 'Scan deleted successfully' },
+      { status: 200 }
+    )
+  } catch (error) {
+    console.error('Error deleting scan:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}

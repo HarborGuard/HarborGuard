@@ -11,6 +11,7 @@ import {
   IconCheck,
   IconX,
   IconDownload,
+  IconTrash,
 } from "@tabler/icons-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -27,6 +28,23 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/components/ui/toggle-group"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { toast } from "sonner"
 
 // Component handles its own data formatting since historical scans are pre-formatted
 
@@ -58,10 +76,13 @@ interface HistoricalScan {
 interface HistoricalScansTableProps {
   data: HistoricalScan[]
   imageId?: string
+  onScanDeleted?: () => void
 }
 
-export function HistoricalScansTable({ data, imageId }: HistoricalScansTableProps) {
+export function HistoricalScansTable({ data, imageId, onScanDeleted }: HistoricalScansTableProps) {
   const router = useRouter()
+  const [deletingScanId, setDeletingScanId] = React.useState<string | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false)
   
   // Data is already formatted for display
   const formattedScans = data
@@ -126,6 +147,40 @@ export function HistoricalScansTable({ data, imageId }: HistoricalScansTableProp
     }
   }
 
+  const handleDeleteClick = (scanId: string) => {
+    setDeletingScanId(scanId)
+    setShowDeleteDialog(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingScanId) return
+    
+    try {
+      const response = await fetch(`/api/scans/${deletingScanId}`, {
+        method: 'DELETE',
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete scan')
+      }
+      
+      toast.success('Scan deleted successfully')
+      onScanDeleted?.() // Refresh the data
+      
+    } catch (error) {
+      console.error('Delete failed:', error)
+      toast.error('Failed to delete scan')
+    } finally {
+      setShowDeleteDialog(false)
+      setDeletingScanId(null)
+    }
+  }
+
+  const handleDeleteCancel = () => {
+    setShowDeleteDialog(false)
+    setDeletingScanId(null)
+  }
+
   return (
     <div className="space-y-4">
       <Table>
@@ -156,11 +211,12 @@ export function HistoricalScansTable({ data, imageId }: HistoricalScansTableProp
             }
 
             return (
-              <TableRow 
-                key={scan.id} 
-                className="cursor-pointer hover:bg-muted/50"
-                onClick={handleScanRowClick}
-              >
+              <ContextMenu key={scan.id}>
+                <ContextMenuTrigger asChild>
+                  <TableRow 
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={handleScanRowClick}
+                  >
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <IconCalendar className="h-4 w-4 text-muted-foreground" />
@@ -268,11 +324,45 @@ export function HistoricalScansTable({ data, imageId }: HistoricalScansTableProp
                     <IconDownload className="h-4 w-4" />
                   </Button>
                 </TableCell>
-              </TableRow>
+                  </TableRow>
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  <ContextMenuItem 
+                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                    onClick={() => handleDeleteClick(scan.scanId)}
+                  >
+                    <IconTrash className="mr-2 h-4 w-4" />
+                    Delete Scan
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             )
           })}
         </TableBody>
       </Table>
+      
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Scan</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this scan? This action cannot be undone.
+              All scan results and reports will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleDeleteCancel}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteConfirm}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

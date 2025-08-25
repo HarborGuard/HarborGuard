@@ -759,12 +759,6 @@ export function DataTable({
       className="w-full flex-col justify-start gap-6"
     >
       <div className="flex items-center justify-between px-4 lg:px-6">
-        {isFullPage && (
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold">Image Repository</h1>
-            <p className="text-muted-foreground">Comprehensive registry of all scanned container images</p>
-          </div>
-        )}
 
         <div className="flex items-center gap-2">
           <DropdownMenu>

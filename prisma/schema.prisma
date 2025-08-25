@@ -242,6 +242,38 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model Repository {
+  id                String            @id @default(cuid())
+  name              String
+  type              RepositoryType
+  registryUrl       String
+  username          String
+  encryptedPassword String
+  organization      String?
+  status            RepositoryStatus  @default(UNTESTED)
+  lastTested        DateTime?
+  repositoryCount   Int?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@map("repositories")
+}
+
+enum RepositoryType {
+  DOCKERHUB
+  GHCR
+  GENERIC
+}
+
+enum RepositoryStatus {
+  UNTESTED
+  ACTIVE
+  ERROR
+}
+
 enum ScanStatus {
   RUNNING
   SUCCESS

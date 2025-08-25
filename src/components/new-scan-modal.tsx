@@ -8,6 +8,8 @@ import {
   IconLink,
   IconSearch,
   IconX,
+  IconGitBranch,
+  IconServer,
 } from "@tabler/icons-react"
 
 import { Badge } from "components/components/ui/badge"
@@ -102,6 +104,61 @@ export function NewScanModal({ children }: NewScanModalProps) {
       }
     }
   }, [])
+
+  // Fetch repositories when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      fetchRepositories()
+    }
+  }, [isOpen])
+
+  const fetchRepositories = async () => {
+    try {
+      const response = await fetch('/api/repositories')
+      if (response.ok) {
+        const data = await response.json()
+        setRepositories(data.filter((repo: any) => repo.status === 'ACTIVE'))
+      }
+    } catch (error) {
+      console.error('Failed to fetch repositories:', error)
+    }
+  }
+
+  const fetchRepositoryImages = async (repository: any) => {
+    setSelectedRepository(repository)
+    setRepositoryImages([])
+    setSelectedImage(null)
+    setRepositoryTags([])
+    setSelectedTag("")
+
+    try {
+      const response = await fetch(`/api/repositories/${repository.id}/images`)
+      if (response.ok) {
+        const data = await response.json()
+        setRepositoryImages(data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch repository images:', error)
+      toast.error('Failed to fetch repository images')
+    }
+  }
+
+  const fetchImageTags = async (image: any) => {
+    setSelectedImage(image)
+    setRepositoryTags([])
+    setSelectedTag("")
+
+    try {
+      const response = await fetch(`/api/repositories/${selectedRepository.id}/images/${encodeURIComponent(image.name)}/tags`)
+      if (response.ok) {
+        const data = await response.json()
+        setRepositoryTags(data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch image tags:', error)
+      toast.error('Failed to fetch image tags')
+    }
+  }
   
   // Get real scanned images from app state
   const existingImages = React.useMemo(() => {
@@ -125,6 +182,12 @@ export function NewScanModal({ children }: NewScanModalProps) {
   const [customRegistry, setCustomRegistry] = React.useState("")
   const [selectedDockerImage, setSelectedDockerImage] = React.useState<DockerImage | null>(null)
   const [selectedExistingImage, setSelectedExistingImage] = React.useState<{source: string, name: string} | null>(null)
+  const [repositories, setRepositories] = React.useState<any[]>([])
+  const [selectedRepository, setSelectedRepository] = React.useState<any>(null)
+  const [repositoryImages, setRepositoryImages] = React.useState<any[]>([])
+  const [selectedImage, setSelectedImage] = React.useState<any>(null)
+  const [repositoryTags, setRepositoryTags] = React.useState<any[]>([])
+  const [selectedTag, setSelectedTag] = React.useState<string>("")
   
 
   const filteredImages = existingImages.filter(image =>
@@ -174,6 +237,8 @@ export function NewScanModal({ children }: NewScanModalProps) {
         return customRegistry
       case 'existing':
         return imageUrl
+      case 'private':
+        return selectedImage && selectedTag ? `${selectedImage.name}:${selectedTag}` : ''
       default:
         return ''
     }
@@ -232,6 +297,13 @@ export function NewScanModal({ children }: NewScanModalProps) {
             scanRequest.dockerImageId = localImage.id
           }
         }
+      }
+
+      // For private repositories, set registry and repository ID
+      if (selectedSource === 'private' && selectedRepository && selectedImage && selectedTag) {
+        scanRequest.registry = selectedRepository.registryUrl
+        scanRequest.repositoryId = selectedRepository.id
+        scanRequest.source = 'registry'
       }
       
       const response = await fetch('/api/scans/start', {
@@ -368,7 +440,7 @@ export function NewScanModal({ children }: NewScanModalProps) {
             <h3 className="text-lg font-semibold">Scan New Image</h3>
             
             <Tabs value={selectedSource} onValueChange={setSelectedSource}>
-              <TabsList className={`grid w-full ${dockerInfo?.hasAccess ? 'grid-cols-4' : 'grid-cols-3'}`}>
+              <TabsList className={`grid w-full ${dockerInfo?.hasAccess ? 'grid-cols-5' : 'grid-cols-4'}`}>
                 <TabsTrigger value="dockerhub" className="flex items-center gap-1">
                   <IconBrandDocker className="h-4 w-4" />
                   <span className="hidden sm:inline">Docker Hub</span>
@@ -386,6 +458,10 @@ export function NewScanModal({ children }: NewScanModalProps) {
                 <TabsTrigger value="custom" className="flex items-center gap-1">
                   <IconLink className="h-4 w-4" />
                   <span className="hidden sm:inline">Custom</span>
+                </TabsTrigger>
+                <TabsTrigger value="private" className="flex items-center gap-1">
+                  <IconGitBranch className="h-4 w-4" />
+                  <span className="hidden sm:inline">Private</span>
                 </TabsTrigger>
               </TabsList>
 
@@ -440,6 +516,126 @@ export function NewScanModal({ children }: NewScanModalProps) {
                   Enter the full URL to your custom registry image.
                 </p>
               </TabsContent>
+
+              <TabsContent value="private" className="space-y-3">
+                {repositories.length === 0 ? (
+                  <div className="text-center py-8">
+                    <IconServer className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No Private Repositories</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Add private repositories in the Repositories page to scan private images.
+                    </p>
+                    <Button variant="outline" onClick={() => window.open('/repositories', '_blank')}>
+                      <IconGitBranch className="mr-2 h-4 w-4" />
+                      Manage Repositories
+                    </Button>
+                  </div>
+                ) : !selectedRepository ? (
+                  <div className="space-y-3">
+                    <Label>Select Repository</Label>
+                    <div className="grid gap-2">
+                      {repositories.map((repo) => (
+                        <Button
+                          key={repo.id}
+                          variant="outline"
+                          className="flex items-center justify-start gap-3 p-4 h-auto"
+                          onClick={() => fetchRepositoryImages(repo)}
+                        >
+                          {repo.type === 'DOCKERHUB' && <IconBrandDocker className="h-5 w-5" />}
+                          {repo.type === 'GHCR' && <IconBrandGithub className="h-5 w-5" />}
+                          {repo.type === 'GENERIC' && <IconServer className="h-5 w-5" />}
+                          <div className="text-left">
+                            <div className="font-medium">{repo.name}</div>
+                            <div className="text-sm text-muted-foreground">{repo.registryUrl}</div>
+                          </div>
+                        </Button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Select a repository to browse available images.
+                    </p>
+                  </div>
+                ) : !selectedImage ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Select Image from {selectedRepository.name}</Label>
+                      <Button variant="ghost" size="sm" onClick={() => setSelectedRepository(null)}>
+                        <IconX className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {repositoryImages.length === 0 ? (
+                      <div className="text-center py-4 text-muted-foreground">
+                        Loading images...
+                      </div>
+                    ) : (
+                      <div className="grid gap-2 max-h-64 overflow-y-auto">
+                        {repositoryImages.map((image, index) => (
+                          <Button
+                            key={index}
+                            variant="outline"
+                            className="flex items-center justify-start gap-3 p-3 h-auto"
+                            onClick={() => fetchImageTags(image)}
+                          >
+                            <div className="text-left">
+                              <div className="font-medium">{image.name}</div>
+                              {image.description && (
+                                <div className="text-sm text-muted-foreground line-clamp-1">
+                                  {image.description}
+                                </div>
+                              )}
+                            </div>
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Select an image to view available tags.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Select Tag for {selectedImage.name}</Label>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => setSelectedImage(null)}>
+                          Back
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setSelectedRepository(null)}>
+                          <IconX className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    {repositoryTags.length === 0 ? (
+                      <div className="text-center py-4 text-muted-foreground">
+                        Loading tags...
+                      </div>
+                    ) : (
+                      <Select value={selectedTag} onValueChange={setSelectedTag}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a tag" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {repositoryTags.map((tag) => (
+                            <SelectItem key={tag.name} value={tag.name}>
+                              <div className="flex items-center gap-2">
+                                <span>{tag.name}</span>
+                                {tag.size && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {(tag.size / 1024 / 1024).toFixed(1)}MB
+                                  </Badge>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Select a tag to scan this private repository image.
+                    </p>
+                  </div>
+                )}
+              </TabsContent>
             </Tabs>
           </div>
 
@@ -471,7 +667,8 @@ export function NewScanModal({ children }: NewScanModalProps) {
               (selectedSource === 'github' && !githubRepo) ||
               (selectedSource === 'local' && !selectedDockerImage && !localImageName) ||
               (selectedSource === 'custom' && !customRegistry) ||
-              (selectedSource === 'existing' && !imageUrl)
+              (selectedSource === 'existing' && !imageUrl) ||
+              (selectedSource === 'private' && (!selectedRepository || !selectedImage || !selectedTag))
             }
           >
             {isLoading ? 'Starting Scan...' : 'Start Scan'}

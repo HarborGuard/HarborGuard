@@ -15,7 +15,7 @@ export default function ImageRepositoryPage() {
   const { scans, loading } = useScans()
   const breadcrumbs = [
     { label: "Dashboard", href: "/" },
-    { label: "Image Repository" }
+    { label: "Images" }
   ]
 
   if (loading) {
