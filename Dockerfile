@@ -76,14 +76,16 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/src/generated ./src/generated
 
-# Setup database
+# Copy database initialization scripts
+COPY --from=builder /app/scripts ./scripts
+
+# Set default database URL (can be overridden at runtime)
 ENV DATABASE_URL="file:./app.db"
-RUN npx prisma migrate deploy
 
 # Run as root (scanners need Docker access)
 USER root
 
 EXPOSE 3000
 
-# Start Next.js standalone server (no npm needed)
-CMD ["node", "server.js"]
+# Initialize database and start server
+CMD ["sh", "-c", "node scripts/init-database.js && node server.js"]

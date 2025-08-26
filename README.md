@@ -25,6 +25,15 @@ To give Harbor Guard access to your local images:
 docker run -p 3000:3000 -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/harborguard/harborguard:latest
 ```
 
+To use with an external PostgreSQL database:
+
+```bash
+docker run -p 3000:3000 \
+  -e DATABASE_URL="postgresql://user:pass@host:5432/harborguard" \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  ghcr.io/harborguard/harborguard:latest
+```
+
 Access the application at `http://localhost:3000`
 
 ## Screenshots
@@ -49,8 +58,10 @@ npm install
 
 3. Set up the database:
 ```bash
-npx prisma migrate dev
+npm run db:init
 ```
+
+> **Database Options**: Harbor Guard supports both SQLite (default) and PostgreSQL. See [Database Configuration Guide](DATABASE.md) for detailed setup instructions.
 
 4. Start the development server:
 ```bash
@@ -135,7 +146,8 @@ The platform employs several innovative approaches to vulnerability data visuali
 ### 🚀 Developer Experience
 - Modern React 19 + Next.js 15 architecture
 - TypeScript for type safety
-- Prisma ORM for database management
+- Prisma ORM with SQLite/PostgreSQL support
+- Automatic database fallback for reliability
 - Tailwind CSS for styling
 - shadcn/ui component library
 
@@ -167,7 +179,7 @@ Harbor Guard is built with modern web technologies:
 
 - **Frontend**: React 19 + Next.js 15 with App Router
 - **Styling**: Tailwind CSS + shadcn/ui components
-- **Database**: SQLite with Prisma ORM
+- **Database**: SQLite/PostgreSQL with Prisma ORM
 - **Charts**: Recharts for data visualization
 - **Icons**: Tabler Icons + Lucide React
 - **State Management**: React Context + Custom hooks

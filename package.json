@@ -5,8 +5,14 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "start": "node scripts/init-database.js && next start",
+    "start:dev": "next start",
+    "lint": "next lint",
+    "db:init": "node scripts/init-database.js",
+    "db:migrate": "npx prisma migrate deploy",
+    "db:push": "npx prisma db push",
+    "db:reset": "npx prisma migrate reset --force",
+    "db:generate": "npx prisma generate"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
