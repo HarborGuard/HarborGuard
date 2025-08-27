@@ -14,7 +14,10 @@ import {
 import { useScans } from "@/hooks/useScans"
 
 export default function Page() {
-  const { scans, stats, loading, error } = useScans()
+  const { scans, stats, loading, dataReceived, dataReady, error } = useScans()
+  
+  // Show skeleton until data is fully processed and ready to display
+  const showSkeleton = loading || !dataReady
 
   // Create mock data for loading state to match the SectionCards interface
   const mockData = Array.from({ length: 5 }, (_, i) => ({
@@ -54,11 +57,11 @@ export default function Page() {
         <div className="flex-1 overflow-auto">
           <div className="@container/main flex flex-col gap-2 p-4 lg:p-6">
             <SectionCards 
-              loading={loading} 
-              scanData={loading ? mockData : scans} 
-              stats={loading ? mockStats : stats} 
+              loading={showSkeleton} 
+              scanData={showSkeleton ? mockData : scans} 
+              stats={showSkeleton ? mockStats : stats} 
             />
-            {loading ? (
+            {showSkeleton ? (
               <>
                 {/* ScanJobsMonitor Skeleton */}
                 <div className="bg-card rounded-lg border shadow-xs p-6">

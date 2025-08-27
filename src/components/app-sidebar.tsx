@@ -11,6 +11,7 @@ import {
 } from "@tabler/icons-react";
 
 import { NavMain } from "@/components/nav-main";
+import { VersionNotification } from "@/components/version-notification";
 import {
   Sidebar,
   SidebarContent,
@@ -71,6 +72,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <NavMain items={data.navMain} />
       </SidebarContent>
+      <SidebarFooter>
+        <VersionNotification />
+      </SidebarFooter>
     </Sidebar>
   );
 }

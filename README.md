@@ -36,6 +36,86 @@ docker run -p 3000:3000 \
 
 Access the application at `http://localhost:3000`
 
+## Environment Variables
+
+Harbor Guard supports comprehensive configuration through environment variables. All variables have sensible defaults and proper validation.
+
+| Variable | Description | Default | Valid Values | Example |
+|----------|-------------|---------|--------------|---------|
+| **Scanner Configuration** |
+| `MAX_CONCURRENT_SCANS` | Limits concurrent scanner execution to prevent resource exhaustion | `3` | `1-20` | `MAX_CONCURRENT_SCANS=5` |
+| `SCAN_TIMEOUT_MINUTES` | Maximum time allowed for individual scanner execution | `30` | `5-180` | `SCAN_TIMEOUT_MINUTES=60` |
+| `ENABLED_SCANNERS` | Comma-separated list of enabled scanners | `trivy,grype,syft,dockle,osv,dive` | Any combination of: `trivy`, `grype`, `syft`, `dockle`, `osv`, `dive` | `ENABLED_SCANNERS=trivy,grype` |
+| **Logging & Debugging** |
+| `LOG_LEVEL` | Controls application log verbosity | `info` | `debug`, `info`, `warn`, `error` | `LOG_LEVEL=debug` |
+| **Database & Maintenance** |
+| `DATABASE_URL` | Database connection string | `file:./dev.db` | SQLite: `file:./db.sqlite`<br>PostgreSQL: `postgresql://user:pass@host:port/db` | `DATABASE_URL="postgresql://user:pass@localhost:5432/harborguard"` |
+| `CLEANUP_OLD_SCANS_DAYS` | Automatically delete scans older than specified days | `30` | `1-365` | `CLEANUP_OLD_SCANS_DAYS=90` |
+| **Network & Deployment** |
+| `PORT` | Server listening port | `3000` | `1000-65535` | `PORT=8080` |
+| `BIND_ADDRESS` | Server bind address | `0.0.0.0` | Valid IP address | `BIND_ADDRESS=127.0.0.1` |
+| **Notifications** |
+| `TEAMS_WEBHOOK_URL` | Microsoft Teams webhook URL for notifications | *none* | Valid HTTPS URL | `TEAMS_WEBHOOK_URL=https://outlook.office.com/webhook/...` |
+| `SLACK_WEBHOOK_URL` | Slack webhook URL for notifications | *none* | Valid HTTPS URL | `SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...` |
+| `NOTIFY_ON_HIGH_SEVERITY` | Send notifications only for high/critical findings | `true` | `true`, `false` | `NOTIFY_ON_HIGH_SEVERITY=false` |
+| **Monitoring & Health Checks** |
+| `HEALTH_CHECK_ENABLED` | Enable `/api/health` and `/api/ready` endpoints | `true` | `true`, `false` | `HEALTH_CHECK_ENABLED=false` |
+
+### Quick Configuration Examples
+
+**Development Setup:**
+```bash
+# Minimal development configuration
+PORT=3000
+LOG_LEVEL=debug
+HEALTH_CHECK_ENABLED=true
+```
+
+**Production Setup:**
+```bash
+# Production configuration with PostgreSQL and notifications
+DATABASE_URL="postgresql://user:password@db:5432/harborguard"
+PORT=8080
+LOG_LEVEL=warn
+MAX_CONCURRENT_SCANS=10
+SCAN_TIMEOUT_MINUTES=60
+ENABLED_SCANNERS=trivy,grype,syft
+TEAMS_WEBHOOK_URL=https://outlook.office.com/webhook/your-webhook-url
+NOTIFY_ON_HIGH_SEVERITY=true
+CLEANUP_OLD_SCANS_DAYS=60
+HEALTH_CHECK_ENABLED=true
+```
+
+**Resource-Constrained Environment:**
+```bash
+# Optimized for low-resource environments
+MAX_CONCURRENT_SCANS=1
+SCAN_TIMEOUT_MINUTES=15
+ENABLED_SCANNERS=trivy,grype
+LOG_LEVEL=error
+CLEANUP_OLD_SCANS_DAYS=7
+```
+
+**Docker Deployment:**
+```bash
+docker run -p 8080:8080 \
+  -e PORT=8080 \
+  -e MAX_CONCURRENT_SCANS=5 \
+  -e LOG_LEVEL=info \
+  -e TEAMS_WEBHOOK_URL=https://your-webhook-url \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  ghcr.io/harborguard/harborguard:latest
+```
+
+### Health Check Endpoints
+
+When `HEALTH_CHECK_ENABLED=true` (default), Harbor Guard provides monitoring endpoints:
+
+- **`GET /api/health`** - Comprehensive health status including database connectivity, scanner configuration, and cleanup statistics
+- **`GET /api/ready`** - Kubernetes-style readiness probe for load balancers
+- **`HEAD /api/health`** - Lightweight health check (returns HTTP status only)
+- **`HEAD /api/ready`** - Lightweight readiness check (returns HTTP status only)
+
 ## Screenshots
 
 <div align="center">

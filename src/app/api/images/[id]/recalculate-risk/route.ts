@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { recalculateImageRiskScores } from '@/lib/scan-aggregations';
+import { recalculateImageRiskScores } from '@/lib/scan-aggregations-server';
 
 interface RouteParams {
   params: Promise<{ id: string }>;

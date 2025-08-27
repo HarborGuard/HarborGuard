@@ -7,6 +7,8 @@ import { IScanExecutor, ScanReports } from './types';
 import { AVAILABLE_SCANNERS } from './scanners';
 import { prisma } from '@/lib/prisma';
 import type { ScanRequest } from '@/types';
+import { config } from '@/lib/config';
+import { logger } from '@/lib/logger';
 
 const execAsync = promisify(exec);
 
@@ -31,7 +33,7 @@ export class ScanExecutor implements IScanExecutor {
 
     const env = this.setupEnvironmentVariables(cacheDir);
 
-    console.log(`Scanning local Docker image ${imageName}`);
+    logger.scanner(`Scanning local Docker image ${imageName}`);
 
     this.progressTracker.updateProgress(requestId, 20, 'Exporting Docker image');
     
@@ -47,7 +49,7 @@ export class ScanExecutor implements IScanExecutor {
       await fs.unlink(tarPath);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.warn('Failed to cleanup tar file:', errorMessage);
+      logger.warn('Failed to cleanup tar file:', errorMessage);
     }
   }
 
@@ -76,7 +78,7 @@ export class ScanExecutor implements IScanExecutor {
     const safeImageName = request.image.replace(/\//g, '_');
     const tarPath = path.join(imageDir, `${safeImageName}-${imageHash}.tar`);
 
-    console.log(`Scanning ${imageRef} (${digest})`);
+    logger.scanner(`Scanning ${imageRef} (${digest})`);
 
     this.progressTracker.updateProgress(requestId, 1, 'Starting image download');
     
@@ -100,7 +102,7 @@ export class ScanExecutor implements IScanExecutor {
       await fs.unlink(tarPath);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.warn('Failed to cleanup tar file:', errorMessage);
+      logger.warn('Failed to cleanup tar file:', errorMessage);
     }
   }
 
@@ -133,25 +135,65 @@ export class ScanExecutor implements IScanExecutor {
     this.progressTracker.updateProgress(requestId, 55, 'Starting security scans');
 
     const progressSteps = [65, 75, 85, 88, 90, 94];
-    const scannerNames = ['trivy', 'grype', 'syft', 'osv', 'dockle', 'dive'];
+    
+    // Filter scanners based on ENABLED_SCANNERS configuration
+    const enabledScanners = AVAILABLE_SCANNERS.filter(scanner => 
+      config.enabledScanners.includes(scanner.name)
+    );
 
-    for (let i = 0; i < AVAILABLE_SCANNERS.length; i++) {
-      const scanner = AVAILABLE_SCANNERS[i];
+    logger.scanner(`Running ${enabledScanners.length} enabled scanners: ${enabledScanners.map(s => s.name).join(', ')}`);
+
+    // Create a semaphore to limit concurrent scans
+    const concurrentScans = Math.min(config.maxConcurrentScans, enabledScanners.length);
+    logger.debug(`Max concurrent scans set to: ${concurrentScans}`);
+
+    const runScannerWithTimeout = async (scanner: typeof AVAILABLE_SCANNERS[0], index: number) => {
       const outputPath = path.join(reportDir, `${scanner.name}.json`);
       
       try {
-        const result = await scanner.scan(tarPath, outputPath, env);
+        logger.debug(`Starting ${scanner.name} scan`);
+        
+        const scanPromise = scanner.scan(tarPath, outputPath, env);
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error(`${scanner.name} scan timed out after ${config.scanTimeoutMinutes} minutes`));
+          }, config.scanTimeoutMinutes * 60 * 1000);
+        });
+
+        const result = await Promise.race([scanPromise, timeoutPromise]);
+        
         if (result.success) {
+          const progressIndex = Math.min(index, progressSteps.length - 1);
           this.progressTracker.updateProgress(
             requestId, 
-            progressSteps[i], 
+            progressSteps[progressIndex], 
             `${scanner.name.charAt(0).toUpperCase() + scanner.name.slice(1)} scan completed`
           );
+          logger.scanner(`${scanner.name} scan completed successfully`);
+        } else {
+          logger.warn(`${scanner.name} scan failed: ${result.error}`);
         }
       } catch (error) {
-        console.warn(`${scanner.name} scan failed:`, error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.warn(`${scanner.name} scan failed: ${errorMessage}`);
       }
+    };
+
+    // Run scanners with concurrency limit
+    const batches: Array<Promise<void>[]> = [];
+    for (let i = 0; i < enabledScanners.length; i += concurrentScans) {
+      const batch = enabledScanners
+        .slice(i, i + concurrentScans)
+        .map((scanner, batchIndex) => runScannerWithTimeout(scanner, i + batchIndex));
+      batches.push(batch);
     }
+
+    // Execute batches sequentially, but scanners within each batch concurrently
+    for (const batch of batches) {
+      await Promise.all(batch);
+    }
+
+    logger.scanner('All enabled scanners completed');
   }
 
   async loadScanResults(requestId: string): Promise<ScanReports> {
@@ -168,7 +210,7 @@ export class ScanExecutor implements IScanExecutor {
         reports[reportName] = JSON.parse(content);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.warn(`Failed to read ${filename}:`, errorMessage);
+        logger.warn(`Failed to read ${filename}:`, errorMessage);
       }
     }
 
@@ -211,7 +253,7 @@ export class ScanExecutor implements IScanExecutor {
       }
       return null;
     } catch (error) {
-      console.error('Failed to find matching repository:', error);
+      logger.error('Failed to find matching repository:', error);
       return null;
     }
   }
@@ -238,7 +280,7 @@ export class ScanExecutor implements IScanExecutor {
       });
 
       if (!repository || repository.status !== 'ACTIVE') {
-        console.warn(`Repository ${repoId} not found or inactive`);
+        logger.warn(`Repository ${repoId} not found or inactive`);
         return '--no-creds';
       }
 
@@ -253,7 +295,7 @@ export class ScanExecutor implements IScanExecutor {
 
       return '--no-creds';
     } catch (error) {
-      console.error(`Failed to get authentication for repository ${repoId}:`, error);
+      logger.error(`Failed to get authentication for repository ${repoId}:`, error);
       return '--no-creds';
     }
   }
@@ -280,7 +322,7 @@ export class ScanExecutor implements IScanExecutor {
       });
 
       if (!repository || repository.status !== 'ACTIVE') {
-        console.warn(`Repository ${repoId} not found or inactive`);
+        logger.warn(`Repository ${repoId} not found or inactive`);
         return '--src-no-creds';
       }
 
@@ -295,7 +337,7 @@ export class ScanExecutor implements IScanExecutor {
 
       return '--src-no-creds';
     } catch (error) {
-      console.error(`Failed to get authentication for repository ${repoId}:`, error);
+      logger.error(`Failed to get authentication for repository ${repoId}:`, error);
       return '--src-no-creds';
     }
   }

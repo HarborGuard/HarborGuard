@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
-    "start": "node scripts/init-database.js && next start",
+    "start": "node scripts/init-database.js && next start -p ${PORT:-3000}",
     "start:dev": "next start",
     "lint": "next lint",
     "db:init": "node scripts/init-database.js",

@@ -9,6 +9,7 @@ import type { ScanRequest, ScanJob, ScanStatus } from '@/types';
 // Global shared state to work around Next.js development mode module reloading
 declare global {
   var scannerJobs: Map<string, ScanJob> | undefined;
+  var __harborguard_scanner_service: ScannerService | undefined;
 }
 
 const globalJobs = globalThis.scannerJobs || (globalThis.scannerJobs = new Map<string, ScanJob>());
@@ -27,7 +28,9 @@ export class ScannerService {
       updateProgress: this.progressTracker.updateProgress.bind(this.progressTracker)
     });
     
-    console.log(`[ScannerService] Created new instance ${this.instanceId}`);
+    if (process.env.NODE_ENV !== 'test') {
+      console.log(`[ScannerService] Created new instance ${this.instanceId}`);
+    }
   }
 
   async startScan(
@@ -176,4 +179,12 @@ export class ScannerService {
   }
 }
 
-export const scannerService = new ScannerService();
+// Create singleton scanner service
+function getScannerService(): ScannerService {
+  if (!globalThis.__harborguard_scanner_service) {
+    globalThis.__harborguard_scanner_service = new ScannerService();
+  }
+  return globalThis.__harborguard_scanner_service;
+}
+
+export const scannerService = getScannerService();

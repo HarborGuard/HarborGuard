@@ -125,6 +125,8 @@ function extractOsInfo(scan: ScanWithImage): { family: string; name: string } | 
 interface AppState {
   scans: Scan[]
   loading: boolean
+  dataReceived: boolean // Track if any data has been received
+  dataReady: boolean // Track if data is processed and ready to display
   error: string | null
   pagination: {
     total: number
@@ -146,6 +148,8 @@ type AppAction =
 const initialState: AppState = {
   scans: [],
   loading: true, // Start with loading true so the loading template shows immediately
+  dataReceived: false,
+  dataReady: false,
   error: null,
   pagination: {
     total: 0,
@@ -166,14 +170,20 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state, 
         scans: action.payload.scans, 
         pagination: action.payload.pagination,
-        loading: false 
+        loading: false,
+        dataReceived: true, // Mark that we've received data
+        dataReady: action.payload.scans.length >= 0, // Data is processed and ready
+        error: null // Clear any previous errors
       }
     case 'APPEND_SCANS':
       return {
         ...state,
         scans: [...state.scans, ...action.payload.scans],
         pagination: action.payload.pagination,
-        loading: false
+        loading: false,
+        dataReceived: true, // Mark that we've received data
+        dataReady: true, // Additional data is processed and ready
+        error: null // Clear any previous errors
       }
     case 'UPDATE_SCAN':
       return {
@@ -225,48 +235,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       const scansData = await scansRes.json()
 
-      // The aggregated endpoint returns data in the format we need
-      const transformedScans = scansData.scans?.map((scan: any) => ({
-        id: Math.abs(scan.id.split('').reduce((a: number, b: string) => ((a << 5) - a + b.charCodeAt(0)) | 0, 0)),
-        imageId: scan.imageId,
-        imageName: scan.image.name,
-        uid: scan.requestId,
-        image: `${scan.image.name}:${scan.image.tag}`,
-        source: scan.source,
-        digestShort: scan.image.digest?.slice(7, 19) || '',
-        platform: 'unknown',
-        sizeMb: 0,
-        riskScore: scan.riskScore || calculateRiskScore({ 
-          vulnerabilityCount: scan.vulnerabilityCount, 
-          scannerReports: scan.scannerReports,
-          riskScore: scan.riskScore 
-        } as any),
-        severities: {
-          crit: scan.vulnerabilityCount?.critical || 0,
-          high: scan.vulnerabilityCount?.high || 0,
-          med: scan.vulnerabilityCount?.medium || 0,
-          low: scan.vulnerabilityCount?.low || 0,
-        },
-        total: scan.vulnerabilityCount?.total || 0,
-        scanTime: new Date(scan.startedAt).toLocaleString(),
-        status: mapScanStatus(scan.status),
-        statusRaw: scan.status,
-        compliance: {
-          dockle: undefined // The data table expects a dockle property
-        },
-        misconfiguration: { pass: 0, warn: 0, info: 0 },
-        secretsData: { count: 0, results: [] }, // Rename to avoid conflict
-        fixed: 0,
-        misconfigs: 0,
-        secrets: 0, // This should be a number for the reduce operation
-        osvPackages: 0,
-        osvVulnerable: 0,
-        osvEcosystems: [],
-        baseImage: extractBaseImage(scan.image.name),
-        osInfo: undefined,
-        lastScan: scan.finishedAt || scan.startedAt,
-        registry: scan.image.registry
-      })) || []
+      // Fast transformation with minimal processing
+      const transformedScans = scansData.scans?.map((scan: any) => {
+        // Pre-compute hash once instead of expensive reduce operation
+        const idHash = scan.id.length > 8 ? scan.id.slice(-8) : scan.id
+        const numericId = parseInt(idHash.replace(/\D/g, '') || '0') || Math.random() * 1000000
+        
+        return {
+          id: numericId,
+          imageId: scan.imageId,
+          imageName: scan.image.name,
+          uid: scan.requestId,
+          image: `${scan.image.name}:${scan.image.tag}`,
+          source: scan.source,
+          digestShort: scan.image.digest?.slice(7, 19) || '',
+          platform: 'unknown',
+          sizeMb: 0,
+          riskScore: scan.riskScore || 0,
+          severities: {
+            crit: scan.vulnerabilityCount?.critical || 0,
+            high: scan.vulnerabilityCount?.high || 0,
+            med: scan.vulnerabilityCount?.medium || 0,
+            low: scan.vulnerabilityCount?.low || 0,
+          },
+          total: scan.vulnerabilityCount?.total || 0,
+          scanTime: scan.startedAt, // Skip expensive date formatting until display
+          status: mapScanStatus(scan.status),
+          statusRaw: scan.status,
+          compliance: { dockle: undefined },
+          misconfiguration: { pass: 0, warn: 0, info: 0 },
+          secretsData: { count: 0, results: [] },
+          fixed: 0,
+          misconfigs: 0,
+          secrets: 0,
+          osvPackages: 0,
+          osvVulnerable: 0,
+          osvEcosystems: [],
+          baseImage: scan.image.name.split(':')[0], // Simplified extraction
+          osInfo: undefined,
+          lastScan: scan.finishedAt || scan.startedAt,
+          registry: scan.image.registry
+        }
+      }) || []
 
       const actionType = loadMore ? 'APPEND_SCANS' : 'SET_SCANS'
       dispatch({ 
@@ -276,6 +286,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           pagination: scansData.pagination 
         } 
       })
+      
+      // Data is now fully processed and ready for display
     } catch (error) {
       console.error('Failed to load data:', error)
       dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' })

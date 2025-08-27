@@ -7,6 +7,8 @@ export function useScans() {
   
   const scans = state.scans
   const loading = state.loading
+  const dataReceived = state.dataReceived
+  const dataReady = state.dataReady
   const error = state.error
 
   const stats = useMemo(() => {
@@ -76,6 +78,8 @@ export function useScans() {
   return {
     scans,
     loading,
+    dataReceived,
+    dataReady,
     error,
     stats,
     getScansByRiskLevel,
