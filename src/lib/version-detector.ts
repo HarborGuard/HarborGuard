@@ -4,6 +4,7 @@
  */
 
 import { logger } from './logger';
+import { config } from './config';
 
 interface VersionInfo {
   current: string;
@@ -47,17 +48,12 @@ class VersionDetector {
    * Get current application version
    */
   getCurrentVersion(): string {
-    // Try environment variable first (set during build)
-    if (process.env.npm_package_version) {
-      return process.env.npm_package_version;
-    }
-    
-    // Try to read from package.json version (fallback)
+    // Use NEXT_PUBLIC_APP_VERSION which is set from package.json in next.config.ts
     if (process.env.NEXT_PUBLIC_APP_VERSION) {
       return process.env.NEXT_PUBLIC_APP_VERSION;
     }
 
-    // Development fallback
+    // Development fallback - also read from package.json if available
     return process.env.NODE_ENV === 'development' ? '0.1.0-dev' : '0.1.0';
   }
 
@@ -72,16 +68,16 @@ class VersionDetector {
   }
 
   /**
-   * Fetch latest version from GitHub Container Registry
+   * Fetch latest version from GitHub releases (public API)
    */
   private async fetchLatestVersion(): Promise<string | null> {
     try {
-      // Use GitHub Container Registry API to get manifest info
-      const tagsUrl = `https://api.github.com/users/harborguard/packages/container/harborguard/versions`;
+      // First try GitHub Releases API (public, no auth required)
+      const releasesUrl = `https://api.github.com/repos/harborguard/harborguard/releases/latest`;
       
-      logger.debug(`Checking for latest version at: ${tagsUrl}`);
+      logger.debug(`Checking for latest version at: ${releasesUrl}`);
       
-      const response = await fetch(tagsUrl, {
+      const response = await fetch(releasesUrl, {
         headers: {
           'Accept': 'application/vnd.github.v3+json',
           'User-Agent': 'Harbor-Guard-App'
@@ -90,100 +86,50 @@ class VersionDetector {
         signal: AbortSignal.timeout(10000)
       });
 
-      if (!response.ok) {
-        // Fallback: try Docker Hub API or simple version check
-        return await this.fetchVersionFallback();
-      }
-
-      const versions = await response.json();
-      
-      // Find the latest version (assumes first item is latest)
-      if (versions && versions.length > 0) {
-        const latestVersion = versions[0];
-        // Extract version from tags
-        const versionTag = latestVersion.metadata?.container?.tags?.find((tag: string) => 
-          tag.match(/^\d+\.\d+\.\d+.*$/) || tag === 'latest'
-        );
-        
-        if (versionTag && versionTag !== 'latest') {
-          return versionTag;
+      if (response.ok) {
+        const release = await response.json();
+        if (release && release.tag_name) {
+          // Remove 'v' prefix if present
+          return release.tag_name.replace(/^v/, '');
         }
-        
-        // If we only have 'latest', try to get commit info
-        return latestVersion.name?.substring(0, 8) || 'latest';
       }
 
-      return null;
+      // If no releases, return null (not an error case)
+      if (response.status === 404) {
+        logger.debug('No GitHub releases found, version checking disabled');
+        return null;
+      }
+
+      // For other errors, try fallback
+      return await this.fetchVersionFallback();
     } catch (error) {
-      logger.warn('Failed to fetch version from GitHub API:', error);
+      logger.debug('GitHub releases check failed:', error);
       return await this.fetchVersionFallback();
     }
   }
 
   /**
-   * Fallback version checking method
+   * Fallback version checking method (disabled for now due to auth requirements)
    */
   private async fetchVersionFallback(): Promise<string | null> {
-    try {
-      // Simple approach: check Docker registry API directly
-      const manifestUrl = `${this.REGISTRY_URL}/v2/${this.IMAGE_NAME}/manifests/latest`;
-      
-      const response = await fetch(manifestUrl, {
-        headers: {
-          'Accept': 'application/vnd.docker.distribution.manifest.v2+json'
-        },
-        signal: AbortSignal.timeout(5000)
-      });
-
-      if (response.ok) {
-        const etag = response.headers.get('Docker-Content-Digest') || 
-                     response.headers.get('Etag');
-        
-        if (etag) {
-          // Return a shortened digest as version identifier
-          return etag.replace(/"/g, '').substring(0, 12);
-        }
-      }
-    } catch (error) {
-      logger.debug('Fallback version check failed:', error);
-    }
-    
+    // Docker registry requires authentication for private repos
+    // For now, we'll skip this approach and return null
+    logger.debug('Registry version checking requires authentication, skipping');
     return null;
   }
 
   /**
-   * Compare version strings (semantic versioning)
+   * Compare version strings - simplified logic assuming online version is newer if different
    */
   private compareVersions(current: string, latest: string): boolean {
-    // Handle development versions
+    // Handle development versions - always consider update available
     if (current.includes('dev')) return true;
     
-    // Handle digest-based versions
-    if (!current.match(/^\d/) || !latest.match(/^\d/)) {
-      return current !== latest;
-    }
-
-    try {
-      const currentParts = current.split('.').map(num => parseInt(num) || 0);
-      const latestParts = latest.split('.').map(num => parseInt(num) || 0);
-      
-      // Pad arrays to same length
-      while (currentParts.length < 3) currentParts.push(0);
-      while (latestParts.length < 3) latestParts.push(0);
-      
-      for (let i = 0; i < Math.max(currentParts.length, latestParts.length); i++) {
-        const curr = currentParts[i] || 0;
-        const lat = latestParts[i] || 0;
-        
-        if (lat > curr) return true;
-        if (curr > lat) return false;
-      }
-      
-      return false; // Versions are equal
-    } catch (error) {
-      // If parsing fails, assume update is available if versions differ
-      return current !== latest;
-    }
+    // If versions are exactly the same, no update needed
+    if (current === latest) return false;
+    
+    // If versions differ, assume the online version is newer
+    return true;
   }
 
   /**
@@ -191,6 +137,18 @@ class VersionDetector {
    */
   async checkForUpdates(): Promise<VersionInfo> {
     const current = this.getCurrentVersion();
+
+    // Check if version checking is disabled
+    if (!config.versionCheckEnabled) {
+      const disabledInfo: VersionInfo = {
+        current,
+        hasUpdate: false,
+        lastChecked: new Date(),
+        error: 'Version checking disabled'
+      };
+      this.cachedVersionInfo = disabledInfo;
+      return disabledInfo;
+    }
 
     // Return cached result if recent
     if (!this.shouldCheck() && this.cachedVersionInfo) {
@@ -207,7 +165,7 @@ class VersionDetector {
         latest: latest || undefined,
         hasUpdate: latest ? this.compareVersions(current, latest) : false,
         lastChecked: new Date(),
-        error: latest ? undefined : 'Could not fetch latest version'
+        error: latest ? undefined : 'Version checking unavailable (no GitHub releases found)'
       };
 
       this.cachedVersionInfo = versionInfo;

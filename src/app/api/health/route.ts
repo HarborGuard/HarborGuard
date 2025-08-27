@@ -33,6 +33,7 @@ interface HealthStatus {
       scanTimeout: number;
       cleanupDays: number;
       notifications: boolean;
+      versionCheckEnabled: boolean;
     };
     cleanup?: {
       status: 'healthy' | 'degraded';
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const healthStatus: HealthStatus = {
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version || '0.1.0',
+    version: process.env.NEXT_PUBLIC_APP_VERSION || '0.1.0',
     uptime: process.uptime(),
     checks: {
       database: {
@@ -75,7 +76,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         maxConcurrentScans: config.maxConcurrentScans,
         scanTimeout: config.scanTimeoutMinutes,
         cleanupDays: config.cleanupOldScansDays,
-        notifications: !!(config.teamsWebhookUrl || config.slackWebhookUrl)
+        notifications: !!(config.teamsWebhookUrl || config.slackWebhookUrl),
+        versionCheckEnabled: config.versionCheckEnabled
       }
     }
   };
