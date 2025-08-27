@@ -58,8 +58,8 @@ PORT=8080 LOG_LEVEL=debug npm run dev
 # Test 2: Limited scanners and concurrency
 MAX_CONCURRENT_SCANS=1 ENABLED_SCANNERS=trivy,grype LOG_LEVEL=warn npm run dev
 
-# Test 3: Health checks disabled
-HEALTH_CHECK_ENABLED=false npm run dev
+# Test 3: Health checks and version checks disabled
+HEALTH_CHECK_ENABLED=false VERSION_CHECK_ENABLED=false npm run dev
 ```
 
 ### 2.2 Verify Configuration Loading

@@ -2,8 +2,9 @@
  * Hook for checking application version updates
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { logger } from '@/lib/logger';
+import { config } from '@/lib/config';
 
 interface VersionInfo {
   current: string;
@@ -25,11 +26,15 @@ export function useVersionCheck(checkOnMount: boolean = true) {
     loading: false,
     error: null
   });
+  
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const hasCheckedRef = useRef(false);
 
   const checkVersion = useCallback(async () => {
-    if (state.loading) return; // Prevent concurrent checks
-    
-    setState(prev => ({ ...prev, loading: true, error: null }));
+    setState(prev => {
+      if (prev.loading) return prev; // Prevent concurrent checks
+      return { ...prev, loading: true, error: null };
+    });
     
     try {
       logger.debug('Checking for version updates...');
@@ -73,25 +78,33 @@ export function useVersionCheck(checkOnMount: boolean = true) {
         error: errorMessage
       });
     }
-  }, [state.loading]);
+  }, []); // Remove state.loading dependency to prevent recreation
 
-  // Check on mount if requested
+  // Check on mount if requested (only once) and version checking is enabled
   useEffect(() => {
-    if (checkOnMount) {
-      // Add small delay to avoid blocking initial page load
-      const timer = setTimeout(checkVersion, 2000);
+    if (config.versionCheckEnabled && checkOnMount && !hasCheckedRef.current) {
+      hasCheckedRef.current = true;
+      // Add delay to avoid blocking initial page load
+      const timer = setTimeout(checkVersion, 5000);
       return () => clearTimeout(timer);
     }
   }, [checkOnMount, checkVersion]);
 
-  // Periodic check every 6 hours
+  // Periodic check every 6 hours (setup only once) if version checking is enabled
   useEffect(() => {
-    const interval = setInterval(() => {
-      checkVersion();
-    }, 6 * 60 * 60 * 1000); // 6 hours
+    if (config.versionCheckEnabled && !intervalRef.current) {
+      intervalRef.current = setInterval(() => {
+        checkVersion();
+      }, 6 * 60 * 60 * 1000); // 6 hours
+    }
 
-    return () => clearInterval(interval);
-  }, [checkVersion]);
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, []); // No dependencies to prevent recreation
 
   return {
     versionInfo: state.versionInfo,

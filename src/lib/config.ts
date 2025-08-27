@@ -26,6 +26,7 @@ export interface AppConfig {
   
   // Monitoring
   healthCheckEnabled: boolean;
+  versionCheckEnabled: boolean;
   
   // Database (existing)
   databaseUrl: string;
@@ -59,7 +60,8 @@ function parseEnvConfig(): AppConfig {
     notifyOnHighSeverity: process.env.NOTIFY_ON_HIGH_SEVERITY?.toLowerCase() === 'true',
     
     // Monitoring
-    healthCheckEnabled: process.env.HEALTH_CHECK_ENABLED?.toLowerCase() === 'true',
+    healthCheckEnabled: process.env.HEALTH_CHECK_ENABLED?.toLowerCase() !== 'false',
+    versionCheckEnabled: process.env.VERSION_CHECK_ENABLED?.toLowerCase() !== 'false',
     
     // Database
     databaseUrl: process.env.DATABASE_URL || 'file:./dev.db'
