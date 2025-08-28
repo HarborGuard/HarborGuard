@@ -353,9 +353,62 @@ docker stop harborguard-test harborguard-env-test
 docker rm harborguard-test harborguard-env-test
 ```
 
-## 8. Test Automation Script
+## 8. Scanner Independence Testing
 
-### 8.1 Quick Test Script
+### 8.1 OSV Scanner Independence Test
+The OSV scanner has been modified to run independently without waiting for the Syft scanner, enabling true parallel execution.
+
+```bash
+# Test OSV scanner independence
+node scripts/test-osv-independence.js
+```
+
+**Expected Results:**
+- ✅ OSV-scanner version displayed (v2.2.1+)
+- ✅ Syft version displayed (for SBOM generation)
+- ✅ Independence test passes
+- ✅ Confirmation that parallel execution is enabled
+
+**Success Indicators:**
+```
+🔍 Testing OSV-scanner independence...
+📋 OSV-scanner version: osv-scanner version: 2.2.1
+📋 Syft version: Application: syft
+✅ OSV-scanner independence test completed successfully!
+🚀 OSV-scanner can now run in parallel without waiting for Syft
+```
+
+### 8.2 Parallel Execution Verification
+To verify that scanners can run in parallel:
+
+```bash
+# Start a scan with multiple concurrent scanners
+MAX_CONCURRENT_SCANS=6 ENABLED_SCANNERS=trivy,grype,syft,osv,dockle,dive npm run dev
+
+# Then start a scan and monitor the logs
+curl -X POST "http://localhost:3000/api/scans/start" \
+  -H "Content-Type: application/json" \
+  -d '{"image":"nginx","tag":"latest","source":"registry"}'
+```
+
+**Expected Results:**
+- ✅ All scanners start simultaneously after image export
+- ✅ OSV scanner generates its own SBOM file (`osv-sbom.cdx.json`)
+- ✅ OSV scanner no longer waits for Syft scanner completion
+- ✅ Scan completion times are improved due to parallel execution
+
+**Log Indicators:**
+```
+[Scanner] Running 6 enabled scanners: trivy, grype, syft, osv, dockle, dive
+OSV scanner: Generating independent SBOM...
+OSV scanner: SBOM generation completed
+OSV scanner: Running vulnerability scan...
+OSV scanner: Scan completed successfully
+```
+
+## 9. Test Automation Script
+
+### 9.1 Quick Test Script
 Create `test-harborguard.sh`:
 ```bash
 #!/bin/bash
@@ -364,30 +417,33 @@ set -e
 echo "🧪 Harbor Guard Testing Suite"
 echo "=============================="
 
-echo "1. Building application..."
+echo "1. Testing scanner independence..."
+node scripts/test-osv-independence.js
+
+echo "2. Building application..."
 npm run build
 
-echo "2. Starting development server..."
+echo "3. Starting development server..."
 npm run dev &
 DEV_PID=$!
 sleep 5
 
-echo "3. Testing health endpoints..."
+echo "4. Testing health endpoints..."
 curl -f "http://localhost:3000/api/health" > /dev/null && echo "✅ Health check passed"
 curl -f "http://localhost:3000/api/ready" > /dev/null && echo "✅ Readiness check passed"
 
-echo "4. Testing API endpoints..."
+echo "5. Testing API endpoints..."
 curl -f "http://localhost:3000/api/scans/aggregated?limit=5" > /dev/null && echo "✅ Scans API working"
 curl -f "http://localhost:3000/api/images?limit=5" > /dev/null && echo "✅ Images API working"
 
-echo "5. Starting nginx:latest scan..."
+echo "6. Starting nginx:latest scan..."
 SCAN_RESULT=$(curl -s -X POST "http://localhost:3000/api/scans/start" \
   -H "Content-Type: application/json" \
   -d '{"image":"nginx","tag":"latest","source":"registry"}')
 REQUEST_ID=$(echo $SCAN_RESULT | jq -r .requestId)
 echo "✅ Scan started: $REQUEST_ID"
 
-echo "6. Monitoring scan progress..."
+echo "7. Monitoring scan progress..."
 for i in {1..30}; do
   STATUS=$(curl -s "http://localhost:3000/api/scans/status/$REQUEST_ID" | jq -r .status)
   if [ "$STATUS" = "SUCCESS" ]; then
@@ -401,10 +457,10 @@ for i in {1..30}; do
   sleep 10
 done
 
-echo "7. Building Docker image..."
+echo "8. Building Docker image..."
 docker build . -t harborguard:test
 
-echo "8. Testing Docker container..."
+echo "9. Testing Docker container..."
 docker run -d -p 3001:3000 --name harborguard-test-container harborguard:test
 sleep 10
 curl -f "http://localhost:3001/api/health" > /dev/null && echo "✅ Container health check passed"
@@ -416,13 +472,13 @@ docker stop harborguard-test-container && docker rm harborguard-test-container
 echo "✅ All tests completed successfully!"
 ```
 
-### 8.2 Make Script Executable
+### 9.2 Make Script Executable
 ```bash
 chmod +x test-harborguard.sh
 ./test-harborguard.sh
 ```
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 ### Common Issues & Solutions
 
@@ -448,5 +504,11 @@ chmod +x test-harborguard.sh
 - Run: `npm run db:init`
 - Check DATABASE_URL environment variable
 - Verify SQLite file permissions
+
+**Scanner Independence Issues:**
+- OSV scanner independence test fails: Verify both `osv-scanner` and `syft` are installed
+- Slow scan performance: Check `MAX_CONCURRENT_SCANS` setting and enabled scanners
+- OSV scanner still waiting for Syft: Ensure using updated OSVScanner.ts with independent SBOM generation
+- SBOM generation fails: Check disk space and temporary file permissions in scan directories
 
 This testing guide ensures comprehensive validation of Harbor Guard's functionality across all deployment scenarios.
