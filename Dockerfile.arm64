@@ -14,7 +14,7 @@ COPY . .
 RUN npx prisma generate
 RUN npm run build
 
-# ---- 2) Runtime + scanners (ARM64 optimized) ----
+# ---- 2) Runtime + scanners (optimized) ----
 FROM node:20-alpine AS runtime
 WORKDIR /app
 
@@ -35,21 +35,21 @@ RUN apk add --no-cache \
   gnupg \
   docker-cli \
   && set -eux \
-  # Install Trivy (ARM64)
+  # Install Trivy
   && curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin "${TRIVY_VERSION}" \
-  # Install Grype (ARM64)
+  # Install Grype
   && curl -fsSL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin \
-  # Install Syft (ARM64)
+  # Install Syft
   && curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin \
-  # Install OSV-Scanner (ARM64)
+  # Install OSV-Scanner
   && curl -L "https://github.com/google/osv-scanner/releases/download/v2.2.1/osv-scanner_linux_arm64" -o /usr/local/bin/osv-scanner \
   && chmod +x /usr/local/bin/osv-scanner \
-  # Install Dive (ARM64)
+  # Install Dive
   && curl -L "https://github.com/wagoodman/dive/releases/download/v0.13.1/dive_0.13.1_linux_arm64.tar.gz" -o /tmp/dive.tgz \
   && tar -xzf /tmp/dive.tgz -C /usr/local/bin dive \
   && rm /tmp/dive.tgz \
   && chmod +x /usr/local/bin/dive \
-  # Install Dockle (ARM64)
+  # Install Dockle
   && curl -L "https://github.com/goodwithtech/dockle/releases/download/${DOCKLE_VERSION}/dockle_0.4.15_Linux-ARM64.tar.gz" -o /tmp/dockle.tgz \
   && tar -xzf /tmp/dockle.tgz -C /usr/local/bin dockle \
   && rm /tmp/dockle.tgz \
