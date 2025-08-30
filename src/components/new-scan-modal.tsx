@@ -14,6 +14,7 @@ import {
 
 import { Badge } from "components/components/ui/badge"
 import { Button } from "components/components/ui/button"
+import { Checkbox } from "components/components/ui/checkbox"
 import {
   Dialog,
   DialogClose,
@@ -105,12 +106,18 @@ export function NewScanModal({ children }: NewScanModalProps) {
     }
   }, [])
 
-  // Fetch repositories when modal opens
-  React.useEffect(() => {
-    if (isOpen) {
-      fetchRepositories()
+  const fetchLocalImageCount = async () => {
+    try {
+      const response = await fetch('/api/docker/images')
+      if (response.ok) {
+        const images = await response.json()
+        setLocalImageCount(images.length)
+      }
+    } catch (error) {
+      console.error('Failed to fetch local image count:', error)
+      setLocalImageCount(0)
     }
-  }, [isOpen])
+  }
 
   const fetchRepositories = async () => {
     try {
@@ -188,7 +195,22 @@ export function NewScanModal({ children }: NewScanModalProps) {
   const [selectedImage, setSelectedImage] = React.useState<any>(null)
   const [repositoryTags, setRepositoryTags] = React.useState<any[]>([])
   const [selectedTag, setSelectedTag] = React.useState<string>("")
+  const [scanAllLocalImages, setScanAllLocalImages] = React.useState(false)
+  const [localImageCount, setLocalImageCount] = React.useState(0)
   
+  // Fetch repositories when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      fetchRepositories()
+    }
+  }, [isOpen])
+
+  // Fetch local image count when checkbox is checked
+  React.useEffect(() => {
+    if (scanAllLocalImages && dockerInfo?.hasAccess) {
+      fetchLocalImageCount()
+    }
+  }, [scanAllLocalImages, dockerInfo?.hasAccess])
 
   const filteredImages = existingImages.filter(image =>
     image.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -245,6 +267,43 @@ export function NewScanModal({ children }: NewScanModalProps) {
   }
 
   const handleStartScan = async () => {
+    // Handle scan all local images
+    if (selectedSource === 'local' && scanAllLocalImages) {
+      try {
+        setIsLoading(true)
+        startProgressAnimation()
+        
+        const response = await fetch('/api/scans/local-bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        })
+
+        const data = await response.json()
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to start bulk scan')
+        }
+
+        toast.success(`Started scanning ${data.data.totalImages} local images`)
+        setIsOpen(false)
+        
+        // Reset states
+        setScanAllLocalImages(false)
+        setLocalImageCount(0)
+        
+        await refreshData()
+        resetProgress()
+      } catch (error) {
+        console.error('Failed to start bulk scan:', error)
+        toast.error(error instanceof Error ? error.message : 'Failed to start bulk scan')
+        resetProgress()
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
+
     const imageString = getCurrentImageString()
     
     if (!imageString) {
@@ -492,14 +551,46 @@ export function NewScanModal({ children }: NewScanModalProps) {
 
               {dockerInfo?.hasAccess && (
                 <TabsContent value="local" className="space-y-3">
-                  <Label htmlFor="local-image">Local Docker Image</Label>
-                  <DockerImageSelector
-                    onImageSelect={setSelectedDockerImage}
-                    disabled={isLoading}
-                    className="w-full"
-                  />
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="scan-all-local"
+                      checked={scanAllLocalImages}
+                      onCheckedChange={(checked) => {
+                        setScanAllLocalImages(checked as boolean)
+                        if (!checked) {
+                          setLocalImageCount(0)
+                        }
+                      }}
+                      disabled={isLoading}
+                    />
+                    <Label 
+                      htmlFor="scan-all-local" 
+                      className="font-normal cursor-pointer"
+                    >
+                      Scan all local images
+                      {scanAllLocalImages && localImageCount > 0 && (
+                        <span className="ml-2 text-muted-foreground">
+                          ({localImageCount} images found)
+                        </span>
+                      )}
+                    </Label>
+                  </div>
+                  
+                  {!scanAllLocalImages && (
+                    <>
+                      <Label htmlFor="local-image">Select Docker Image</Label>
+                      <DockerImageSelector
+                        onImageSelect={setSelectedDockerImage}
+                        disabled={isLoading}
+                        className="w-full"
+                      />
+                    </>
+                  )}
+                  
                   <p className="text-xs text-muted-foreground">
-                    Select a Docker image from your local Docker daemon.
+                    {scanAllLocalImages 
+                      ? `All ${localImageCount || 0} local Docker images will be scanned.`
+                      : "Select a Docker image from your local Docker daemon."}
                   </p>
                 </TabsContent>
               )}
@@ -665,13 +756,14 @@ export function NewScanModal({ children }: NewScanModalProps) {
               !selectedSource || 
               (selectedSource === 'dockerhub' && !imageUrl) ||
               (selectedSource === 'github' && !githubRepo) ||
-              (selectedSource === 'local' && !selectedDockerImage && !localImageName) ||
+              (selectedSource === 'local' && !scanAllLocalImages && !selectedDockerImage && !localImageName) ||
               (selectedSource === 'custom' && !customRegistry) ||
               (selectedSource === 'existing' && !imageUrl) ||
               (selectedSource === 'private' && (!selectedRepository || !selectedImage || !selectedTag))
             }
           >
-            {isLoading ? 'Starting Scan...' : 'Start Scan'}
+            {isLoading ? 'Starting Scan...' : 
+             (selectedSource === 'local' && scanAllLocalImages ? `Scan ${localImageCount} Images` : 'Start Scan')}
           </Button>
         </DialogFooter>
       </DialogContent>
