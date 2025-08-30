@@ -46,4 +46,4 @@ next-env.d.ts
 
 # local development database
 dev.db
-dev.db-journal
+dev.db-journalprisma/dev.db
