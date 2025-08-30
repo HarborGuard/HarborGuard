@@ -300,11 +300,9 @@ export class BulkScanService {
             image: image.name,
             tag: image.tag,
             registry: image.registry,
-            source: scanSource
+            source: scanSource,
+            scanners: scanners // Pass scanner configuration
           };
-
-          // Note: Scanner configuration would need to be handled at the scanner service level
-          // The scanners parameter is available here if needed for future implementation
           
           const { scanId } = await scannerService.startScan(scanRequest);
 

@@ -6,7 +6,7 @@ import { exportDockerImage, inspectDockerImage } from '@/lib/docker';
 import { IScanExecutor, ScanReports } from './types';
 import { AVAILABLE_SCANNERS } from './scanners';
 import { prisma } from '@/lib/prisma';
-import type { ScanRequest } from '@/types';
+import type { ScanRequest, ScannerConfig } from '@/types';
 import { config } from '@/lib/config';
 import { logger } from '@/lib/logger';
 
@@ -43,7 +43,7 @@ export class ScanExecutor implements IScanExecutor {
     const imageData = await inspectDockerImage(imageName);
     await fs.writeFile(path.join(reportDir, 'metadata.json'), JSON.stringify(imageData, null, 2));
 
-    await this.runScannersOnTar(requestId, tarPath, reportDir, env);
+    await this.runScannersOnTar(requestId, tarPath, reportDir, env, request.scanners);
 
     try {
       await fs.unlink(tarPath);
@@ -96,7 +96,7 @@ export class ScanExecutor implements IScanExecutor {
     );
     await fs.writeFile(path.join(reportDir, 'metadata.json'), metadataOutput);
 
-    await this.runScannersOnTar(requestId, tarPath, reportDir, env);
+    await this.runScannersOnTar(requestId, tarPath, reportDir, env, request.scanners);
 
     try {
       await fs.unlink(tarPath);
@@ -130,16 +130,26 @@ export class ScanExecutor implements IScanExecutor {
     requestId: string,
     tarPath: string,
     reportDir: string,
-    env: NodeJS.ProcessEnv
+    env: NodeJS.ProcessEnv,
+    scannerConfig?: ScannerConfig
   ): Promise<void> {
     this.progressTracker.updateProgress(requestId, 55, 'Starting security scans');
 
     const progressSteps = [65, 75, 85, 88, 90, 94];
     
-    // Filter scanners based on ENABLED_SCANNERS configuration
-    const enabledScanners = AVAILABLE_SCANNERS.filter(scanner => 
+    // Filter scanners based on configuration
+    let enabledScanners = AVAILABLE_SCANNERS.filter(scanner => 
       config.enabledScanners.includes(scanner.name)
     );
+    
+    // If scanner config is provided, further filter based on user selection
+    if (scannerConfig) {
+      enabledScanners = enabledScanners.filter(scanner => {
+        // Check if the scanner is explicitly enabled in the config
+        const scannerKey = scanner.name as keyof ScannerConfig;
+        return scannerConfig[scannerKey] === true;
+      });
+    }
 
     logger.scanner(`Running ${enabledScanners.length} enabled scanners: ${enabledScanners.map(s => s.name).join(', ')}`);
 

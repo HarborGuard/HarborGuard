@@ -122,10 +122,11 @@ declare global {
 }
 
 /**
- * Get configuration singleton - lazy loaded and cached
+ * Get configuration singleton - lazy loaded and cached (except in development)
  */
 function getConfig(): AppConfig {
-  if (globalThis.__harborguard_config) {
+  // In development, always re-read config to pick up env changes
+  if (process.env.NODE_ENV !== 'development' && globalThis.__harborguard_config) {
     return globalThis.__harborguard_config;
   }
 

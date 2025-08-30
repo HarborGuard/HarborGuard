@@ -3,6 +3,11 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -19,13 +24,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -41,6 +39,7 @@ import {
   Layers2Icon,
 } from "lucide-react";
 import { toast } from "sonner";
+import type { ScannerInfo } from "@/types";
 
 interface BulkScanJob {
   id: string;
@@ -75,6 +74,7 @@ export function BulkScanModal({ children }: BulkScanModalProps) {
   const [loading, setLoading] = useState(false);
   const [jobsLoading, setJobsLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [scannerAvailability, setScannerAvailability] = useState<ScannerInfo[]>([]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -91,6 +91,38 @@ export function BulkScanModal({ children }: BulkScanModalProps) {
     enableOsv: false,
     enableDive: false,
   });
+
+  // Fetch scanner availability
+  const fetchScannerAvailability = async () => {
+    try {
+      const response = await fetch("/api/scanners/available");
+      const result = await response.json();
+      
+      if (result.success) {
+        setScannerAvailability(result.scanners);
+        
+        // Update form data to pre-check available scanners
+        const updatedFormData = { ...formData };
+        result.scanners.forEach((scanner: ScannerInfo) => {
+          const key = `enable${scanner.name.charAt(0).toUpperCase()}${scanner.name.slice(1)}`;
+          // Type-safe update for boolean scanner fields
+          switch(key) {
+            case 'enableTrivy':
+            case 'enableGrype':
+            case 'enableSyft':
+            case 'enableDockle':
+            case 'enableOsv':
+            case 'enableDive':
+              updatedFormData[key] = scanner.available;
+              break;
+          }
+        });
+        setFormData(updatedFormData);
+      }
+    } catch (error) {
+      console.error("Error fetching scanner availability:", error);
+    }
+  };
 
   // Fetch bulk scan jobs
   const fetchJobs = async () => {
@@ -130,10 +162,11 @@ export function BulkScanModal({ children }: BulkScanModalProps) {
     }
   };
 
-  // Load jobs when dialog opens
+  // Load jobs and scanner availability when dialog opens
   useEffect(() => {
     if (open) {
       fetchJobs();
+      fetchScannerAvailability();
     }
   }, [open]);
 
@@ -358,34 +391,69 @@ export function BulkScanModal({ children }: BulkScanModalProps) {
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {[
-                    { key: "enableTrivy", label: "Trivy", description: "Vulnerability scanner" },
-                    { key: "enableGrype", label: "Grype", description: "Vulnerability scanner" },
-                    { key: "enableSyft", label: "Syft", description: "SBOM generator" },
-                    { key: "enableDockle", label: "Dockle", description: "Container linter" },
-                    { key: "enableOsv", label: "OSV", description: "OSV vulnerability DB" },
-                    { key: "enableDive", label: "Dive", description: "Layer analysis" },
-                  ].map((scanner) => (
-                    <div key={scanner.key} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={scanner.key}
-                        checked={formData[scanner.key as keyof typeof formData] as boolean}
-                        onCheckedChange={(checked) =>
-                          handleInputChange(scanner.key, checked)
-                        }
-                      />
-                      <div className="grid gap-1.5 leading-none">
-                        <Label
-                          htmlFor={scanner.key}
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                        >
-                          {scanner.label}
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          {scanner.description}
-                        </p>
+                    { key: "enableTrivy", name: "trivy", label: "Trivy", description: "Comprehensive vulnerability scanner" },
+                    { key: "enableGrype", name: "grype", label: "Grype", description: "Vulnerability scanner by Anchore" },
+                    { key: "enableSyft", name: "syft", label: "Syft", description: "SBOM generator" },
+                    { key: "enableDockle", name: "dockle", label: "Dockle", description: "Container linter for best practices" },
+                    { key: "enableOsv", name: "osv", label: "OSV", description: "OSV vulnerability database scanner" },
+                    { key: "enableDive", name: "dive", label: "Dive", description: "Layer analysis and image efficiency" },
+                  ].map((scanner) => {
+                    const availability = scannerAvailability.find(s => s.name === scanner.name);
+                    const isAvailable = availability?.available ?? false;
+                    
+                    return (
+                      <div key={scanner.key} className="flex items-center space-x-2">
+                        {isAvailable ? (
+                          <>
+                            <Checkbox
+                              id={scanner.key}
+                              checked={formData[scanner.key as keyof typeof formData] as boolean}
+                              onCheckedChange={(checked) =>
+                                handleInputChange(scanner.key, checked)
+                              }
+                            />
+                            <div className="grid gap-1.5 leading-none">
+                              <Label
+                                htmlFor={scanner.key}
+                                className="text-sm font-medium leading-none"
+                              >
+                                {scanner.label}
+                              </Label>
+                              <p className="text-xs text-muted-foreground">
+                                {scanner.description}
+                              </p>
+                            </div>
+                          </>
+                        ) : (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center space-x-2 opacity-50">
+                                <Checkbox
+                                  id={scanner.key}
+                                  checked={false}
+                                  disabled={true}
+                                />
+                                <div className="grid gap-1.5 leading-none">
+                                  <Label
+                                    htmlFor={scanner.key}
+                                    className="text-sm font-medium leading-none cursor-not-allowed"
+                                  >
+                                    {scanner.label}
+                                  </Label>
+                                  <p className="text-xs text-muted-foreground">
+                                    {scanner.description}
+                                  </p>
+                                </div>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Disabled in server configuration</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 

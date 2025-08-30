@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BulkScanService } from '@/lib/bulk/BulkScanService';
 import { z } from 'zod';
+import { config } from '@/lib/config';
 
 const BulkScanRequestSchema = z.object({
   name: z.string().optional(),
@@ -29,6 +30,35 @@ export async function POST(request: NextRequest) {
     
     // Validate request body
     const validatedData = BulkScanRequestSchema.parse(body);
+    
+    // Validate that requested scanners are actually available
+    if (validatedData.options?.scanners) {
+      const enabledScanners = config.enabledScanners;
+      const requestedScanners = Object.entries(validatedData.options.scanners)
+        .filter(([_, enabled]) => enabled === true)
+        .map(([scanner]) => scanner);
+      
+      const unavailableScanners = requestedScanners.filter(
+        scanner => !enabledScanners.includes(scanner)
+      );
+      
+      if (unavailableScanners.length > 0) {
+        return NextResponse.json({
+          success: false,
+          error: 'Some requested scanners are not available',
+          unavailable: unavailableScanners,
+          available: enabledScanners
+        }, { status: 400 });
+      }
+      
+      // Ensure at least one scanner is selected
+      if (requestedScanners.length === 0) {
+        return NextResponse.json({
+          success: false,
+          error: 'At least one scanner must be selected'
+        }, { status: 400 });
+      }
+    }
     
     const bulkScanService = new BulkScanService();
     const result = await bulkScanService.executeBulkScan(validatedData);

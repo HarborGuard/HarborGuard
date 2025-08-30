@@ -455,6 +455,23 @@ export interface DatabaseContextType {
   refreshBulkScans: () => Promise<void>;
 }
 
+// Scanner configuration
+export interface ScannerConfig {
+  trivy?: boolean;
+  grype?: boolean;
+  syft?: boolean;
+  dockle?: boolean;
+  osv?: boolean;
+  dive?: boolean;
+}
+
+// Scanner availability information
+export interface ScannerInfo {
+  name: string;
+  description: string;
+  available: boolean;
+}
+
 // API Request/Response Types
 export interface ScanRequest {
   image: string;
@@ -463,6 +480,7 @@ export interface ScanRequest {
   source?: ScanSource; // 'registry' or 'local'
   dockerImageId?: string; // For local Docker images
   repositoryId?: string; // For private repositories
+  scanners?: ScannerConfig; // Optional scanner configuration
 }
 
 export interface CreateScanRequest extends ScanRequest {
