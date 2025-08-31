@@ -9,6 +9,21 @@ const execAsync = promisify(exec);
 console.log('[DB] Starting database initialization...');
 
 /**
+ * Check if Prisma CLI is available
+ */
+async function checkPrismaAvailability() {
+  try {
+    await execAsync('which prisma || command -v prisma');
+    console.log('[DB] Prisma CLI found');
+    return true;
+  } catch (error) {
+    console.error('[DB] ERROR: Prisma CLI not found. Please ensure Prisma is installed.');
+    console.error('[DB] You can install it with: npm install -g prisma');
+    return false;
+  }
+}
+
+/**
  * Detect database provider from DATABASE_URL
  */
 function detectDatabaseProvider() {
@@ -55,7 +70,7 @@ async function testPostgreSQLConnection(url) {
     const testFile = '/tmp/test-connection.sql';
     fs.writeFileSync(testFile, testSql);
     
-    await execAsync(`npx prisma db execute --file "${testFile}" --url "${modifiedUrl}"`, {
+    await execAsync(`prisma db execute --file "${testFile}" --url "${modifiedUrl}"`, {
       timeout: 15000,
       env: { ...process.env, DATABASE_URL: modifiedUrl }
     });
@@ -108,7 +123,7 @@ async function initializeSQLite(url) {
   updateSchemaProvider('sqlite');
   
   // Run migrations for SQLite
-  await execAsync('npx prisma migrate deploy', {
+  await execAsync('prisma migrate deploy', {
     env: { ...process.env, DATABASE_URL: url }
   });
   
@@ -125,7 +140,7 @@ async function initializePostgreSQL(url) {
   updateSchemaProvider('postgresql');
   
   // Use db push to sync schema (avoids migration issues)
-  await execAsync('npx prisma db push --accept-data-loss', {
+  await execAsync('prisma db push --accept-data-loss', {
     env: { ...process.env, DATABASE_URL: url }
   });
   
@@ -137,6 +152,12 @@ async function initializePostgreSQL(url) {
  */
 async function initializeDatabase() {
   try {
+    // Check if Prisma is available first
+    const prismaAvailable = await checkPrismaAvailability();
+    if (!prismaAvailable) {
+      throw new Error('Prisma CLI is not available. Cannot initialize database.');
+    }
+
     const config = detectDatabaseProvider();
     console.log(`[DB] Detected database type: ${config.provider}`);
 
@@ -165,7 +186,7 @@ async function initializeDatabase() {
 
     // Generate Prisma client
     console.log('[DB] Generating Prisma client...');
-    await execAsync('npx prisma generate', {
+    await execAsync('prisma generate', {
       env: { ...process.env, DATABASE_URL: activeUrl }
     });
 
