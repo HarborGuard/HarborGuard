@@ -1,3 +1,62 @@
+/**
+ * @swagger
+ * /api/images:
+ *   get:
+ *     summary: List container images
+ *     description: Retrieve a paginated list of scanned container images
+ *     tags: [Images]
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 25
+ *         description: Number of images to return
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *         description: Number of images to skip
+ *       - in: query
+ *         name: includeScans
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: Include scan history
+ *       - in: query
+ *         name: includeVulnerabilities
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: Include vulnerability details
+ *     responses:
+ *       200:
+ *         description: List of images retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 images:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Image'
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     offset:
+ *                       type: integer
+ *                     hasMore:
+ *                       type: boolean
+ *       500:
+ *         description: Internal server error
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { DatabaseService } from '@/services/DatabaseService';
 

@@ -1,6 +1,45 @@
 /**
- * Health check endpoint for Harbor Guard
- * Returns system health and configuration status
+ * @swagger
+ * /api/health:
+ *   get:
+ *     summary: Health check endpoint
+ *     description: Returns system health status and configuration details
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: System is healthy or degraded but operational
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   enum: [healthy, unhealthy, degraded]
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                 version:
+ *                   type: string
+ *                 uptime:
+ *                   type: number
+ *                 checks:
+ *                   type: object
+ *       404:
+ *         description: Health checks are disabled
+ *       503:
+ *         description: System is unhealthy
+ *   head:
+ *     summary: Lightweight health check
+ *     description: Quick health check for load balancers
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: System is healthy
+ *       404:
+ *         description: Health checks are disabled
+ *       503:
+ *         description: System is unhealthy
  */
 
 import { NextRequest, NextResponse } from 'next/server';
