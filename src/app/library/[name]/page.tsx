@@ -16,6 +16,7 @@ import {
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
+import { VulnerabilityUrlMenu } from "@/components/vulnerability-url-menu"
 import {
   Card,
   CardContent,
@@ -495,20 +496,10 @@ export default function LibraryDetailsPage() {
                                 </Badge>
                               </TableCell>
                               <TableCell>
-                                <div className="flex items-center gap-2">
-                                  {vuln.references && vuln.references.length > 0 && (
-                                    <Button variant="ghost" size="sm" asChild>
-                                      <a
-                                        href={vuln.references[0]}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        title="View CVE details"
-                                      >
-                                        <IconExternalLink className="h-4 w-4" />
-                                      </a>
-                                    </Button>
-                                  )}
-                                </div>
+                                <VulnerabilityUrlMenu 
+                                  vulnerabilityId={vuln.id}
+                                  references={vuln.references || []}
+                                />
                               </TableCell>
                             </TableRow>
                           ))}
