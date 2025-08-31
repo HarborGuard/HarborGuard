@@ -54,6 +54,15 @@ function detectDatabaseProvider() {
 async function testPostgreSQLConnection(url) {
   console.log('[DB] Testing PostgreSQL connection...');
   try {
+    // Temporarily update schema to PostgreSQL for connection test
+    const originalProvider = fs.readFileSync('prisma/schema.prisma', 'utf8').match(/provider\s*=\s*"(\w+)"/)?.[1];
+    updateSchemaProvider('postgresql');
+    
+    // Generate client for PostgreSQL to test connection
+    await execAsync('prisma generate', {
+      env: { ...process.env, DATABASE_URL: url }
+    });
+    
     // For DigitalOcean and other managed PostgreSQL services, we need to handle SSL properly
     // Create a modified URL that works with Prisma's SSL requirements
     let modifiedUrl = url;
@@ -82,6 +91,11 @@ async function testPostgreSQLConnection(url) {
     return true;
   } catch (error) {
     console.warn(`[DB] PostgreSQL connection failed: ${error.message}`);
+    // Restore original provider if test failed
+    const originalProvider = fs.readFileSync('prisma/schema.prisma', 'utf8').match(/provider\s*=\s*"(\w+)"/)?.[1];
+    if (originalProvider && originalProvider !== 'postgresql') {
+      updateSchemaProvider(originalProvider);
+    }
     return false;
   }
 }
@@ -122,6 +136,12 @@ async function initializeSQLite(url) {
   // Update schema to SQLite
   updateSchemaProvider('sqlite');
   
+  // Generate Prisma client for SQLite
+  console.log('[DB] Generating Prisma client for SQLite...');
+  await execAsync('prisma generate', {
+    env: { ...process.env, DATABASE_URL: url }
+  });
+  
   // Run migrations for SQLite
   await execAsync('prisma migrate deploy', {
     env: { ...process.env, DATABASE_URL: url }
@@ -138,6 +158,12 @@ async function initializePostgreSQL(url) {
   
   // Update schema to PostgreSQL
   updateSchemaProvider('postgresql');
+  
+  // Generate Prisma client for PostgreSQL
+  console.log('[DB] Generating Prisma client for PostgreSQL...');
+  await execAsync('prisma generate', {
+    env: { ...process.env, DATABASE_URL: url }
+  });
   
   // Use db push to sync schema (avoids migration issues)
   await execAsync('prisma db push --accept-data-loss', {
@@ -183,12 +209,6 @@ async function initializeDatabase() {
       // Initialize SQLite directly
       await initializeSQLite(config.url);
     }
-
-    // Generate Prisma client
-    console.log('[DB] Generating Prisma client...');
-    await execAsync('prisma generate', {
-      env: { ...process.env, DATABASE_URL: activeUrl }
-    });
 
     console.log('[DB] Database initialization complete');
     console.log(`[DB] Active database type: ${activeProvider}`);
