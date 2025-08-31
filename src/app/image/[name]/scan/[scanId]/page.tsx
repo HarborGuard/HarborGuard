@@ -24,6 +24,7 @@ import {
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
+import { VulnerabilityUrlMenu } from "@/components/vulnerability-url-menu";
 import {
   Card,
   CardContent,
@@ -1062,22 +1063,10 @@ export default function ScanResultsPage() {
                                           <IconX className="h-4 w-4" />
                                         </Button>
                                       )}
-                                      {vuln.references &&
-                                        vuln.references.length > 0 && (
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            asChild
-                                          >
-                                            <a
-                                              href={vuln.references[0]}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                            >
-                                              <IconExternalLink className="h-4 w-4" />
-                                            </a>
-                                          </Button>
-                                        )}
+                                      <VulnerabilityUrlMenu 
+                                        vulnerabilityId={vuln.VulnerabilityID}
+                                        references={vuln.references || vuln.References || []}
+                                      />
                                     </div>
                                   </TableCell>
                                   <TableCell>
@@ -1270,22 +1259,10 @@ export default function ScanResultsPage() {
                                       <IconX className="h-4 w-4" />
                                     </Button>
                                   )}
-                                  {match.vulnerability.urls &&
-                                    match.vulnerability.urls.length > 0 && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        asChild
-                                      >
-                                        <a
-                                          href={match.vulnerability.urls[0]}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                        >
-                                          <IconExternalLink className="h-4 w-4" />
-                                        </a>
-                                      </Button>
-                                    )}
+                                  <VulnerabilityUrlMenu 
+                                    vulnerabilityId={match.vulnerability.id}
+                                    references={match.vulnerability.urls || []}
+                                  />
                                 </div>
                               </TableCell>
                               <TableCell>
