@@ -164,7 +164,7 @@ export class ScannerService {
     // Send notifications if high/critical vulnerabilities found
     if (vulnerabilityCounts.critical > 0 || vulnerabilityCounts.high > 0) {
       await notificationService.notifyScanComplete(
-        `${request.image}:${request.tag}`,
+        `${_request.image}:${_request.tag}`,
         scanId,
         vulnerabilityCounts
       );
