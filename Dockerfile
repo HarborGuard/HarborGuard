@@ -20,6 +20,9 @@ ARG DOCKLE_VERSION=0.4.15
 ARG OSV_SCANNER_VERSION=v2.2.2
 ARG DIVE_VERSION=0.13.1
 
+# Install Prisma CLI only (minimal size)
+RUN npm install -g prisma@6.14.0 --no-save
+
 RUN apk add --no-cache \
     ca-certificates skopeo curl tar gzip xz gnupg docker-cli \
   && set -eux \
