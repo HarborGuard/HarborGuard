@@ -169,15 +169,27 @@ export function NewScanModal({ children }: NewScanModalProps) {
   
   // Get real scanned images from app state
   const existingImages = React.useMemo(() => {
-    return state.scans
+    // Use a Map to deduplicate by image name, keeping the most recent scan
+    const imageMap = new Map()
+    
+    state.scans
       .filter(scan => scan.status === 'Complete')
-      .map(scan => ({
-        id: scan.id,
-        name: scan.image,
-        lastScan: scan.lastScan || '',
-        riskScore: scan.riskScore,
-        source: scan.source || 'registry'
-      }))
+      .forEach(scan => {
+        const key = scan.image
+        const existing = imageMap.get(key)
+        
+        if (!existing || new Date(scan.lastScan || '').getTime() > new Date(existing.lastScan).getTime()) {
+          imageMap.set(key, {
+            id: `${scan.id}_${scan.image}_${scan.lastScan}`, // Create unique composite key
+            name: scan.image,
+            lastScan: scan.lastScan || '',
+            riskScore: scan.riskScore,
+            source: scan.source || 'registry'
+          })
+        }
+      })
+    
+    return Array.from(imageMap.values())
       .sort((a, b) => new Date(b.lastScan).getTime() - new Date(a.lastScan).getTime()) // Sort by most recent
   }, [state.scans])
   

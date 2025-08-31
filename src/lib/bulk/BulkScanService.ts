@@ -68,10 +68,9 @@ export class BulkScanService {
         }
       });
 
-      // Execute scans with concurrency control
-      const result = await this.executeConcurrentScans(
-        limitedImages, 
-        3, // Default concurrency
+      // Execute scans - queue will handle concurrency
+      const result = await this.executeQueuedScans(
+        limitedImages,
         batchId,
         request.options?.scanners
       );
@@ -269,9 +268,8 @@ export class BulkScanService {
     });
   }
 
-  private async executeConcurrentScans(
-    images: any[], 
-    maxConcurrent: number,
+  private async executeQueuedScans(
+    images: any[],
     batchId: string,
     scanners?: {
       trivy?: boolean;
@@ -286,87 +284,84 @@ export class BulkScanService {
     let successful = 0;
     let failed = 0;
     
-    // Process in chunks to control concurrency
-    for (let i = 0; i < images.length; i += maxConcurrent) {
-      const chunk = images.slice(i, i + maxConcurrent);
-      
-      const chunkPromises = chunk.map(async (image) => {
+    // Submit all scans to the queue with bulk scan priority
+    const scanPromises = images.map(async (image, index) => {
+      try {
+        // Determine correct source based on image source field
+        const scanSource: 'registry' | 'local' = 
+          image.source === 'LOCAL_DOCKER' ? 'local' : 'registry';
+
+        const scanRequest: ScanRequest = {
+          image: image.name,
+          tag: image.tag,
+          registry: image.registry,
+          source: scanSource,
+          scanners: scanners // Pass scanner configuration
+        };
+        
+        // Use lower priority for bulk scans (0 = normal, -1 = bulk)
+        const { scanId, queued, queuePosition } = await scannerService.startScan(scanRequest, -1);
+
+        // Link scan to batch
+        await prisma.bulkScanItem.create({
+          data: {
+            batchId,
+            scanId,
+            imageId: image.id,
+            status: 'RUNNING'
+          }
+        });
+
+        // Monitor scan completion in background
+        this.monitorScanCompletion(batchId, scanId, image.id);
+
+        if (queued) {
+          console.log(`Bulk scan for ${image.name}:${image.tag} queued at position ${queuePosition}`);
+        }
+
+        successful++;
+        return scanId;
+
+      } catch (error) {
+        console.error(`Failed to start scan for ${image.name}:${image.tag}`, error);
+        
+        // Create a failed scan record first to satisfy foreign key constraint
         try {
-          // Determine correct source based on image source field
-          const scanSource: 'registry' | 'local' = 
-            image.source === 'LOCAL_DOCKER' ? 'local' : 'registry';
-
-          const scanRequest: ScanRequest = {
-            image: image.name,
-            tag: image.tag,
-            registry: image.registry,
-            source: scanSource,
-            scanners: scanners // Pass scanner configuration
-          };
-          
-          const { scanId } = await scannerService.startScan(scanRequest);
-
-          // Link scan to batch
-          await prisma.bulkScanItem.create({
+          const failedScan = await prisma.scan.create({
             data: {
-              batchId,
-              scanId,
+              requestId: `failed-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               imageId: image.id,
-              status: 'RUNNING'
+              status: 'FAILED',
+              startedAt: new Date(),
+              finishedAt: new Date(),
+              source: 'registry',
+              metadata: {
+                error: error instanceof Error ? error.message : String(error)
+              }
             }
           });
 
-          // Monitor scan completion in background
-          this.monitorScanCompletion(batchId, scanId, image.id);
-
-          successful++;
-          return scanId;
-
-        } catch (error) {
-          console.error(`Failed to start scan for ${image.name}:${image.tag}`, error);
-          
-          // Create a failed scan record first to satisfy foreign key constraint
-          try {
-            const failedScan = await prisma.scan.create({
-              data: {
-                requestId: `failed-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                imageId: image.id,
-                status: 'FAILED',
-                startedAt: new Date(),
-                finishedAt: new Date(),
-                source: 'registry',
-                metadata: {
-                  error: error instanceof Error ? error.message : String(error)
-                }
-              }
-            });
-
-            // Now create the bulk scan item with the failed scan ID
-            await prisma.bulkScanItem.create({
-              data: {
-                batchId,
-                scanId: failedScan.id,
-                imageId: image.id,
-                status: 'FAILED'
-              }
-            });
-          } catch (dbError) {
-            console.error('Failed to create failed scan record:', dbError);
-          }
-          
-          failed++;
-          return null;
+          // Now create the bulk scan item with the failed scan ID
+          await prisma.bulkScanItem.create({
+            data: {
+              batchId,
+              scanId: failedScan.id,
+              imageId: image.id,
+              status: 'FAILED'
+            }
+          });
+        } catch (dbError) {
+          console.error('Failed to create failed scan record:', dbError);
         }
-      });
-
-      const chunkResults = await Promise.all(chunkPromises);
-      results.push(...chunkResults.filter((id): id is string => id !== null));
-
-      // Small delay between chunks to avoid overwhelming the system
-      if (i + maxConcurrent < images.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        failed++;
+        return null;
       }
-    }
+    });
+
+    // Wait for all scan submissions to complete
+    const scanResults = await Promise.all(scanPromises);
+    results.push(...scanResults.filter((id): id is string => id !== null));
 
     return { scanIds: results, successful, failed };
   }

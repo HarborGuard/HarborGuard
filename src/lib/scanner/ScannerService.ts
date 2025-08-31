@@ -3,7 +3,9 @@ import { ProgressTracker } from './ProgressTracker';
 import { DatabaseAdapter } from './DatabaseAdapter';
 import { ScanExecutor } from './ScanExecutor';
 import { getScannerVersions } from './scanners';
+import { scanQueue } from './ScanQueue';
 import type { ScanRequest, ScanJob, ScanStatus } from '@/types';
+import { logger } from '@/lib/logger';
 // Template types removed - using basic ScanRequest
 
 // Global shared state to work around Next.js development mode module reloading
@@ -28,17 +30,21 @@ export class ScannerService {
       updateProgress: this.progressTracker.updateProgress.bind(this.progressTracker)
     });
     
+    // Set up queue event listeners
+    this.setupQueueListeners();
+    
     if (process.env.NODE_ENV !== 'test') {
       console.log(`[ScannerService] Created new instance ${this.instanceId}`);
     }
   }
 
   async startScan(
-    request: ScanRequest
-  ): Promise<{ requestId: string; scanId: string }> {
+    request: ScanRequest,
+    priority?: number
+  ): Promise<{ requestId: string; scanId: string; queued: boolean; queuePosition?: number }> {
     const requestId = this.generateRequestId();
     
-    console.log(`Starting scan for ${request.image}:${request.tag} with requestId: ${requestId}`);
+    logger.info(`Requesting scan for ${request.image}:${request.tag} with requestId: ${requestId}`);
 
     const { scanId, imageId } = await this.databaseAdapter.initializeScanRecord(requestId, request);
 
@@ -46,18 +52,59 @@ export class ScannerService {
       requestId,
       scanId,
       imageId,
-      status: 'RUNNING' as ScanStatus,
+      status: 'PENDING' as ScanStatus,
       progress: 0
     };
     globalJobs.set(requestId, job);
 
-    this.executeScan(requestId, request, scanId, imageId).catch(error => {
-      console.error(`Scan ${requestId} failed:`, error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.updateJobStatus(requestId, 'FAILED', undefined, errorMessage);
+    // Add to queue
+    await scanQueue.addToQueue({
+      requestId,
+      scanId,
+      imageId,
+      request,
+      priority
     });
 
-    return { requestId, scanId };
+    const queuePosition = scanQueue.getQueuePosition(requestId);
+    const queued = queuePosition > 0;
+
+    if (queued) {
+      logger.info(`Scan ${requestId} queued at position ${queuePosition}`);
+      // Update database to reflect queued status
+      await this.databaseAdapter.updateScanRecord(scanId, {
+        status: 'PENDING',
+        metadata: { queuePosition } as any
+      });
+    }
+
+    return { requestId, scanId, queued, queuePosition: queued ? queuePosition : undefined };
+  }
+
+  private setupQueueListeners(): void {
+    // Listen for scan-started events from the queue
+    scanQueue.on('scan-started', async (queuedScan) => {
+      logger.info(`[ScannerService] Processing queued scan ${queuedScan.requestId}`);
+      
+      const job = globalJobs.get(queuedScan.requestId);
+      if (job) {
+        job.status = 'RUNNING';
+        globalJobs.set(queuedScan.requestId, job);
+      }
+
+      // Execute the scan
+      this.executeScan(
+        queuedScan.requestId, 
+        queuedScan.request, 
+        queuedScan.scanId, 
+        queuedScan.imageId
+      ).catch(error => {
+        logger.error(`Scan ${queuedScan.requestId} failed:`, error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        this.updateJobStatus(queuedScan.requestId, 'FAILED', undefined, errorMessage);
+        scanQueue.completeScan(queuedScan.requestId, errorMessage);
+      });
+    });
   }
 
   private generateRequestId(): string {
@@ -112,6 +159,8 @@ export class ScannerService {
 
     this.updateJobStatus(requestId, 'SUCCESS', 100, undefined, 'Scan completed successfully');
     
+    // Notify queue that scan is complete
+    await scanQueue.completeScan(requestId);
   }
 
   private isLocalDockerScan(request: ScanRequest): boolean {
@@ -163,6 +212,20 @@ export class ScannerService {
   }
 
   async cancelScan(requestId: string): Promise<boolean> {
+    // First try to cancel from queue
+    if (scanQueue.cancelQueuedScan(requestId)) {
+      const job = globalJobs.get(requestId);
+      if (job) {
+        this.updateJobStatus(requestId, 'CANCELLED');
+        await this.databaseAdapter.updateScanRecord(job.scanId, {
+          status: 'CANCELLED',
+          finishedAt: new Date()
+        });
+      }
+      return true;
+    }
+
+    // Otherwise cancel running scan
     const job = globalJobs.get(requestId);
     if (job && job.status === 'RUNNING') {
       this.progressTracker.cleanup(requestId);
@@ -173,9 +236,32 @@ export class ScannerService {
         finishedAt: new Date()
       });
       
+      // Notify queue that scan is complete
+      await scanQueue.completeScan(requestId, 'Cancelled by user');
+      
       return true;
     }
     return false;
+  }
+
+  getQueueStats() {
+    return scanQueue.getStats();
+  }
+
+  getQueuedScans() {
+    return scanQueue.getQueuedScans();
+  }
+
+  getRunningScans() {
+    return scanQueue.getRunningScans();
+  }
+
+  getQueuePosition(requestId: string): number {
+    return scanQueue.getQueuePosition(requestId);
+  }
+
+  getEstimatedWaitTime(requestId: string): number | null {
+    return scanQueue.getEstimatedWaitTime(requestId);
   }
 }
 

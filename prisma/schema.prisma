@@ -275,6 +275,7 @@ enum RepositoryStatus {
 }
 
 enum ScanStatus {
+  PENDING
   RUNNING
   SUCCESS
   PARTIAL

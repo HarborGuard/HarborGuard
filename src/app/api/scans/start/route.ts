@@ -49,8 +49,8 @@ export async function POST(request: NextRequest) {
       repositoryId: validatedData.repositoryId,
     }
     
-    // Start scan
-    const result = await scannerService.startScan(scanRequest)
+    // Start scan with normal priority
+    const result = await scannerService.startScan(scanRequest, 0)
     
     // Log the scan start action
     await auditLogger.scanStart(
@@ -59,12 +59,21 @@ export async function POST(request: NextRequest) {
       validatedData.source || 'registry'
     );
     
-    return NextResponse.json({
+    // Include queue information in response
+    const response: any = {
       success: true,
       requestId: result.requestId,
       scanId: result.scanId,
-      message: 'Scan started successfully'
-    }, { status: 201 })
+      message: result.queued ? 'Scan queued successfully' : 'Scan started successfully'
+    }
+    
+    if (result.queued) {
+      response.queued = true;
+      response.queuePosition = result.queuePosition;
+      response.estimatedWaitTime = scannerService.getEstimatedWaitTime(result.requestId);
+    }
+    
+    return NextResponse.json(response, { status: 201 })
 
   } catch (error) {
     console.error('Error starting scan:', error)
