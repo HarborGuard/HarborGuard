@@ -14,8 +14,22 @@ export function useScans() {
   const stats = useMemo(() => {
     const totalScans = scans.length
     
-    // Aggregate vulnerabilities directly from the transformed scans
-    const aggregatedVulns = scans.reduce((acc, scan) => ({
+    // Count unique image:tag combinations
+    const uniqueImageTags = new Set(scans.map(scan => scan.image)).size
+    
+    // Group scans by image name (without tag) to get latest scan per image
+    const imageGroups = new Map<string, any>()
+    scans.forEach(scan => {
+      const imageName = scan.image ? scan.image.split(':')[0] : 'unknown'
+      // Keep only the most recent scan for each image
+      if (!imageGroups.has(imageName) || 
+          new Date(scan.lastScan) > new Date(imageGroups.get(imageName).lastScan)) {
+        imageGroups.set(imageName, scan)
+      }
+    })
+    
+    // Aggregate vulnerabilities from the most recent scan of each unique image
+    const aggregatedVulns = Array.from(imageGroups.values()).reduce((acc, scan) => ({
       critical: acc.critical + (scan.severities?.crit || 0),
       high: acc.high + (scan.severities?.high || 0),
       medium: acc.medium + (scan.severities?.med || 0),
@@ -33,6 +47,8 @@ export function useScans() {
 
     return {
       totalScans,
+      uniqueImageTags,
+      uniqueImages: imageGroups.size,
       vulnerabilities: {
         critical: aggregatedVulns.critical,
         high: aggregatedVulns.high,

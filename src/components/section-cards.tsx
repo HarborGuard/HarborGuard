@@ -39,6 +39,8 @@ interface SectionCardsProps {
   }>
   stats: {
     totalScans: number
+    uniqueImageTags?: number
+    uniqueImages?: number
     vulnerabilities: {
       critical: number
       high: number
@@ -54,12 +56,13 @@ interface SectionCardsProps {
 }
 
 export function SectionCards({ loading = false, scanData, stats }: SectionCardsProps) {
-  // Use aggregated stats for unique vulnerability counts
-  const totalImages = stats.totalScans
+  // Use unique image:tag count for "Images Scanned"
+  const totalImages = stats.uniqueImageTags || stats.totalScans
   const completedScans = stats.completeScans
+  const totalScans = stats.totalScans
   const averageRiskScore = stats.avgRiskScore
   
-  // Use unique vulnerability counts from stats instead of summing duplicates
+  // Use unique vulnerability counts from stats (already deduplicated per image)
   const totalCriticalVulns = stats.vulnerabilities.critical
   const totalHighVulns = stats.vulnerabilities.high
   const totalVulns = stats.vulnerabilities.total
@@ -161,7 +164,7 @@ export function SectionCards({ loading = false, scanData, stats }: SectionCardsP
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="line-clamp-1 flex gap-2 font-medium">
-            {completedScans} of {totalImages} scans completed <IconChecks className="size-4" />
+            {completedScans} of {totalScans} scans completed <IconChecks className="size-4" />
           </div>
           <div className="text-muted-foreground">
             Active security monitoring

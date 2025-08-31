@@ -262,7 +262,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           scanTime: scan.startedAt, // Skip expensive date formatting until display
           status: mapScanStatus(scan.status),
           statusRaw: scan.status,
-          compliance: { dockle: undefined },
+          compliance: { dockle: scan.dockleGrade || undefined },
           misconfiguration: { pass: 0, warn: 0, info: 0 },
           secretsData: { count: 0, results: [] },
           fixed: 0,

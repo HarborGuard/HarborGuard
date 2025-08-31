@@ -50,45 +50,96 @@ export async function GET(request: NextRequest) {
       prisma.scan.count({ where })
     ])
     
-    // Process and serialize the data with optimized vulnerability counting
+    // Process and serialize the data with actual vulnerability counting
     const serializedData = scans.map((scan: any) => {
-      // Try to get cached vulnerability counts from ImageVulnerability table first
       let vulnCount = { total: 0, critical: 0, high: 0, medium: 0, low: 0 }
       
-      // Fast path: Try to estimate from riskScore if available
-      if (scan.riskScore && scan.riskScore > 0) {
-        // Rough estimation based on risk score to avoid heavy parsing
-        const estimatedTotal = Math.floor(scan.riskScore / 5) // Rough heuristic
-        vulnCount = {
-          total: estimatedTotal,
-          critical: scan.riskScore > 80 ? Math.floor(estimatedTotal * 0.1) : 0,
-          high: scan.riskScore > 50 ? Math.floor(estimatedTotal * 0.3) : 0,
-          medium: Math.floor(estimatedTotal * 0.4),
-          low: Math.floor(estimatedTotal * 0.2)
-        }
-      } else {
-        // Fallback: Quick metadata parsing (only if riskScore unavailable)
-        const scanResults = (scan.metadata as any)?.scanResults
-        const trivyResults = scanResults?.trivy
-        
-        if (trivyResults?.Results) {
-          // Only parse first few results for speed
-          const maxResults = Math.min(trivyResults.Results.length, 3)
-          for (let i = 0; i < maxResults; i++) {
-            const result = trivyResults.Results[i]
-            if (result.Vulnerabilities) {
-              const maxVulns = Math.min(result.Vulnerabilities.length, 50) // Limit parsing
-              for (let j = 0; j < maxVulns; j++) {
-                const vuln = result.Vulnerabilities[j]
-                const severity = (vuln.Severity || 'unknown').toLowerCase()
-                
-                if (severity === 'critical') vulnCount.critical++
-                else if (severity === 'high') vulnCount.high++
-                else if (severity === 'medium') vulnCount.medium++
-                else if (severity === 'low' || severity === 'info') vulnCount.low++
-                vulnCount.total++
+      // Always parse actual metadata to get real vulnerability counts
+      const scanResults = (scan.metadata as any)?.scanResults
+      const trivyResults = scanResults?.trivy
+      
+      if (trivyResults?.Results) {
+        // Parse all results to get accurate counts
+        for (const result of trivyResults.Results) {
+          if (result.Vulnerabilities && Array.isArray(result.Vulnerabilities)) {
+            for (const vuln of result.Vulnerabilities) {
+              const severity = (vuln.Severity || 'UNKNOWN').toUpperCase()
+              
+              switch (severity) {
+                case 'CRITICAL':
+                  vulnCount.critical++
+                  break
+                case 'HIGH':
+                  vulnCount.high++
+                  break
+                case 'MEDIUM':
+                  vulnCount.medium++
+                  break
+                case 'LOW':
+                  vulnCount.low++
+                  break
+                case 'NEGLIGIBLE':
+                case 'INFO':
+                  vulnCount.low++
+                  break
               }
+              vulnCount.total++
             }
+          }
+        }
+      }
+      
+      // Also check grype results if trivy didn't find anything
+      if (vulnCount.total === 0) {
+        const grypeResults = scanResults?.grype
+        if (grypeResults?.matches) {
+          for (const match of grypeResults.matches) {
+            const severity = (match.vulnerability?.severity || 'UNKNOWN').toUpperCase()
+            
+            switch (severity) {
+              case 'CRITICAL':
+                vulnCount.critical++
+                break
+              case 'HIGH':
+                vulnCount.high++
+                break
+              case 'MEDIUM':
+                vulnCount.medium++
+                break
+              case 'LOW':
+              case 'NEGLIGIBLE':
+                vulnCount.low++
+                break
+            }
+            vulnCount.total++
+          }
+        }
+      }
+      
+      // Extract or calculate Dockle compliance grade
+      let dockleGrade = null
+      const dockleResults = scanResults?.dockle
+      if (dockleResults?.summary) {
+        const summary = dockleResults.summary
+        // If grade exists, use it
+        if (summary.grade) {
+          dockleGrade = summary.grade
+        } else if (typeof summary.fatal === 'number' && typeof summary.warn === 'number') {
+          // Calculate grade based on fatal and warn counts
+          const fatal = summary.fatal || 0
+          const warn = summary.warn || 0
+          const info = summary.info || 0
+          
+          if (fatal > 0) {
+            dockleGrade = 'F'
+          } else if (warn > 5) {
+            dockleGrade = 'D'
+          } else if (warn > 2) {
+            dockleGrade = 'C'
+          } else if (warn > 0 || info > 5) {
+            dockleGrade = 'B'
+          } else {
+            dockleGrade = 'A'
           }
         }
       }
@@ -110,7 +161,8 @@ export async function GET(request: NextRequest) {
           digest: scan.image.digest
         },
         vulnerabilityCount: vulnCount,
-        complianceScore: scan.complianceScore
+        complianceScore: scan.complianceScore,
+        dockleGrade: dockleGrade
       }
     })
     
