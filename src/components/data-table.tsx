@@ -62,6 +62,9 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
 } from "@/components/ui/context-menu"
 import { DeleteImageDialog } from "@/components/delete-image-dialog"
 import { useScanning } from "@/providers/ScanningProvider"
@@ -445,12 +448,13 @@ function DraggableRow({
 }: { 
   row: Row<z.infer<typeof schema>>, 
   onRowClick: (imageName: string) => void,
-  onRescan: (imageName: string, source?: string) => void,
+  onRescan: (imageName: string, source?: string, tag?: string) => void,
   onDelete: (imageName: string) => void
 }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
   })
+  const { addScanJob } = useScanning()
 
   const handleRowClick = (e: React.MouseEvent) => {
     // Don't navigate if clicking on interactive elements
@@ -460,13 +464,40 @@ function DraggableRow({
     onRowClick(row.original.imageName)
   }
 
-  const handleRescan = () => {
-    onRescan(row.original.imageName, row.original.source)
+  const handleRescan = (tag?: string) => {
+    onRescan(row.original.imageName, row.original.source, tag)
+  }
+
+  const handleRescanAll = async () => {
+    const tags = (row.original as any)._allTags?.split(', ').filter(Boolean) || ['latest']
+    const imageName = row.original.imageName
+    const source = row.original.source
+    
+    // Show loading toast
+    const loadingToastId = toast.loading(`Starting scans for ${tags.length} tags of ${imageName}...`)
+    
+    try {
+      // Start all scans with a small delay between each
+      for (const tag of tags) {
+        await new Promise(resolve => setTimeout(resolve, 500)) // 500ms delay between scans
+        onRescan(imageName, source, tag)
+      }
+      
+      toast.dismiss(loadingToastId)
+      toast.success(`Started scans for all ${tags.length} tags of ${imageName}`)
+    } catch (error) {
+      toast.dismiss(loadingToastId)
+      toast.error('Failed to start all scans')
+    }
   }
 
   const handleDelete = () => {
     onDelete(row.original.imageName)
   }
+  
+  // Get tag information
+  const tagCount = (row.original as any)._tagCount || 1
+  const tags = (row.original as any)._allTags?.split(', ').filter(Boolean) || []
 
   return (
     <ContextMenu>
@@ -490,10 +521,43 @@ function DraggableRow({
         </TableRow>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onSelect={handleRescan}>
-          <IconRefresh className="mr-2 h-4 w-4" />
-          Rescan Image
-        </ContextMenuItem>
+        {tagCount > 1 ? (
+          <ContextMenuSub>
+            <ContextMenuSubTrigger className="flex items-center">
+              <IconRefresh className="mr-2 h-4 w-4" />
+              Rescan Image
+              <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
+                {tagCount} tags
+                <IconChevronRight className="h-3 w-3" />
+              </span>
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="min-w-[200px]">
+              {tags.map((tag: string) => (
+                <ContextMenuItem 
+                  key={tag}
+                  onSelect={() => handleRescan(tag)}
+                  className="flex items-center"
+                >
+                  <IconRefresh className="mr-2 h-4 w-4" />
+                  <span className="flex-1">Scan :{tag}</span>
+                </ContextMenuItem>
+              ))}
+              <ContextMenuSeparator />
+              <ContextMenuItem 
+                onSelect={handleRescanAll}
+                className="flex items-center font-medium"
+              >
+                <IconRefresh className="mr-2 h-4 w-4" />
+                <span className="flex-1">Scan All {tags.length} Tags</span>
+              </ContextMenuItem>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        ) : (
+          <ContextMenuItem onSelect={() => handleRescan()}>
+            <IconRefresh className="mr-2 h-4 w-4" />
+            Rescan Image
+          </ContextMenuItem>
+        )}
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={handleDelete} className="text-red-600 focus:text-red-600">
           <IconTrash className="mr-2 h-4 w-4" />
@@ -666,10 +730,11 @@ export function DataTable({
     router.push(`/image/${encodeURIComponent(imageName)}`)
   }
 
-  const handleRescan = async (imageName: string, source?: string) => {
+  const handleRescan = async (imageName: string, source?: string, tag?: string) => {
     // Determine the source - default to 'registry' if not specified
     const scanSource = source || 'registry'
-    const loadingToastId = toast.loading(`Starting ${scanSource} rescan for ${imageName}...`)
+    const actualTag = tag || 'latest'
+    const loadingToastId = toast.loading(`Starting ${scanSource} rescan for ${imageName}:${actualTag}...`)
     
     try {
       // Use the correct API endpoint for starting scans
@@ -680,7 +745,7 @@ export function DataTable({
         },
         body: JSON.stringify({
           image: imageName,
-          tag: 'latest', // You might want to handle tags differently
+          tag: actualTag,
           source: scanSource
         }),
       })
@@ -690,7 +755,7 @@ export function DataTable({
         
         // Dismiss loading toast and show success
         toast.dismiss(loadingToastId)
-        toast.success(`${scanSource.charAt(0).toUpperCase() + scanSource.slice(1)} rescan started for ${imageName}`)
+        toast.success(`${scanSource.charAt(0).toUpperCase() + scanSource.slice(1)} rescan started for ${imageName}:${actualTag}`)
         
         // Add the scan job to the scanning context so it shows in the monitor
         if (result.requestId && result.scanId) {
