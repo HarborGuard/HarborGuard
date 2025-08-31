@@ -1,3 +1,53 @@
+/**
+ * @swagger
+ * /api/scans/start:
+ *   post:
+ *     summary: Start a new container scan
+ *     description: Initiates a security scan for a container image
+ *     tags: [Scans]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 description: Image name
+ *                 example: nginx
+ *               tag:
+ *                 type: string
+ *                 description: Image tag
+ *                 example: latest
+ *               source:
+ *                 type: string
+ *                 enum: [registry, local]
+ *                 description: Image source
+ *               dockerImageId:
+ *                 type: string
+ *                 description: Docker image ID for local images
+ *               repositoryId:
+ *                 type: string
+ *                 description: Repository ID for private registries
+ *     responses:
+ *       200:
+ *         description: Scan started successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 requestId:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Invalid request data
+ *       500:
+ *         description: Internal server error
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { scannerService } from '@/lib/scanner'
 import { z } from 'zod'

@@ -12,7 +12,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { LogsIcon } from "lucide-react";
+import { LogsIcon, BookOpenIcon } from "lucide-react";
 
 interface BreadcrumbItem {
   label: string;
@@ -65,6 +65,22 @@ export function SiteHeader({ breadcrumbs }: SiteHeaderProps) {
         )}
         
         <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="secondary"
+            asChild
+            size="sm"
+            className="hidden sm:flex"
+          >
+            <a
+              href="/api-docs"
+              className="dark:text-foreground flex items-center gap-2"
+              title="API Documentation"
+            >
+              <BookOpenIcon className="h-4 w-4" />
+              API Docs
+            </a>
+          </Button>
+
           <Button
             variant="secondary"
             asChild
