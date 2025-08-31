@@ -22,6 +22,11 @@ export interface AppConfig {
   // Notifications
   teamsWebhookUrl?: string;
   slackWebhookUrl?: string;
+  gotifyServerUrl?: string;
+  gotifyAppToken?: string;
+  appriseApiUrl?: string;
+  appriseConfigKey?: string;
+  appriseUrls?: string;
   notifyOnHighSeverity: boolean;
   
   // Monitoring
@@ -57,6 +62,11 @@ function parseEnvConfig(): AppConfig {
     // Notifications
     teamsWebhookUrl: process.env.TEAMS_WEBHOOK_URL,
     slackWebhookUrl: process.env.SLACK_WEBHOOK_URL,
+    gotifyServerUrl: process.env.GOTIFY_SERVER_URL,
+    gotifyAppToken: process.env.GOTIFY_APP_TOKEN,
+    appriseApiUrl: process.env.APPRISE_API_URL,
+    appriseConfigKey: process.env.APPRISE_CONFIG_KEY,
+    appriseUrls: process.env.APPRISE_URLS,
     notifyOnHighSeverity: process.env.NOTIFY_ON_HIGH_SEVERITY?.toLowerCase() === 'true',
     
     // Monitoring
@@ -107,6 +117,28 @@ function validateConfig(config: AppConfig): void {
   
   if (config.enabledScanners.length === 0) {
     errors.push('At least one scanner must be enabled');
+  }
+  
+  // Validate Gotify configuration
+  if (config.gotifyServerUrl && !config.gotifyAppToken) {
+    errors.push('GOTIFY_APP_TOKEN is required when GOTIFY_SERVER_URL is set');
+  }
+  
+  if (config.gotifyAppToken && !config.gotifyServerUrl) {
+    errors.push('GOTIFY_SERVER_URL is required when GOTIFY_APP_TOKEN is set');
+  }
+  
+  if (config.gotifyServerUrl && !config.gotifyServerUrl.startsWith('http')) {
+    errors.push('GOTIFY_SERVER_URL must start with http:// or https://');
+  }
+  
+  // Validate Apprise configuration
+  if (config.appriseUrls && !config.appriseApiUrl) {
+    errors.push('APPRISE_API_URL is required when APPRISE_URLS is set');
+  }
+  
+  if (config.appriseApiUrl && !config.appriseApiUrl.startsWith('http')) {
+    errors.push('APPRISE_API_URL must start with http:// or https://');
   }
   
   if (errors.length > 0) {

@@ -42,6 +42,14 @@ export class NotificationService {
       promises.push(this.sendSlackNotification(payload));
     }
 
+    if (config.gotifyServerUrl && config.gotifyAppToken) {
+      promises.push(this.sendGotifyNotification(payload));
+    }
+
+    if (config.appriseApiUrl) {
+      promises.push(this.sendAppriseNotification(payload));
+    }
+
     if (promises.length === 0) {
       logger.debug('No webhook URLs configured, skipping notifications');
       return;
@@ -223,6 +231,174 @@ export class NotificationService {
       case 'low': return '📝';
       case 'info': return 'ℹ️';
       default: return '📋';
+    }
+  }
+
+  /**
+   * Send notification to Gotify
+   */
+  private async sendGotifyNotification(payload: NotificationPayload): Promise<void> {
+    if (!config.gotifyServerUrl || !config.gotifyAppToken) return;
+
+    try {
+      const gotifyMessage = this.formatGotifyMessage(payload);
+      
+      const response = await fetch(`${config.gotifyServerUrl}/message?token=${config.gotifyAppToken}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(gotifyMessage),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Gotify API returned ${response.status}: ${response.statusText}`);
+      }
+
+      logger.webhook('Successfully sent Gotify notification');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Failed to send Gotify notification:', errorMessage);
+      throw error;
+    }
+  }
+
+  /**
+   * Send notification via Apprise
+   */
+  private async sendAppriseNotification(payload: NotificationPayload): Promise<void> {
+    if (!config.appriseApiUrl) return;
+
+    try {
+      const appriseMessage = this.formatAppriseMessage(payload);
+      
+      // Determine the endpoint based on configuration
+      let endpoint = `${config.appriseApiUrl}/notify`;
+      if (config.appriseConfigKey) {
+        endpoint = `${config.appriseApiUrl}/notify/${config.appriseConfigKey}`;
+      }
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(appriseMessage),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Apprise API returned ${response.status}: ${response.statusText}`);
+      }
+
+      logger.webhook('Successfully sent Apprise notification');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Failed to send Apprise notification:', errorMessage);
+      throw error;
+    }
+  }
+
+  /**
+   * Format message for Gotify
+   */
+  private formatGotifyMessage(payload: NotificationPayload): any {
+    const priority = this.getGotifyPriority(payload.severity);
+    const severityIcon = this.getSeverityIcon(payload.severity);
+
+    let message = `${severityIcon} ${payload.message}\n\n`;
+    
+    if (payload.imageName) {
+      message += `Image: ${payload.imageName}\n`;
+    }
+    
+    if (payload.vulnerabilityCount) {
+      message += `\nVulnerabilities Found:\n`;
+      message += `• Critical: ${payload.vulnerabilityCount.critical}\n`;
+      message += `• High: ${payload.vulnerabilityCount.high}\n`;
+      message += `• Medium: ${payload.vulnerabilityCount.medium}\n`;
+      message += `• Low: ${payload.vulnerabilityCount.low}\n`;
+    }
+    
+    message += `\nTimestamp: ${new Date().toISOString()}`;
+
+    return {
+      title: payload.title,
+      message,
+      priority,
+      extras: {
+        'client::display': {
+          contentType: 'text/markdown'
+        },
+        ...(payload.scanId && { scanId: payload.scanId }),
+        ...(payload.imageId && { imageId: payload.imageId }),
+        severity: payload.severity
+      }
+    };
+  }
+
+  /**
+   * Format message for Apprise
+   */
+  private formatAppriseMessage(payload: NotificationPayload): any {
+    const severityIcon = this.getSeverityIcon(payload.severity);
+    const appriseType = this.getAppriseType(payload.severity);
+
+    let body = `${severityIcon} ${payload.message}\n\n`;
+    
+    if (payload.imageName) {
+      body += `**Image:** ${payload.imageName}\n`;
+    }
+    
+    if (payload.vulnerabilityCount) {
+      body += `\n**Vulnerabilities Found:**\n`;
+      body += `• Critical: ${payload.vulnerabilityCount.critical}\n`;
+      body += `• High: ${payload.vulnerabilityCount.high}\n`;
+      body += `• Medium: ${payload.vulnerabilityCount.medium}\n`;
+      body += `• Low: ${payload.vulnerabilityCount.low}\n`;
+    }
+    
+    body += `\n_Timestamp: ${new Date().toISOString()}_`;
+
+    const message: any = {
+      title: payload.title,
+      body,
+      type: appriseType,
+      format: 'markdown'
+    };
+
+    // If specific URLs are configured, use them
+    if (config.appriseUrls) {
+      message.urls = config.appriseUrls;
+    }
+
+    return message;
+  }
+
+  /**
+   * Get Gotify priority based on severity
+   */
+  private getGotifyPriority(severity: string): number {
+    switch (severity) {
+      case 'critical': return 10;  // Max priority
+      case 'high': return 8;
+      case 'medium': return 5;
+      case 'low': return 3;
+      case 'info': return 1;
+      default: return 0;
+    }
+  }
+
+  /**
+   * Get Apprise notification type based on severity
+   */
+  private getAppriseType(severity: string): string {
+    switch (severity) {
+      case 'critical': return 'failure';
+      case 'high': return 'warning';
+      case 'medium': return 'warning';
+      case 'low': return 'info';
+      case 'info': return 'info';
+      default: return 'info';
     }
   }
 
