@@ -6,6 +6,7 @@ import { getScannerVersions } from './scanners';
 import { scanQueue } from './ScanQueue';
 import type { ScanRequest, ScanJob, ScanStatus } from '@/types';
 import { logger } from '@/lib/logger';
+import { notificationService } from '@/lib/notifications';
 // Template types removed - using basic ScanRequest
 
 // Global shared state to work around Next.js development mode module reloading
@@ -157,6 +158,18 @@ export class ScannerService {
 
     await this.databaseAdapter.uploadScanResults(scanId, reports);
 
+    // Calculate vulnerability counts for notifications
+    const vulnerabilityCounts = this.calculateVulnerabilityCounts(reports);
+    
+    // Send notifications if high/critical vulnerabilities found
+    if (vulnerabilityCounts.critical > 0 || vulnerabilityCounts.high > 0) {
+      await notificationService.notifyScanComplete(
+        `${_request.image}:${_request.tag}`,
+        scanId,
+        vulnerabilityCounts
+      );
+    }
+
     this.updateJobStatus(requestId, 'SUCCESS', 100, undefined, 'Scan completed successfully');
     
     // Notify queue that scan is complete
@@ -262,6 +275,68 @@ export class ScannerService {
 
   getEstimatedWaitTime(requestId: string): number | null {
     return scanQueue.getEstimatedWaitTime(requestId);
+  }
+
+  private calculateVulnerabilityCounts(reports: any): { critical: number; high: number; medium: number; low: number } {
+    const counts = {
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0
+    };
+
+    // Count vulnerabilities from all scanner reports
+    for (const [scanner, report] of Object.entries(reports)) {
+      if (scanner === 'trivy' && report) {
+        const trivyReport = report as any;
+        if (trivyReport.Results) {
+          for (const result of trivyReport.Results) {
+            if (result.Vulnerabilities) {
+              for (const vuln of result.Vulnerabilities) {
+                const severity = (vuln.Severity || 'UNKNOWN').toUpperCase();
+                switch (severity) {
+                  case 'CRITICAL':
+                    counts.critical++;
+                    break;
+                  case 'HIGH':
+                    counts.high++;
+                    break;
+                  case 'MEDIUM':
+                    counts.medium++;
+                    break;
+                  case 'LOW':
+                    counts.low++;
+                    break;
+                }
+              }
+            }
+          }
+        }
+      } else if (scanner === 'grype' && report) {
+        const grypeReport = report as any;
+        if (grypeReport.matches) {
+          for (const match of grypeReport.matches) {
+            const severity = (match.vulnerability?.severity || 'Unknown').toUpperCase();
+            switch (severity) {
+              case 'CRITICAL':
+                counts.critical++;
+                break;
+              case 'HIGH':
+                counts.high++;
+                break;
+              case 'MEDIUM':
+                counts.medium++;
+                break;
+              case 'LOW':
+                counts.low++;
+                break;
+            }
+          }
+        }
+      }
+    }
+
+    return counts;
   }
 }
 
