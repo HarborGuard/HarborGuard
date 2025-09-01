@@ -6,7 +6,12 @@ import path from 'path';
  */
 export function generateDynamicOpenApiSpec() {
   const apiDir = path.join(process.cwd(), 'src', 'app', 'api');
+  console.log(`[OpenAPI] Attempting to scan API directory: ${apiDir}`);
+  console.log(`[OpenAPI] Current working directory: ${process.cwd()}`);
+  console.log(`[OpenAPI] NODE_ENV: ${process.env.NODE_ENV}`);
+  
   const dynamicPaths = generateOpenApiPaths(apiDir);
+  console.log(`[OpenAPI] Found ${Object.keys(dynamicPaths).length} API paths`);
   
   // Merge with manual overrides for well-documented endpoints
   const enhancedPaths = { ...dynamicPaths };

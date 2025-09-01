@@ -1,0 +1,1850 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "HarborGuard API",
+    "version": "0.1b",
+    "description": "HarborGuard Container Security Platform API Documentation",
+    "contact": {
+      "name": "HarborGuard Team",
+      "url": "https://github.com/HarborGuard/HarborGuard"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://github.com/HarborGuard/HarborGuard/blob/main/LICENSE"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Development Server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Audit Logs",
+      "description": "Audit logging and history"
+    },
+    {
+      "name": "Docker",
+      "description": "Docker daemon and local image operations"
+    },
+    {
+      "name": "Health",
+      "description": "Health check and status endpoints"
+    },
+    {
+      "name": "Image",
+      "description": "Individual image operations"
+    },
+    {
+      "name": "Images",
+      "description": "Container image management"
+    },
+    {
+      "name": "Openapi.json",
+      "description": "Openapi.json operations"
+    },
+    {
+      "name": "Ready",
+      "description": "Readiness probe endpoints"
+    },
+    {
+      "name": "Repositories",
+      "description": "Repository management and configuration"
+    },
+    {
+      "name": "Scanners",
+      "description": "Scanner configuration and availability"
+    },
+    {
+      "name": "Scans",
+      "description": "Container scanning operations"
+    },
+    {
+      "name": "Version",
+      "description": "Version and build information"
+    },
+    {
+      "name": "Vulnerabilities",
+      "description": "Vulnerability information and analysis"
+    }
+  ],
+  "paths": {
+    "/api/audit-logs": {
+      "get": {
+        "summary": "GET /api/audit-logs",
+        "tags": [
+          "Audit Logs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/audit-logs",
+        "tags": [
+          "Audit Logs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "eventType": {
+                    "type": "string",
+                    "description": "eventType parameter"
+                  },
+                  "category": {
+                    "type": "string",
+                    "description": "category parameter"
+                  },
+                  "userIp": {
+                    "type": "string",
+                    "description": "userIp parameter"
+                  },
+                  "action": {
+                    "type": "string",
+                    "description": "action parameter"
+                  },
+                  "userAgent": {
+                    "type": "string",
+                    "description": "userAgent parameter (optional)"
+                  },
+                  "userId": {
+                    "type": "string",
+                    "description": "userId parameter (optional)"
+                  },
+                  "resource": {
+                    "type": "string",
+                    "description": "resource parameter (optional)"
+                  },
+                  "details": {
+                    "type": "string",
+                    "description": "details parameter (optional)"
+                  },
+                  "metadata": {
+                    "type": "string",
+                    "description": "metadata parameter (optional)"
+                  }
+                },
+                "required": [
+                  "eventType",
+                  "category",
+                  "userIp",
+                  "action"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/docker/images": {
+      "get": {
+        "summary": "GET /api/docker/images",
+        "tags": [
+          "Docker"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/docker/info": {
+      "get": {
+        "summary": "GET /api/docker/info",
+        "tags": [
+          "Docker"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/docker/search": {
+      "get": {
+        "summary": "GET /api/docker/search",
+        "tags": [
+          "Docker"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "Health check endpoint",
+        "description": "Returns system health status and configuration details",
+        "tags": [
+          "Health"
+        ],
+        "responses": {
+          "200": {
+            "description": "System is healthy or degraded but operational",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "healthy",
+                        "unhealthy",
+                        "degraded"
+                      ]
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "uptime": {
+                      "type": "number"
+                    },
+                    "checks": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Health checks are disabled"
+          },
+          "503": {
+            "description": "System is unhealthy"
+          }
+        }
+      },
+      "head": {
+        "summary": "HEAD /api/health",
+        "tags": [
+          "Health"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/image/{name}/scan/{scanId}/{reportType}": {
+      "get": {
+        "summary": "GET /api/image/{name}/scan/{scanId}/{reportType}",
+        "tags": [
+          "Image"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "name parameter"
+          },
+          {
+            "name": "scanId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "scanId parameter"
+          },
+          {
+            "name": "reportType",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "reportType parameter"
+          }
+        ]
+      }
+    },
+    "/api/image/{name}/scan/{scanId}/download": {
+      "get": {
+        "summary": "GET /api/image/{name}/scan/{scanId}/download",
+        "tags": [
+          "Image"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "name parameter"
+          },
+          {
+            "name": "scanId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "scanId parameter"
+          }
+        ]
+      }
+    },
+    "/api/images/{id}/cve-classifications/{cveId}": {
+      "get": {
+        "summary": "GET /api/images/{id}/cve-classifications/{cveId}",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          },
+          {
+            "name": "cveId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "cveId parameter"
+          }
+        ]
+      },
+      "put": {
+        "summary": "PUT /api/images/{id}/cve-classifications/{cveId}",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          },
+          {
+            "name": "cveId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "cveId parameter"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "isFalsePositive": {
+                    "type": "boolean",
+                    "description": "isFalsePositive parameter (optional)"
+                  },
+                  "comment": {
+                    "type": "string",
+                    "description": "comment parameter (optional)"
+                  },
+                  "createdBy": {
+                    "type": "string",
+                    "description": "createdBy parameter (optional)"
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "DELETE /api/images/{id}/cve-classifications/{cveId}",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          },
+          {
+            "name": "cveId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "cveId parameter"
+          }
+        ]
+      }
+    },
+    "/api/images/{id}/cve-classifications": {
+      "get": {
+        "summary": "GET /api/images/{id}/cve-classifications",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ]
+      },
+      "post": {
+        "summary": "POST /api/images/{id}/cve-classifications",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cveId": {
+                    "type": "string",
+                    "description": "cveId parameter"
+                  },
+                  "packageName": {
+                    "type": "string",
+                    "description": "packageName parameter"
+                  },
+                  "isFalsePositive": {
+                    "type": "boolean",
+                    "description": "isFalsePositive parameter (optional)"
+                  },
+                  "comment": {
+                    "type": "string",
+                    "description": "comment parameter (optional)"
+                  },
+                  "createdBy": {
+                    "type": "string",
+                    "description": "createdBy parameter (optional)"
+                  }
+                },
+                "required": [
+                  "cveId",
+                  "packageName"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/images/{id}/recalculate-risk": {
+      "post": {
+        "summary": "POST /api/images/{id}/recalculate-risk",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ]
+      }
+    },
+    "/api/images/{id}": {
+      "get": {
+        "summary": "GET /api/images/{id}",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ]
+      }
+    },
+    "/api/images/name/{name}/cve-classifications": {
+      "get": {
+        "summary": "GET /api/images/name/{name}/cve-classifications",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "name parameter"
+          }
+        ]
+      },
+      "post": {
+        "summary": "POST /api/images/name/{name}/cve-classifications",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "name parameter"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cveId": {
+                    "type": "string",
+                    "description": "cveId parameter"
+                  },
+                  "isFalsePositive": {
+                    "type": "boolean",
+                    "description": "isFalsePositive parameter (optional)"
+                  },
+                  "comment": {
+                    "type": "string",
+                    "description": "comment parameter (optional)"
+                  },
+                  "createdBy": {
+                    "type": "string",
+                    "description": "createdBy parameter (optional)"
+                  }
+                },
+                "required": [
+                  "cveId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/images/name/{name}": {
+      "get": {
+        "summary": "GET /api/images/name/{name}",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "name parameter"
+          }
+        ]
+      },
+      "delete": {
+        "summary": "DELETE /api/images/name/{name}",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "name parameter"
+          }
+        ]
+      }
+    },
+    "/api/images": {
+      "get": {
+        "summary": "List container images",
+        "description": "Retrieve a paginated list of scanned container images",
+        "tags": [
+          "Images"
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 25
+            },
+            "description": "Number of images to return"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            },
+            "description": "Number of images to skip"
+          },
+          {
+            "name": "includeScans",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Include scan history"
+          },
+          {
+            "name": "includeVulnerabilities",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Include vulnerability details"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of images retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "images": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Image"
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "type": "integer"
+                        },
+                        "hasMore": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/openapi.json": {
+      "get": {
+        "summary": "GET /api/openapi.json",
+        "tags": [
+          "Openapi.json"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/ready": {
+      "get": {
+        "summary": "GET /api/ready",
+        "tags": [
+          "Ready"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      },
+      "head": {
+        "summary": "HEAD /api/ready",
+        "tags": [
+          "Ready"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/repositories/{id}/images/{imageName}/tags": {
+      "get": {
+        "summary": "GET /api/repositories/{id}/images/{imageName}/tags",
+        "tags": [
+          "Repositories"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          },
+          {
+            "name": "imageName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "imageName parameter"
+          }
+        ]
+      }
+    },
+    "/api/repositories/{id}/images": {
+      "get": {
+        "summary": "GET /api/repositories/{id}/images",
+        "tags": [
+          "Repositories"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ]
+      }
+    },
+    "/api/repositories/{id}": {
+      "delete": {
+        "summary": "DELETE /api/repositories/{id}",
+        "tags": [
+          "Repositories"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ]
+      }
+    },
+    "/api/repositories/{id}/test": {
+      "post": {
+        "summary": "POST /api/repositories/{id}/test",
+        "tags": [
+          "Repositories"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ]
+      }
+    },
+    "/api/repositories": {
+      "get": {
+        "summary": "GET /api/repositories",
+        "tags": [
+          "Repositories"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/repositories",
+        "tags": [
+          "Repositories"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "name parameter"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "type parameter"
+                  },
+                  "registryUrl": {
+                    "type": "string",
+                    "description": "registryUrl parameter"
+                  },
+                  "username": {
+                    "type": "string",
+                    "description": "username parameter"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "password parameter"
+                  },
+                  "organization": {
+                    "type": "string",
+                    "description": "organization parameter"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repositories/test": {
+      "post": {
+        "summary": "POST /api/repositories/test",
+        "tags": [
+          "Repositories"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "description": "type parameter"
+                  },
+                  "registryUrl": {
+                    "type": "string",
+                    "description": "registryUrl parameter"
+                  },
+                  "username": {
+                    "type": "string",
+                    "description": "username parameter"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "password parameter"
+                  },
+                  "organization": {
+                    "type": "string",
+                    "description": "organization parameter"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scanners/available": {
+      "get": {
+        "summary": "GET /api/scanners/available",
+        "tags": [
+          "Scanners"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/scans/{id}": {
+      "get": {
+        "summary": "GET /api/scans/{id}",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ]
+      },
+      "patch": {
+        "summary": "PATCH /api/scans/{id}",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ]
+      },
+      "delete": {
+        "summary": "DELETE /api/scans/{id}",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ]
+      }
+    },
+    "/api/scans/aggregated": {
+      "get": {
+        "summary": "GET /api/scans/aggregated",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/scans/bulk/{batchId}/cancel": {
+      "post": {
+        "summary": "POST /api/scans/bulk/{batchId}/cancel",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "batchId parameter"
+          }
+        ]
+      }
+    },
+    "/api/scans/bulk/{batchId}": {
+      "get": {
+        "summary": "GET /api/scans/bulk/{batchId}",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "batchId parameter"
+          }
+        ]
+      },
+      "delete": {
+        "summary": "DELETE /api/scans/bulk/{batchId}",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "batchId parameter"
+          }
+        ]
+      }
+    },
+    "/api/scans/bulk": {
+      "post": {
+        "summary": "POST /api/scans/bulk",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "name parameter (optional)"
+                  },
+                  "patterns": {
+                    "type": "object",
+                    "description": "patterns parameter (optional)"
+                  },
+                  "registryPattern": {
+                    "type": "string",
+                    "description": "registryPattern parameter (optional)"
+                  },
+                  "tagPattern": {
+                    "type": "string",
+                    "description": "tagPattern parameter (optional)"
+                  },
+                  "excludeTagPattern": {
+                    "type": "string",
+                    "description": "excludeTagPattern parameter (optional)"
+                  },
+                  "options": {
+                    "type": "object",
+                    "description": "options parameter (optional)"
+                  },
+                  "scanners": {
+                    "type": "object",
+                    "description": "scanners parameter (optional)"
+                  },
+                  "grype": {
+                    "type": "boolean",
+                    "description": "grype parameter (optional)"
+                  },
+                  "syft": {
+                    "type": "boolean",
+                    "description": "syft parameter (optional)"
+                  },
+                  "dockle": {
+                    "type": "boolean",
+                    "description": "dockle parameter (optional)"
+                  },
+                  "osv": {
+                    "type": "boolean",
+                    "description": "osv parameter (optional)"
+                  },
+                  "dive": {
+                    "type": "boolean",
+                    "description": "dive parameter (optional)"
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "GET /api/scans/bulk",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/scans/cancel/{requestId}": {
+      "post": {
+        "summary": "POST /api/scans/cancel/{requestId}",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "requestId parameter"
+          }
+        ]
+      }
+    },
+    "/api/scans/events/{requestId}": {
+      "get": {
+        "summary": "GET /api/scans/events/{requestId}",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "requestId parameter"
+          }
+        ]
+      }
+    },
+    "/api/scans/jobs": {
+      "get": {
+        "summary": "GET /api/scans/jobs",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/scans/local-bulk": {
+      "post": {
+        "summary": "POST /api/scans/local-bulk",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/scans/queue": {
+      "get": {
+        "summary": "GET /api/scans/queue",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      },
+      "delete": {
+        "summary": "DELETE /api/scans/queue",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/scans": {
+      "get": {
+        "summary": "GET /api/scans",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/scans/start": {
+      "post": {
+        "summary": "Start a new container scan",
+        "description": "Initiates a security scan for a container image",
+        "tags": [
+          "Scans"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "image",
+                  "tag"
+                ],
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "description": "Image name",
+                    "example": "nginx"
+                  },
+                  "tag": {
+                    "type": "string",
+                    "description": "Image tag",
+                    "example": "latest"
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "registry",
+                      "local"
+                    ],
+                    "description": "Image source"
+                  },
+                  "dockerImageId": {
+                    "type": "string",
+                    "description": "Docker image ID for local images"
+                  },
+                  "repositoryId": {
+                    "type": "string",
+                    "description": "Repository ID for private registries"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Scan started successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "requestId": {
+                      "type": "string",
+                      "description": "Unique scan request ID"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/scans/status/{requestId}": {
+      "get": {
+        "summary": "GET /api/scans/status/{requestId}",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "requestId parameter"
+          }
+        ]
+      }
+    },
+    "/api/scans/upload": {
+      "post": {
+        "summary": "POST /api/scans/upload",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "requestId": {
+                    "type": "string",
+                    "description": "requestId parameter"
+                  },
+                  "image": {
+                    "type": "object",
+                    "description": "image parameter"
+                  },
+                  "tag": {
+                    "type": "string",
+                    "description": "tag parameter"
+                  },
+                  "registry": {
+                    "type": "string",
+                    "description": "registry parameter (optional)"
+                  },
+                  "digest": {
+                    "type": "string",
+                    "description": "digest parameter"
+                  },
+                  "platform": {
+                    "type": "string",
+                    "description": "platform parameter (optional)"
+                  },
+                  "sizeBytes": {
+                    "type": "number",
+                    "description": "sizeBytes parameter (optional)"
+                  },
+                  "scan": {
+                    "type": "object",
+                    "description": "scan parameter"
+                  },
+                  "finishedAt": {
+                    "type": "string",
+                    "description": "finishedAt parameter (optional)"
+                  },
+                  "status": {
+                    "type": "string",
+                    "description": "status parameter"
+                  },
+                  "reportsDir": {
+                    "type": "string",
+                    "description": "reportsDir parameter (optional)"
+                  },
+                  "errorMessage": {
+                    "type": "string",
+                    "description": "errorMessage parameter (optional)"
+                  },
+                  "scannerVersions": {
+                    "type": "string",
+                    "description": "scannerVersions parameter"
+                  },
+                  "scanConfig": {
+                    "type": "string",
+                    "description": "scanConfig parameter"
+                  },
+                  "reports": {
+                    "type": "object",
+                    "description": "reports parameter (optional)"
+                  },
+                  "grype": {
+                    "type": "string",
+                    "description": "grype parameter (optional)"
+                  },
+                  "syft": {
+                    "type": "string",
+                    "description": "syft parameter (optional)"
+                  },
+                  "dockle": {
+                    "type": "string",
+                    "description": "dockle parameter (optional)"
+                  },
+                  "metadata": {
+                    "type": "string",
+                    "description": "metadata parameter (optional)"
+                  }
+                },
+                "required": [
+                  "requestId",
+                  "image",
+                  "tag",
+                  "digest",
+                  "scan",
+                  "status",
+                  "scannerVersions",
+                  "scanConfig"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "GET /api/scans/upload",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/version": {
+      "get": {
+        "summary": "GET /api/version",
+        "tags": [
+          "Version"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      },
+      "head": {
+        "summary": "HEAD /api/version",
+        "tags": [
+          "Version"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/vulnerabilities": {
+      "get": {
+        "summary": "GET /api/vulnerabilities",
+        "tags": [
+          "Vulnerabilities"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "details": {
+            "type": "string",
+            "description": "Additional error details"
+          }
+        }
+      },
+      "ScanStatus": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "Unique scan request ID"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "processing",
+              "completed",
+              "error",
+              "cancelled"
+            ],
+            "description": "Current scan status"
+          },
+          "progress": {
+            "type": "object",
+            "properties": {
+              "current": {
+                "type": "number",
+                "description": "Current step"
+              },
+              "total": {
+                "type": "number",
+                "description": "Total steps"
+              },
+              "percentage": {
+                "type": "number",
+                "description": "Progress percentage"
+              }
+            }
+          },
+          "results": {
+            "type": "object",
+            "description": "Scan results when completed"
+          },
+          "error": {
+            "type": "string",
+            "description": "Error message if failed"
+          }
+        }
+      },
+      "Image": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Image ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Image name"
+          },
+          "tag": {
+            "type": "string",
+            "description": "Image tag"
+          },
+          "repository": {
+            "type": "string",
+            "description": "Repository name"
+          },
+          "riskScore": {
+            "type": "number",
+            "description": "Risk score (0-100)"
+          },
+          "vulnerabilities": {
+            "type": "object",
+            "properties": {
+              "critical": {
+                "type": "number"
+              },
+              "high": {
+                "type": "number"
+              },
+              "medium": {
+                "type": "number"
+              },
+              "low": {
+                "type": "number"
+              },
+              "negligible": {
+                "type": "number"
+              }
+            }
+          },
+          "lastScanned": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last scan timestamp"
+          }
+        }
+      },
+      "Repository": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Repository ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Repository name"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "dockerhub",
+              "ghcr",
+              "ecr",
+              "gcr",
+              "acr",
+              "harbor",
+              "quay",
+              "custom"
+            ],
+            "description": "Repository type"
+          },
+          "url": {
+            "type": "string",
+            "description": "Repository URL"
+          },
+          "isPublic": {
+            "type": "boolean",
+            "description": "Whether repository is public"
+          }
+        }
+      },
+      "Vulnerability": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Vulnerability ID (CVE)"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "CRITICAL",
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "NEGLIGIBLE"
+            ],
+            "description": "Vulnerability severity"
+          },
+          "title": {
+            "type": "string",
+            "description": "Vulnerability title"
+          },
+          "description": {
+            "type": "string",
+            "description": "Vulnerability description"
+          },
+          "cvss": {
+            "type": "object",
+            "properties": {
+              "score": {
+                "type": "number"
+              },
+              "vector": {
+                "type": "string"
+              }
+            }
+          },
+          "fixedVersion": {
+            "type": "string",
+            "description": "Version with fix"
+          },
+          "installedVersion": {
+            "type": "string",
+            "description": "Currently installed version"
+          },
+          "packageName": {
+            "type": "string",
+            "description": "Affected package name"
+          }
+        }
+      }
+    }
+  }
+}

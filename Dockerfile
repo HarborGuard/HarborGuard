@@ -8,7 +8,9 @@ RUN npm ci --ignore-scripts
 
 COPY . .
 RUN npx prisma generate
-RUN npm run build
+# Generate static OpenAPI spec before build
+RUN npm run generate:openapi || true
+RUN npm run build:docker
 
 # ---- 2) Runtime + scanners ----
 FROM node:20-alpine AS runtime

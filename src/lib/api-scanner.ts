@@ -284,9 +284,11 @@ function scanDirectory(dir: string): ApiRoute[] {
   const routes: ApiRoute[] = [];
   
   if (!fs.existsSync(dir)) {
+    console.log(`[API Scanner] Directory does not exist: ${dir}`);
     return routes;
   }
   
+  console.log(`[API Scanner] Scanning directory: ${dir}`);
   const files = fs.readdirSync(dir);
   
   for (const file of files) {
