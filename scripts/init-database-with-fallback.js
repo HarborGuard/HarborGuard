@@ -145,7 +145,7 @@ async function initializeWithFallback() {
     let usingBundled = false;
     
     // Check if DATABASE_URL is provided and valid
-    if (databaseUrl && databaseUrl !== '' && databaseUrl !== 'postgresql://harborguard:harborguard@localhost:5432/harborguard?sslmode=disable') {
+    if (databaseUrl && databaseUrl !== '') {
       console.log('[DB] External DATABASE_URL provided, testing connection...');
       
       // Test the external database connection

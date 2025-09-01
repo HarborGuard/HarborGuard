@@ -25,12 +25,12 @@ ARG DIVE_VERSION=0.13.1
 # Install Prisma CLI only (minimal size)
 RUN npm install -g prisma@6.14.0 --no-save
 
-# Install PostgreSQL 16
+# Install PostgreSQL 16 and other dependencies
 RUN apk add --no-cache \
     postgresql16 \
     postgresql16-client \
     postgresql16-contrib \
-    ca-certificates skopeo curl tar gzip xz gnupg docker-cli \
+    ca-certificates skopeo curl tar gzip xz gnupg docker-cli openssl \
   && set -eux \
   # Install Trivy
   && curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin "${TRIVY_VERSION}" \
@@ -81,53 +81,10 @@ COPY --from=builder /app/src/generated ./src/generated
 COPY --from=builder /app/scripts ./scripts
 
 ENV PORT=3000
-# Default PostgreSQL settings for bundled database (used only if DATABASE_URL is not provided)
-ENV POSTGRES_USER=harborguard
-ENV POSTGRES_PASSWORD=harborguard
-ENV POSTGRES_DB=harborguard
 
-# Create startup script
-RUN echo '#!/bin/sh' > /start.sh && \
-    echo 'set -e' >> /start.sh && \
-    echo '' >> /start.sh && \
-    echo '# Check if external DATABASE_URL is provided' >> /start.sh && \
-    echo 'if [ -z "$DATABASE_URL" ] || [ "$DATABASE_URL" = "postgresql://harborguard:harborguard@localhost:5432/harborguard?sslmode=disable" ]; then' >> /start.sh && \
-    echo '  echo "No external DATABASE_URL provided, using bundled PostgreSQL"' >> /start.sh && \
-    echo '  USE_BUNDLED_PG=true' >> /start.sh && \
-    echo '  export DATABASE_URL="postgresql://harborguard:harborguard@localhost:5432/harborguard?sslmode=disable"' >> /start.sh && \
-    echo 'else' >> /start.sh && \
-    echo '  echo "External DATABASE_URL provided, will attempt to connect"' >> /start.sh && \
-    echo '  USE_BUNDLED_PG=false' >> /start.sh && \
-    echo 'fi' >> /start.sh && \
-    echo '' >> /start.sh && \
-    echo '# Start bundled PostgreSQL if needed' >> /start.sh && \
-    echo 'if [ "$USE_BUNDLED_PG" = "true" ]; then' >> /start.sh && \
-    echo '  # Initialize PostgreSQL if needed' >> /start.sh && \
-    echo '  if [ ! -s "$PGDATA/PG_VERSION" ]; then' >> /start.sh && \
-    echo '    echo "Initializing bundled PostgreSQL database..."' >> /start.sh && \
-    echo '    su - postgres -c "initdb -D $PGDATA --auth-local=trust --auth-host=scram-sha-256"' >> /start.sh && \
-    echo '    echo "host all all 127.0.0.1/32 trust" >> $PGDATA/pg_hba.conf' >> /start.sh && \
-    echo '    echo "host all all ::1/128 trust" >> $PGDATA/pg_hba.conf' >> /start.sh && \
-    echo '  fi' >> /start.sh && \
-    echo '  ' >> /start.sh && \
-    echo '  # Start PostgreSQL' >> /start.sh && \
-    echo '  echo "Starting bundled PostgreSQL..."' >> /start.sh && \
-    echo '  su - postgres -c "pg_ctl -D $PGDATA -l /var/lib/postgresql/logfile start"' >> /start.sh && \
-    echo '  sleep 3' >> /start.sh && \
-    echo '  ' >> /start.sh && \
-    echo '  # Create database and user if needed' >> /start.sh && \
-    echo '  su - postgres -c "psql -tc \"SELECT 1 FROM pg_user WHERE usename = '"'"'harborguard'"'"'\" | grep -q 1 || psql -c \"CREATE USER harborguard WITH PASSWORD '"'"'harborguard'"'"';\""' >> /start.sh && \
-    echo '  su - postgres -c "psql -tc \"SELECT 1 FROM pg_database WHERE datname = '"'"'harborguard'"'"'\" | grep -q 1 || psql -c \"CREATE DATABASE harborguard OWNER harborguard;\""' >> /start.sh && \
-    echo 'fi' >> /start.sh && \
-    echo '' >> /start.sh && \
-    echo '# Initialize database schema with fallback' >> /start.sh && \
-    echo 'echo "Initializing database schema..."' >> /start.sh && \
-    echo 'node scripts/init-database-with-fallback.js' >> /start.sh && \
-    echo '' >> /start.sh && \
-    echo '# Start the application' >> /start.sh && \
-    echo 'echo "Starting HarborGuard..."' >> /start.sh && \
-    echo 'exec node server.js' >> /start.sh && \
-    chmod +x /start.sh
+# Copy and make startup script executable
+COPY scripts/start.sh /start.sh
+RUN chmod +x /start.sh
 
 USER root
 EXPOSE 3000 5432
