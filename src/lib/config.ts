@@ -57,7 +57,7 @@ function parseEnvConfig(): AppConfig {
     
     // Network
     port: parseInt(process.env.PORT || '3000'),
-    bindAddress: process.env.BIND_ADDRESS || '0.0.0.0',
+    bindAddress: process.env.HOSTNAME || '0.0.0.0',
     
     // Notifications
     teamsWebhookUrl: process.env.TEAMS_WEBHOOK_URL,
@@ -74,7 +74,7 @@ function parseEnvConfig(): AppConfig {
     versionCheckEnabled: process.env.VERSION_CHECK_ENABLED?.toLowerCase() !== 'false',
     
     // Database
-    databaseUrl: process.env.DATABASE_URL || 'file:./dev.db'
+    databaseUrl: process.env.DATABASE_URL || 'postgresql://harborguard:harborguard@localhost:5432/harborguard?sslmode=disable'
   };
 }
 

@@ -44,7 +44,5 @@ next-env.d.ts
 /.claude
 /docs
 
-# local development database
-dev.db
-dev.db-journal
-/prisma/dev.db
+# PostgreSQL data directory
+/var/lib/postgresql/data

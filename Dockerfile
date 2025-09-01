@@ -7,12 +7,12 @@ COPY package.json package-lock.json* pnpm-lock.yaml* yarn.lock* ./
 RUN npm ci --ignore-scripts
 
 COPY . .
-RUN npx prisma generate
-# Generate static OpenAPI spec before build
-RUN npm run generate:openapi || true
+RUN mv .env.example .env
+
+# Build will now generate Prisma client automatically
 RUN npm run build:docker
 
-# ---- 2) Runtime + scanners ----
+# ---- 2) Runtime + scanners + PostgreSQL ----
 FROM node:20-alpine AS runtime
 WORKDIR /app
 
@@ -25,8 +25,12 @@ ARG DIVE_VERSION=0.13.1
 # Install Prisma CLI only (minimal size)
 RUN npm install -g prisma@6.14.0 --no-save
 
+# Install PostgreSQL 16 and other dependencies
 RUN apk add --no-cache \
-    ca-certificates skopeo curl tar gzip xz gnupg docker-cli \
+    postgresql16 \
+    postgresql16-client \
+    postgresql16-contrib \
+    ca-certificates skopeo curl tar gzip xz gnupg docker-cli openssl \
   && set -eux \
   # Install Trivy
   && curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin "${TRIVY_VERSION}" \
@@ -54,13 +58,21 @@ RUN apk add --no-cache \
   && chmod +x /usr/local/bin/dockle \
   && rm -rf /var/cache/apk/* /tmp/* /var/tmp/*
 
-ENV TRIVY_CACHE_DIR=/opt/trivy-cache \
-    GRYPE_DB_CACHE_DIR=/opt/grype-cache \
-    SYFT_CACHE_DIR=/opt/syft-cache
-RUN mkdir -p "$TRIVY_CACHE_DIR" "$GRYPE_DB_CACHE_DIR" "$SYFT_CACHE_DIR"
+ENV TRIVY_CACHE_DIR=/workspace/cache/trivy \
+    GRYPE_DB_CACHE_DIR=/workspace/cache/grype \
+    SYFT_CACHE_DIR=/workspace/cache/syft
 
 RUN mkdir -p /workspace && chown node:node /workspace
+RUN mkdir -p /workspace/cache/trivy/db /workspace/cache/grype /workspace/cache/syft /workspace/cache/dockle && \
+    chmod -R 755 /workspace/cache
+
+# Setup PostgreSQL
+RUN mkdir -p /var/lib/postgresql/data /run/postgresql && \
+    chown -R postgres:postgres /var/lib/postgresql /run/postgresql && \
+    chmod 700 /var/lib/postgresql/data
+
 ENV NODE_ENV=production
+ENV PGDATA=/var/lib/postgresql/data
 
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
@@ -69,13 +81,17 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/src/generated ./src/generated
 COPY --from=builder /app/scripts ./scripts
 
-ENV DATABASE_URL="file:./app.db"
 ENV PORT=3000
+
+# Copy and make startup script executable
+COPY scripts/start.sh /start.sh
+RUN chmod +x /start.sh
+
 USER root
-EXPOSE 3000
+EXPOSE 3000 5432
 
 # Health check using the /api/health endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD curl -f http://localhost:${PORT:-3000}/api/health || exit 1
 
-CMD ["sh", "-c", "node scripts/init-database.js && node server.js"]
+CMD ["/start.sh"]
