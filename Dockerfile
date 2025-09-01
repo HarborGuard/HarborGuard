@@ -12,7 +12,7 @@ RUN npx prisma generate
 RUN npm run generate:openapi || true
 RUN npm run build:docker
 
-# ---- 2) Runtime + scanners ----
+# ---- 2) Runtime + scanners + PostgreSQL ----
 FROM node:20-alpine AS runtime
 WORKDIR /app
 
@@ -25,7 +25,11 @@ ARG DIVE_VERSION=0.13.1
 # Install Prisma CLI only (minimal size)
 RUN npm install -g prisma@6.14.0 --no-save
 
+# Install PostgreSQL 16
 RUN apk add --no-cache \
+    postgresql16 \
+    postgresql16-client \
+    postgresql16-contrib \
     ca-certificates skopeo curl tar gzip xz gnupg docker-cli \
   && set -eux \
   # Install Trivy
@@ -60,7 +64,14 @@ ENV TRIVY_CACHE_DIR=/opt/trivy-cache \
 RUN mkdir -p "$TRIVY_CACHE_DIR" "$GRYPE_DB_CACHE_DIR" "$SYFT_CACHE_DIR"
 
 RUN mkdir -p /workspace && chown node:node /workspace
+
+# Setup PostgreSQL
+RUN mkdir -p /var/lib/postgresql/data /run/postgresql && \
+    chown -R postgres:postgres /var/lib/postgresql /run/postgresql && \
+    chmod 700 /var/lib/postgresql/data
+
 ENV NODE_ENV=production
+ENV PGDATA=/var/lib/postgresql/data
 
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
@@ -69,13 +80,47 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/src/generated ./src/generated
 COPY --from=builder /app/scripts ./scripts
 
-ENV DATABASE_URL="file:./app.db"
+ENV DATABASE_URL="postgresql://harborguard:harborguard@localhost:5432/harborguard?sslmode=disable"
 ENV PORT=3000
+ENV POSTGRES_USER=harborguard
+ENV POSTGRES_PASSWORD=harborguard
+ENV POSTGRES_DB=harborguard
+
+# Create startup script
+RUN echo '#!/bin/sh' > /start.sh && \
+    echo 'set -e' >> /start.sh && \
+    echo '' >> /start.sh && \
+    echo '# Initialize PostgreSQL if needed' >> /start.sh && \
+    echo 'if [ ! -s "$PGDATA/PG_VERSION" ]; then' >> /start.sh && \
+    echo '  echo "Initializing PostgreSQL database..."' >> /start.sh && \
+    echo '  su - postgres -c "initdb -D $PGDATA --auth-local=trust --auth-host=scram-sha-256"' >> /start.sh && \
+    echo '  echo "host all all 127.0.0.1/32 trust" >> $PGDATA/pg_hba.conf' >> /start.sh && \
+    echo '  echo "host all all ::1/128 trust" >> $PGDATA/pg_hba.conf' >> /start.sh && \
+    echo 'fi' >> /start.sh && \
+    echo '' >> /start.sh && \
+    echo '# Start PostgreSQL' >> /start.sh && \
+    echo 'echo "Starting PostgreSQL..."' >> /start.sh && \
+    echo 'su - postgres -c "pg_ctl -D $PGDATA -l /var/lib/postgresql/logfile start"' >> /start.sh && \
+    echo 'sleep 3' >> /start.sh && \
+    echo '' >> /start.sh && \
+    echo '# Create database and user if needed' >> /start.sh && \
+    echo 'su - postgres -c "psql -tc \"SELECT 1 FROM pg_user WHERE usename = '"'"'$POSTGRES_USER'"'"'\" | grep -q 1 || psql -c \"CREATE USER $POSTGRES_USER WITH PASSWORD '"'"'$POSTGRES_PASSWORD'"'"';\""' >> /start.sh && \
+    echo 'su - postgres -c "psql -tc \"SELECT 1 FROM pg_database WHERE datname = '"'"'$POSTGRES_DB'"'"'\" | grep -q 1 || psql -c \"CREATE DATABASE $POSTGRES_DB OWNER $POSTGRES_USER;\""' >> /start.sh && \
+    echo '' >> /start.sh && \
+    echo '# Initialize database schema' >> /start.sh && \
+    echo 'echo "Initializing database schema..."' >> /start.sh && \
+    echo 'node scripts/init-database.js' >> /start.sh && \
+    echo '' >> /start.sh && \
+    echo '# Start the application' >> /start.sh && \
+    echo 'echo "Starting HarborGuard..."' >> /start.sh && \
+    echo 'exec node server.js' >> /start.sh && \
+    chmod +x /start.sh
+
 USER root
-EXPOSE 3000
+EXPOSE 3000 5432
 
 # Health check using the /api/health endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD curl -f http://localhost:${PORT:-3000}/api/health || exit 1
 
-CMD ["sh", "-c", "node scripts/init-database.js && node server.js"]
+CMD ["/start.sh"]

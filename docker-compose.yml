@@ -8,7 +8,10 @@ services:
     environment:
       # Core configuration
       - NODE_ENV=production
-      - DATABASE_URL=file:./app.db
+      - DATABASE_URL=postgresql://harborguard:harborguard@localhost:5432/harborguard?sslmode=disable
+      - POSTGRES_USER=harborguard
+      - POSTGRES_PASSWORD=harborguard
+      - POSTGRES_DB=harborguard
       # Network
       - PORT=3000
       - HOSTNAME=0.0.0.0 
