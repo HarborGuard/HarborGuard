@@ -71,7 +71,6 @@ COPY --from=builder /app/scripts ./scripts
 
 ENV DATABASE_URL="file:./app.db"
 ENV PORT=3000
-ENV HOSTNAME=0.0.0.0
 USER root
 EXPOSE 3000
 
