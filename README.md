@@ -304,7 +304,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - 🐛 [Report Issues](https://github.com/HarborGuard/HarborGuard/issues)
 - 💬 [Discussions](https://github.com/HarborGuard/HarborGuard/discussions)
-- 📧 [Email Support](mailto:support@harborguard.io)
+- 📧 [Email Support](mailto:hello@harborguard.co)
 
 ## Acknowledgments
 
