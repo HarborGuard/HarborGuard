@@ -1,9 +1,12 @@
+'use client';
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { IconBrandGithub, IconClipboard } from "@tabler/icons-react";
+import { IconBrandGithub } from "@tabler/icons-react";
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -13,18 +16,12 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { LogsIcon, BookOpenIcon } from "lucide-react";
+import { generateBreadcrumbs } from "@/lib/breadcrumb-utils";
 
-interface BreadcrumbItem {
-  label: string;
-  href?: string;
-}
-
-interface SiteHeaderProps {
-  breadcrumbs?: BreadcrumbItem[];
-}
-
-export function SiteHeader({ breadcrumbs }: SiteHeaderProps) {
+export function SiteHeader() {
+  const pathname = usePathname();
   const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+  const breadcrumbs = generateBreadcrumbs(pathname);
   
   return (
     <header className="sticky top-0 z-50 flex h-(--header-height) shrink-0 items-center gap-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
@@ -34,28 +31,24 @@ export function SiteHeader({ breadcrumbs }: SiteHeaderProps) {
           orientation="vertical"
           className="mx-2 data-[orientation=vertical]:h-4"
         />
-        {breadcrumbs ? (
-          <Breadcrumb>
-            <BreadcrumbList>
-              {breadcrumbs.map((item, index) => (
-                <div key={index} className="flex items-center">
-                  <BreadcrumbItem>
-                    {item.href ? (
-                      <BreadcrumbLink asChild>
-                        <Link href={item.href}>{item.label}</Link>
-                      </BreadcrumbLink>
-                    ) : (
-                      <BreadcrumbPage>{item.label}</BreadcrumbPage>
-                    )}
-                  </BreadcrumbItem>
-                  {index < breadcrumbs.length - 1 && <BreadcrumbSeparator />}
-                </div>
-              ))}
-            </BreadcrumbList>
-          </Breadcrumb>
-        ) : (
-          <h1 className="text-base font-medium">Dashboard</h1>
-        )}
+        <Breadcrumb>
+          <BreadcrumbList>
+            {breadcrumbs.map((item, index) => (
+              <div key={index} className="flex items-center">
+                <BreadcrumbItem>
+                  {item.href ? (
+                    <BreadcrumbLink asChild>
+                      <Link href={item.href}>{item.label}</Link>
+                    </BreadcrumbLink>
+                  ) : (
+                    <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                  )}
+                </BreadcrumbItem>
+                {index < breadcrumbs.length - 1 && <BreadcrumbSeparator />}
+              </div>
+            ))}
+          </BreadcrumbList>
+        </Breadcrumb>
         
         {/* Demo Mode Badge */}
         {isDemoMode && (
