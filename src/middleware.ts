@@ -63,8 +63,10 @@ async function logPageView(request: NextRequest, pathname: string) {
     
     // Make an API call to log the page view
     const port = process.env.PORT || '3000';
+    // Use localhost for internal API calls when HOSTNAME is 0.0.0.0
+    const internalHost = process.env.HOSTNAME === '0.0.0.0' ? 'localhost' : process.env.HOSTNAME;
     const baseUrl = process.env.HOSTNAME 
-      ? `http://${process.env.HOSTNAME}:${port}`
+      ? `http://${internalHost}:${port}`
       : request.nextUrl.origin;
     await fetch(`${baseUrl}/api/audit-logs`, {
       method: 'POST',
