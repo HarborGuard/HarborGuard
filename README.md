@@ -49,11 +49,11 @@ Harbor Guard supports comprehensive configuration through environment variables.
 | **Logging & Debugging** |
 | `LOG_LEVEL` | Controls application log verbosity | `info` | `debug`, `info`, `warn`, `error` | `LOG_LEVEL=debug` |
 | **Database & Maintenance** |
-| `DATABASE_URL` | Database connection string | `file:./dev.db` | SQLite: `file:./db.sqlite`<br>PostgreSQL: `postgresql://user:pass@host:port/db` | `DATABASE_URL="postgresql://user:pass@localhost:5432/harborguard"` |
+| `DATABASE_URL` | PostgreSQL database connection string | Bundled PostgreSQL | External PostgreSQL: `postgresql://user:pass@host:port/db` | `DATABASE_URL="postgresql://user:pass@localhost:5432/harborguard"` |
 | `CLEANUP_OLD_SCANS_DAYS` | Automatically delete scans older than specified days | `30` | `1-365` | `CLEANUP_OLD_SCANS_DAYS=90` |
 | **Network & Deployment** |
 | `PORT` | Server listening port | `3000` | `1000-65535` | `PORT=8080` |
-| `BIND_ADDRESS` | Server bind address | `0.0.0.0` | Valid IP address | `BIND_ADDRESS=127.0.0.1` |
+| `HOSTNAME` | Server bind address | `0.0.0.0` | Valid IP address | `HOSTNAME=127.0.0.1` |
 | **Notifications** |
 | `TEAMS_WEBHOOK_URL` | Microsoft Teams webhook URL for notifications | *none* | Valid HTTPS URL | `TEAMS_WEBHOOK_URL=https://outlook.office.com/webhook/...` |
 | `SLACK_WEBHOOK_URL` | Slack webhook URL for notifications | *none* | Valid HTTPS URL | `SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...` |
@@ -160,7 +160,7 @@ npm install
 npm run db:init
 ```
 
-> **Database Options**: Harbor Guard supports both SQLite (default) and PostgreSQL. See [Database Configuration Guide](DATABASE.md) for detailed setup instructions.
+> **Database**: Harbor Guard uses PostgreSQL. It includes a bundled PostgreSQL instance, or you can connect to an external database via `DATABASE_URL`. See [Database Configuration Guide](DATABASE.md) for detailed setup instructions.
 
 4. Start the development server:
 ```bash
@@ -245,7 +245,7 @@ The platform employs several innovative approaches to vulnerability data visuali
 ### 🚀 Developer Experience
 - Modern React 19 + Next.js 15 architecture
 - TypeScript for type safety
-- Prisma ORM with SQLite/PostgreSQL support
+- Prisma ORM with PostgreSQL
 - Automatic database fallback for reliability
 - Tailwind CSS for styling
 - shadcn/ui component library
@@ -278,7 +278,7 @@ Harbor Guard is built with modern web technologies:
 
 - **Frontend**: React 19 + Next.js 15 with App Router
 - **Styling**: Tailwind CSS + shadcn/ui components
-- **Database**: SQLite/PostgreSQL with Prisma ORM
+- **Database**: PostgreSQL with Prisma ORM
 - **Charts**: Recharts for data visualization
 - **Icons**: Tabler Icons + Lucide React
 - **State Management**: React Context + Custom hooks

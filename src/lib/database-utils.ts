@@ -4,7 +4,7 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 
 export interface DatabaseConfig {
-  provider: 'postgresql' | 'sqlite';
+  provider: 'postgresql';
   url: string;
   isExternal: boolean;
 }
@@ -15,15 +15,15 @@ export interface DatabaseConfig {
 export function detectDatabaseProvider(): DatabaseConfig {
   const databaseUrl = process.env.DATABASE_URL || '';
   
-  // Default SQLite configuration
+  // Default PostgreSQL configuration for bundled database
   const defaultConfig: DatabaseConfig = {
-    provider: 'sqlite',
-    url: 'file:./dev.db',
+    provider: 'postgresql',
+    url: 'postgresql://harborguard:harborguard@localhost:5432/harborguard?sslmode=disable',
     isExternal: false
   };
 
   if (!databaseUrl) {
-    console.log('[DB] No DATABASE_URL provided, using default SQLite');
+    console.log('[DB] No DATABASE_URL provided, using bundled PostgreSQL');
     return defaultConfig;
   }
 
@@ -36,23 +36,8 @@ export function detectDatabaseProvider(): DatabaseConfig {
     };
   }
 
-  // SQLite detection
-  if (databaseUrl.startsWith('file:') || (!databaseUrl.includes('://'))) {
-    return {
-      provider: 'sqlite',
-      url: databaseUrl,
-      isExternal: false
-    };
-  }
-
-  // MySQL/MariaDB detection (future support)
-  if (databaseUrl.startsWith('mysql://')) {
-    console.warn('[DB] MySQL detected but not fully supported yet, falling back to SQLite');
-    return defaultConfig;
-  }
-
-  // Unknown provider, fall back to SQLite
-  console.warn(`[DB] Unknown database provider in URL: ${databaseUrl}, falling back to SQLite`);
+  // Unknown provider, fall back to bundled PostgreSQL
+  console.warn(`[DB] Unknown database provider in URL: ${databaseUrl}, using bundled PostgreSQL`);
   return defaultConfig;
 }
 
@@ -61,7 +46,7 @@ export function detectDatabaseProvider(): DatabaseConfig {
  */
 export async function testDatabaseConnection(config: DatabaseConfig): Promise<{ success: boolean; error?: string }> {
   if (!config.isExternal) {
-    // SQLite doesn't need connection testing
+    // Bundled PostgreSQL is assumed to be available
     return { success: true };
   }
 
@@ -94,7 +79,7 @@ export async function getActiveDatabaseUrl(): Promise<string> {
   const config = detectDatabaseProvider();
   
   if (!config.isExternal) {
-    // SQLite - return as is
+    // Bundled PostgreSQL - return as is
     return config.url;
   }
 
@@ -105,9 +90,9 @@ export async function getActiveDatabaseUrl(): Promise<string> {
     console.log('[DB] Using external PostgreSQL database');
     return config.url;
   } else {
-    console.warn('[DB] External database connection failed, falling back to SQLite');
+    console.warn('[DB] External database connection failed, falling back to bundled PostgreSQL');
     console.warn(`[DB] Error: ${connectionTest.error}`);
-    return 'file:./dev.db';
+    return 'postgresql://harborguard:harborguard@localhost:5432/harborguard?sslmode=disable';
   }
 }
 
@@ -133,25 +118,25 @@ export async function initializeDatabase(): Promise<{ provider: string; success:
         console.log('[DB] External database initialized successfully');
         return { provider: config.provider, success: true };
       } else {
-        console.warn('[DB] External database failed, initializing SQLite fallback...');
+        console.warn('[DB] External database failed, initializing bundled PostgreSQL fallback...');
         
-        // Initialize SQLite fallback
+        // Initialize bundled PostgreSQL fallback
         await execAsync('npx prisma migrate deploy', {
-          env: { ...process.env, DATABASE_URL: 'file:./dev.db' }
+          env: { ...process.env, DATABASE_URL: 'postgresql://harborguard:harborguard@localhost:5432/harborguard?sslmode=disable' }
         });
         
-        console.log('[DB] SQLite fallback initialized successfully');
-        return { provider: 'sqlite', success: true };
+        console.log('[DB] Bundled PostgreSQL fallback initialized successfully');
+        return { provider: 'postgresql', success: true };
       }
     } else {
-      // Initialize SQLite
-      console.log('[DB] Initializing SQLite database...');
+      // Initialize bundled PostgreSQL
+      console.log('[DB] Initializing bundled PostgreSQL database...');
       await execAsync('npx prisma migrate deploy', {
         env: { ...process.env, DATABASE_URL: config.url }
       });
       
-      console.log('[DB] SQLite database initialized successfully');
-      return { provider: 'sqlite', success: true };
+      console.log('[DB] Bundled PostgreSQL database initialized successfully');
+      return { provider: 'postgresql', success: true };
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

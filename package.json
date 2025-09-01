@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "npm run generate:openapi && next build",
-    "build:docker": "next build",
+    "build": "npx prisma generate && npm run generate:openapi && next build",
+    "build:docker": "npx prisma generate && next build",
     "generate:openapi": "npx tsx scripts/generate-openapi.ts",
     "start": "node scripts/init-database.js && next start -p ${PORT:-3000}",
     "start:dev": "next start",

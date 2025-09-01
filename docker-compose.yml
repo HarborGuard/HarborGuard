@@ -14,7 +14,6 @@ services:
       # Network
       - PORT=3000
       - HOSTNAME=0.0.0.0 
-      - BIND_ADDRESS=0.0.0.0
       # Scanner Configuration
       - MAX_CONCURRENT_SCANS=3
       - SCAN_TIMEOUT_MINUTES=30
@@ -53,3 +52,11 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     image: ghcr.io/harborguard/harborguard:latest
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G

@@ -7,9 +7,9 @@ COPY package.json package-lock.json* pnpm-lock.yaml* yarn.lock* ./
 RUN npm ci --ignore-scripts
 
 COPY . .
-RUN npx prisma generate
-# Generate static OpenAPI spec before build
-RUN npm run generate:openapi || true
+RUN mv .env.example .env
+
+# Build will now generate Prisma client automatically
 RUN npm run build:docker
 
 # ---- 2) Runtime + scanners + PostgreSQL ----
@@ -58,12 +58,13 @@ RUN apk add --no-cache \
   && chmod +x /usr/local/bin/dockle \
   && rm -rf /var/cache/apk/* /tmp/* /var/tmp/*
 
-ENV TRIVY_CACHE_DIR=/opt/trivy-cache \
-    GRYPE_DB_CACHE_DIR=/opt/grype-cache \
-    SYFT_CACHE_DIR=/opt/syft-cache
-RUN mkdir -p "$TRIVY_CACHE_DIR" "$GRYPE_DB_CACHE_DIR" "$SYFT_CACHE_DIR"
+ENV TRIVY_CACHE_DIR=/workspace/cache/trivy \
+    GRYPE_DB_CACHE_DIR=/workspace/cache/grype \
+    SYFT_CACHE_DIR=/workspace/cache/syft
 
 RUN mkdir -p /workspace && chown node:node /workspace
+RUN mkdir -p /workspace/cache/trivy/db /workspace/cache/grype /workspace/cache/syft /workspace/cache/dockle && \
+    chmod -R 755 /workspace/cache
 
 # Setup PostgreSQL
 RUN mkdir -p /var/lib/postgresql/data /run/postgresql && \

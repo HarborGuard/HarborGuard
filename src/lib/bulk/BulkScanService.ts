@@ -203,7 +203,7 @@ export class BulkScanService {
       const imagePattern = patterns.imagePattern.replace(/\*/g, '%');
       whereConditions.push({
         name: {
-          contains: imagePattern.replace(/%/g, '') // SQLite LIKE equivalent
+          contains: imagePattern.replace(/%/g, '') // PostgreSQL pattern matching
         }
       });
     }

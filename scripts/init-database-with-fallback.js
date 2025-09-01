@@ -98,12 +98,7 @@ async function startBundledPostgreSQL() {
 async function initializeDatabase(databaseUrl) {
   try {
     console.log('[DB] Database URL:', databaseUrl.replace(/:[^:@]+@/, ':****@')); // Hide password
-    
-    // Generate Prisma client
-    console.log('[DB] Generating Prisma client...');
-    await execAsync('prisma generate', {
-      env: { ...process.env, DATABASE_URL: databaseUrl }
-    });
+
     
     // Run migrations
     console.log('[DB] Running database migrations...');
