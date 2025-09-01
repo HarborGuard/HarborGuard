@@ -62,8 +62,9 @@ async function logPageView(request: NextRequest, pathname: string) {
     const userAgent = request.headers.get('user-agent') || '';
     
     // Make an API call to log the page view
+    const port = process.env.PORT || '3000';
     const baseUrl = process.env.HOSTNAME 
-      ? `http://${process.env.HOSTNAME}:3000`
+      ? `http://${process.env.HOSTNAME}:${port}`
       : request.nextUrl.origin;
     await fetch(`${baseUrl}/api/audit-logs`, {
       method: 'POST',

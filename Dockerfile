@@ -70,11 +70,12 @@ COPY --from=builder /app/src/generated ./src/generated
 COPY --from=builder /app/scripts ./scripts
 
 ENV DATABASE_URL="file:./app.db"
+ENV PORT=3000
 USER root
 EXPOSE 3000
 
 # Health check using the /api/health endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:3000/api/health || exit 1
+  CMD curl -f http://localhost:${PORT:-3000}/api/health || exit 1
 
 CMD ["sh", "-c", "node scripts/init-database.js && node server.js"]

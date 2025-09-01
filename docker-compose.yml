@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  harborguard-test:
+    container_name: harborguard
+    ports:
+      - "3000:3000"
+    environment:
+      # Core configuration
+      - NODE_ENV=production
+      - DATABASE_URL=file:./app.db
+      # Network
+      - PORT=3000
+      - HOSTNAME=0.0.0.0 
+      - BIND_ADDRESS=0.0.0.0
+      # Scanner Configuration
+      - MAX_CONCURRENT_SCANS=3
+      - SCAN_TIMEOUT_MINUTES=30
+      - ENABLED_SCANNERS=trivy,grype,syft,dockle,osv,dive
+      - VERSION_CHECK_ENABLED=true
+      # Scanner cache directories
+      - TRIVY_CACHE_DIR=/opt/trivy-cache
+      - GRYPE_DB_CACHE_DIR=/opt/grype-cache
+      - SYFT_CACHE_DIR=/opt/syft-cache
+      # Logging
+      - LOG_LEVEL=info
+      # Maintenance
+      - CLEANUP_OLD_SCANS_DAYS=30
+      # Monitoring
+      - HEALTH_CHECK_ENABLED=true
+      # Performance Optimization Settings
+      - STORE_RAW_SCAN_DATA=true
+      - STORE_METADATA_JSON=true
+      - USE_NORMALIZED_APIS=true
+      - ENABLE_LEGACY_FALLBACK=true
+      # Summary Table Configuration
+      - AUTO_UPDATE_SUMMARIES=true
+      - SUMMARY_CACHE_TTL_MINUTES=5
+      - ENABLE_CVE_DEDUPLICATION=true
+      # Performance Tuning
+      - DASHBOARD_API_TIMEOUT_MS=105000
+      - BATCH_SUMMARY_UPDATE_SIZE=10
+      # Notifications (optional - uncomment and configure as needed)
+      # - TEAMS_WEBHOOK_URL=https://...
+      # - SLACK_WEBHOOK_URL=https://...
+      # - GOTIFY_SERVER_URL=http://localhost:8080
+      # - GOTIFY_APP_TOKEN=your-token-here
+      # - APPRISE_API_URL=http://localhost:8000
+      # - APPRISE_CONFIG_KEY=harborguard
+      # - NOTIFY_ON_HIGH_SEVERITY=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    image: ghcr.io/harborguard/harborguard:latest
