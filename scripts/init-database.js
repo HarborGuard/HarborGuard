@@ -75,7 +75,6 @@ async function testPostgreSQLConnection(url) {
     
     // Create a simple test SQL file
     const testSql = 'SELECT 1;';
-    const fs = require('fs');
     const testFile = '/tmp/test-connection.sql';
     fs.writeFileSync(testFile, testSql);
     
