@@ -8,10 +8,9 @@ services:
     environment:
       # Core configuration
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://harborguard:harborguard@localhost:5432/harborguard?sslmode=disable
-      - POSTGRES_USER=harborguard
-      - POSTGRES_PASSWORD=harborguard
-      - POSTGRES_DB=harborguard
+      # Database configuration (optional - uses bundled PostgreSQL if not provided)
+      # - DATABASE_URL=postgresql://user:password@host:5432/database
+      # If DATABASE_URL is not set or connection fails, the container will use its bundled PostgreSQL
       # Network
       - PORT=3000
       - HOSTNAME=0.0.0.0 
