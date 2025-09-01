@@ -116,6 +116,25 @@ When `HEALTH_CHECK_ENABLED=true` (default), Harbor Guard provides monitoring end
 - **`HEAD /api/health`** - Lightweight health check (returns HTTP status only)
 - **`HEAD /api/ready`** - Lightweight readiness check (returns HTTP status only)
 
+#### Docker Health Check
+
+The Harbor Guard Docker image includes a built-in HEALTHCHECK instruction that automatically monitors container health:
+
+- **Interval**: 30 seconds between health checks
+- **Timeout**: 10 seconds for each health check request
+- **Start Period**: 40 seconds grace period during container startup
+- **Retries**: 3 consecutive failures before marking container as unhealthy
+
+The health check uses the `/api/health` endpoint to verify:
+- Application is responding to HTTP requests
+- Database connectivity is working
+- Critical services are operational
+
+Docker and orchestration platforms (like Docker Compose, Kubernetes, etc.) will automatically use this health check to:
+- Monitor container health status
+- Restart unhealthy containers (if configured)
+- Route traffic only to healthy instances in load-balanced setups
+
 ## Screenshots
 
 <div align="center">
