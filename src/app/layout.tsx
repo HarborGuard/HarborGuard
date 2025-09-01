@@ -6,6 +6,14 @@ import { ScanningProvider } from "@/providers/ScanningProvider";
 import { DatabaseProvider } from "@/providers/DatabaseProvider";
 import { ScanCompletionSync } from "@/components/ScanCompletionSync";
 import { Toaster } from "@/components/ui/sonner";
+import {
+  SidebarInset,
+  SidebarProvider,
+} from "@/components/ui/sidebar"
+
+import { AppSidebar } from "@/components/app-sidebar"
+import { SiteHeader } from "@/components/site-header"
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,7 +44,20 @@ export default function RootLayout({
           <DatabaseProvider>
             <ScanningProvider>
               <ScanCompletionSync />
-              {children}
+              <SidebarProvider
+                style={
+                  {
+                    "--sidebar-width": "calc(var(--spacing) * 72)",
+                    "--header-height": "calc(var(--spacing) * 12)",
+                  } as React.CSSProperties
+                }
+              >
+                <AppSidebar variant="inset" />
+                <SidebarInset className="flex flex-col">
+                  <SiteHeader />
+                  {children}
+                </SidebarInset>
+              </SidebarProvider>
               <Toaster />
             </ScanningProvider>
           </DatabaseProvider>
