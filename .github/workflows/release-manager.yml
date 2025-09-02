@@ -2,20 +2,23 @@ name: Release to GHCR
 
 on:
   workflow_dispatch:
+    inputs:
+      manual_tag:
+        description: "Tag to apply when running manually (e.g. v0.2b)"
+        required: true
+        default: ""
   release:
     types: [published]
 
 env:
-  # Use docker.io for Docker Hub if empty
   REGISTRY: ghcr.io
-  # github.repository as <account>/<repo>
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   retag-push-update:
     runs-on: ubuntu-latest
     permissions:
-      contents: write    # needed to update the release body
+      contents: write
       packages: write
     steps:
       - uses: actions/checkout@v4
@@ -26,10 +29,25 @@ jobs:
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
+      - name: Determine version tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.manual_tag }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Using version tag: $VERSION"
+
       - name: Retag latest as release version (multi-arch safe)
         run: |
           IMAGE=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
-          VERSION=${{ github.ref_name }}
+          echo "Creating multi-arch tag $IMAGE:${VERSION} from $IMAGE:latest"
+          docker buildx imagetools create -t $IMAGE:${VERSION} $IMAGE:latest
 
-          echo "Creating multi-arch tag $IMAGE:$VERSION from $IMAGE:latest"
-          docker buildx imagetools create -t $IMAGE:$VERSION $IMAGE:latest
+      - name: Show published manifest
+        run: |
+          IMAGE=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
+          echo "Inspecting $IMAGE:${VERSION}"
+          docker buildx imagetools inspect $IMAGE:${VERSION}
