@@ -5,11 +5,9 @@ set -e
 if [ -z "$DATABASE_URL" ]; then
   echo "No external DATABASE_URL provided, using bundled PostgreSQL"
   USE_BUNDLED_PG=true
-  # Generate secure random password if not provided (alphanumeric only for URL safety)
-  if [ -z "$POSTGRES_PASSWORD" ]; then
-    export POSTGRES_PASSWORD=$(openssl rand -base64 32 | tr -d "=+/")
-    echo "Generated PostgreSQL password for bundled database"
-  fi
+  # Use a fixed password for bundled PostgreSQL for simplicity
+  # In production, this should be generated or provided via environment
+  export POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-harborguard}
   # Set default values if not provided
   export POSTGRES_USER=${POSTGRES_USER:-harborguard}
   export POSTGRES_DB=${POSTGRES_DB:-harborguard}
