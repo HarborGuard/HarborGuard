@@ -525,30 +525,6 @@
         }
       }
     },
-    "/api/images/{id}/recalculate-risk": {
-      "post": {
-        "summary": "POST /api/images/{id}/recalculate-risk",
-        "tags": [
-          "Images"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "id parameter"
-          }
-        ]
-      }
-    },
     "/api/images/{id}": {
       "get": {
         "summary": "GET /api/images/{id}",
