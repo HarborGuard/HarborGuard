@@ -1,6 +1,6 @@
 {
   "name": "harborguard",
-  "version": "0.1b",
+  "version": "0.2b",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
