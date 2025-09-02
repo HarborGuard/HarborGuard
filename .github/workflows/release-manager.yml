@@ -1,6 +1,7 @@
 name: Release to GHCR
 
 on:
+  workflow_dispatch:
   release:
     types: [published]
 
