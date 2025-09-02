@@ -1,0 +1,46 @@
+name: Release to GHCR
+
+on:
+  release:
+    types: [published]
+
+env:
+  # Use docker.io for Docker Hub if empty
+  REGISTRY: ghcr.io
+  # github.repository as <account>/<repo>
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-push-update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write    # needed to update the release
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build and push image
+        run: |
+          IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          VERSION=${{ github.ref_name }}
+          docker build -t $IMAGE:$VERSION -t $IMAGE:latest .
+          docker push $IMAGE:$VERSION
+          docker push $IMAGE:latest
+
+      - name: Update release body with image URL
+        run: |
+          IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+          RELEASE_DATA=$(gh api repos/${{ github.repository }}/releases/tags/${{ github.ref_name }})
+          RELEASE_ID=$(echo "$RELEASE_DATA" | jq -r '.id')
+          OLD_BODY=$(echo "$RELEASE_DATA" | jq -r '.body')
+          NEW_BODY="${OLD_BODY}\n\nContainer image: \`${IMAGE}\`"
+          gh api \
+            repos/${{ github.repository }}/releases/${RELEASE_ID} \
+            --method PATCH \
+            -f body="$NEW_BODY"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
