@@ -57,9 +57,30 @@ Harbor Guard supports comprehensive configuration through environment variables.
 | **Notifications** |
 | `TEAMS_WEBHOOK_URL` | Microsoft Teams webhook URL for notifications | *none* | Valid HTTPS URL | `TEAMS_WEBHOOK_URL=https://outlook.office.com/webhook/...` |
 | `SLACK_WEBHOOK_URL` | Slack webhook URL for notifications | *none* | Valid HTTPS URL | `SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...` |
+| `GOTIFY_SERVER_URL` | Gotify server URL for self-hosted notifications | *none* | Valid HTTP/HTTPS URL | `GOTIFY_SERVER_URL=https://gotify.example.com` |
+| `GOTIFY_APP_TOKEN` | Gotify application token for authentication | *none* | Valid token string | `GOTIFY_APP_TOKEN=AC5X0f7ISmwz-zJ` |
+| `APPRISE_API_URL` | Apprise API URL for multi-service notifications | *none* | Valid HTTP/HTTPS URL | `APPRISE_API_URL=https://apprise.example.com` |
+| `APPRISE_CONFIG_KEY` | Apprise configuration key (optional) | *none* | Configuration key string | `APPRISE_CONFIG_KEY=harborguard` |
+| `APPRISE_URLS` | Direct Apprise notification URLs (comma-separated) | *none* | Comma-separated service URLs | `APPRISE_URLS=mailto://user:pass@gmail.com,discord://webhook/...` |
 | `NOTIFY_ON_HIGH_SEVERITY` | Send notifications only for high/critical findings | `true` | `true`, `false` | `NOTIFY_ON_HIGH_SEVERITY=false` |
 | **Monitoring & Health Checks** |
 | `HEALTH_CHECK_ENABLED` | Enable `/api/health` and `/api/ready` endpoints | `true` | `true`, `false` | `HEALTH_CHECK_ENABLED=false` |
+| `VERSION_CHECK_ENABLED` | Enable automatic version checking for updates | `true` | `true`, `false` | `VERSION_CHECK_ENABLED=false` |
+
+### Advanced Environment Variables
+
+These variables are typically used for internal configuration or advanced deployments:
+
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `SCANNER_WORKDIR` | Working directory for scanner operations | `/workspace` | `SCANNER_WORKDIR=/tmp/scanners` |
+| `NEXT_PUBLIC_DEMO_MODE` | Enable demo mode with limited functionality | `false` | `NEXT_PUBLIC_DEMO_MODE=true` |
+| `NEXT_PUBLIC_APP_URL` | Public application URL (for OpenAPI spec) | `http://localhost:3000` | `NEXT_PUBLIC_APP_URL=https://harborguard.example.com` |
+| `NEXT_PUBLIC_API_URL` | Public API URL (for OpenAPI spec) | *auto-detected* | `NEXT_PUBLIC_API_URL=https://api.harborguard.example.com` |
+| `PGDATA` | PostgreSQL data directory (bundled PostgreSQL only) | `/var/lib/postgresql/data` | `PGDATA=/data/postgres` |
+| `POSTGRES_USER` | PostgreSQL username (bundled PostgreSQL only) | `harborguard` | `POSTGRES_USER=admin` |
+| `POSTGRES_PASSWORD` | PostgreSQL password (bundled PostgreSQL only) | `harborguard` | `POSTGRES_PASSWORD=secure_password` |
+| `POSTGRES_DB` | PostgreSQL database name (bundled PostgreSQL only) | `harborguard` | `POSTGRES_DB=harborguard_prod` |
 
 ### Quick Configuration Examples
 
@@ -80,10 +101,26 @@ LOG_LEVEL=warn
 MAX_CONCURRENT_SCANS=10
 SCAN_TIMEOUT_MINUTES=60
 ENABLED_SCANNERS=trivy,grype,syft
+
+# Choose your notification service(s):
+# Option 1: Microsoft Teams
 TEAMS_WEBHOOK_URL=https://outlook.office.com/webhook/your-webhook-url
+
+# Option 2: Slack
+# SLACK_WEBHOOK_URL=https://hooks.slack.com/services/your-webhook
+
+# Option 3: Self-hosted Gotify
+# GOTIFY_SERVER_URL=https://gotify.example.com
+# GOTIFY_APP_TOKEN=your-app-token
+
+# Option 4: Apprise (supports 80+ notification services)
+# APPRISE_API_URL=https://apprise.example.com
+# APPRISE_URLS=discord://webhook/...,mailto://user:pass@gmail.com
+
 NOTIFY_ON_HIGH_SEVERITY=true
 CLEANUP_OLD_SCANS_DAYS=60
 HEALTH_CHECK_ENABLED=true
+VERSION_CHECK_ENABLED=true
 ```
 
 **Resource-Constrained Environment:**
