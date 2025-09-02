@@ -60,6 +60,9 @@ async function startBundledPostgreSQL() {
     console.log('[DB] Starting bundled PostgreSQL...');
     
     const pgData = process.env.PGDATA || '/var/lib/postgresql/data';
+    const pgUser = process.env.POSTGRES_USER || 'harborguard';
+    const pgPassword = process.env.POSTGRES_PASSWORD || 'harborguard';
+    const pgDatabase = process.env.POSTGRES_DB || 'harborguard';
     
     // Check if PostgreSQL is already initialized
     const fs = require('fs');
@@ -81,11 +84,11 @@ async function startBundledPostgreSQL() {
       await execAsync('sleep 3'); // Wait for PostgreSQL to start
     }
     
-    // Create user and database if needed
-    await execAsync('su - postgres -c "psql -tc \\"SELECT 1 FROM pg_user WHERE usename = \'harborguard\'\\" | grep -q 1 || psql -c \\"CREATE USER harborguard WITH PASSWORD \'harborguard\';\\"" || true');
-    await execAsync('su - postgres -c "psql -tc \\"SELECT 1 FROM pg_database WHERE datname = \'harborguard\'\\" | grep -q 1 || psql -c \\"CREATE DATABASE harborguard OWNER harborguard;\\"" || true');
+    // Create user and database if needed - using environment variables
+    await execAsync(`su - postgres -c "psql -tc \\"SELECT 1 FROM pg_user WHERE usename = '${pgUser}'\\" | grep -q 1 || psql -c \\"CREATE USER ${pgUser} WITH PASSWORD '${pgPassword}';\\"" || true`);
+    await execAsync(`su - postgres -c "psql -tc \\"SELECT 1 FROM pg_database WHERE datname = '${pgDatabase}'\\" | grep -q 1 || psql -c \\"CREATE DATABASE ${pgDatabase} OWNER ${pgUser};\\"" || true`);
     
-    return 'postgresql://harborguard:harborguard@localhost:5432/harborguard?sslmode=disable';
+    return `postgresql://${pgUser}:${pgPassword}@localhost:5432/${pgDatabase}?sslmode=disable`;
   } catch (error) {
     console.error(`[DB] Failed to start bundled PostgreSQL: ${error.message}`);
     throw error;
