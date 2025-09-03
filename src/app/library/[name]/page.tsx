@@ -118,10 +118,9 @@ export default function LibraryDetailsPage() {
             }
           });
         });
-        return; // Skip Grype if we have Trivy data
       }
 
-      // Process Grype results (fallback)
+      // Also process Grype results (combine with Trivy)
       const grypeResults = scan.scannerReports?.grype;
       if (grypeResults?.matches) {
         grypeResults.matches.forEach((match) => {
@@ -134,7 +133,7 @@ export default function LibraryDetailsPage() {
             }
             imageMap.get(cveId)!.add(fullImageName);
 
-            // Only store each CVE once
+            // Store or update with highest severity
             if (!vulnMap.has(cveId)) {
               vulnMap.set(cveId, {
                 id: cveId,
@@ -149,6 +148,40 @@ export default function LibraryDetailsPage() {
                 imageTag: imageTag,
                 references: match.vulnerability.urls || [],
               });
+            } else {
+              // Update if Grype has higher severity or additional info
+              const existing = vulnMap.get(cveId)!;
+              const grypeSevertiy = match.vulnerability.severity?.toUpperCase() || "UNKNOWN";
+              
+              // Helper to get severity priority
+              const getSeverityPriority = (sev: string) => {
+                const priorities: Record<string, number> = {
+                  CRITICAL: 5,
+                  HIGH: 4,
+                  MEDIUM: 3,
+                  LOW: 2,
+                  INFO: 1,
+                  UNKNOWN: 0
+                };
+                return priorities[sev] || 0;
+              };
+              
+              // Update to highest severity
+              if (getSeverityPriority(grypeSevertiy) > getSeverityPriority(existing.severity)) {
+                existing.severity = grypeSevertiy;
+              }
+              
+              // Update other fields if missing
+              if (!existing.description && match.vulnerability.description) {
+                existing.description = match.vulnerability.description;
+              }
+              if (!existing.fixedVersion && match.vulnerability.fix?.versions?.[0]) {
+                existing.fixedVersion = match.vulnerability.fix.versions[0];
+              }
+              const grypeCvss = match.vulnerability.cvss?.[0]?.metrics?.baseScore;
+              if (grypeCvss && (!existing.cvss || grypeCvss > existing.cvss)) {
+                existing.cvss = grypeCvss;
+              }
             }
           }
         });

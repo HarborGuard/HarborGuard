@@ -77,11 +77,26 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    // Helper function to get severity priority (higher number = higher severity)
+    const getSeverityPriority = (severity: string) => {
+      const priority: { [key: string]: number } = {
+        'critical': 5,
+        'high': 4,
+        'medium': 3,
+        'low': 2,
+        'negligible': 1,
+        'info': 1,
+        'unknown': 0
+      };
+      return priority[severity.toLowerCase()] || 0;
+    }
+
     // Process each scan for vulnerabilities
     for (const scan of scans) {
       const scanResults = (scan.metadata as any)?.scanResults;
+      
+      // Process Trivy results
       const trivyResults = scanResults?.trivy;
-
       if (trivyResults?.Results) {
         for (const result of trivyResults.Results) {
           if (result.Vulnerabilities) {
@@ -105,6 +120,22 @@ export async function GET(request: NextRequest) {
                   references: new Set(),
                   affectedImages: new Map()
                 });
+              } else {
+                // Update to highest severity if this one is higher
+                const existing = cveMap.get(cveId)!;
+                const newSeverity = vuln.Severity?.toLowerCase() || 'unknown';
+                if (getSeverityPriority(newSeverity) > getSeverityPriority(existing.severity)) {
+                  existing.severity = newSeverity;
+                }
+                // Update CVSS if higher
+                const newCvss = vuln.CVSS?.nvd?.V3Score || vuln.CVSS?.redhat?.V3Score;
+                if (newCvss && (!existing.cvssScore || newCvss > existing.cvssScore)) {
+                  existing.cvssScore = newCvss;
+                }
+                // Update description if empty
+                if (!existing.description && (vuln.Description || vuln.Title)) {
+                  existing.description = vuln.Description || vuln.Title || '';
+                }
               }
 
               const cveData = cveMap.get(cveId)!;
@@ -132,6 +163,67 @@ export async function GET(request: NextRequest) {
               });
             }
           }
+        }
+      }
+      
+      // Process Grype results
+      const grypeResults = scanResults?.grype;
+      if (grypeResults?.matches) {
+        for (const match of grypeResults.matches) {
+          const vuln = match.vulnerability;
+          if (!vuln) continue;
+          
+          const cveId = vuln.id;
+          if (!cveId) continue;
+
+          // Check if this CVE is marked as false positive for this image
+          const imageClassifications = classificationMap.get(cveId);
+          const isFalsePositive = imageClassifications?.get(scan.imageId) || false;
+
+          if (!cveMap.has(cveId)) {
+            cveMap.set(cveId, {
+              cveId,
+              severity: vuln.severity?.toLowerCase() || 'unknown',
+              description: vuln.description || '',
+              cvssScore: vuln.cvss?.[0]?.metrics?.baseScore,
+              packageNames: new Set(),
+              fixedVersions: new Set(),
+              publishedDate: vuln.publishedDate,
+              references: new Set(),
+              affectedImages: new Map()
+            });
+          } else {
+            // Update to highest severity if this one is higher
+            const existing = cveMap.get(cveId)!;
+            const newSeverity = vuln.severity?.toLowerCase() || 'unknown';
+            if (getSeverityPriority(newSeverity) > getSeverityPriority(existing.severity)) {
+              existing.severity = newSeverity;
+            }
+          }
+
+          const cveData = cveMap.get(cveId)!;
+
+          // Add package information from artifact
+          if (match.artifact?.name) {
+            cveData.packageNames.add(match.artifact.name);
+          }
+
+          // Add fixed version information
+          if (vuln.fix?.versions && vuln.fix.versions.length > 0) {
+            vuln.fix.versions.forEach((v: string) => cveData.fixedVersions.add(v));
+          }
+
+          // Add references from URLs
+          if (vuln.urls) {
+            vuln.urls.forEach((url: string) => cveData.references.add(url));
+          }
+
+          // Add affected image (using imageId as key to avoid duplicates)
+          cveData.affectedImages.set(scan.imageId, {
+            imageName: scan.image.name,
+            imageId: scan.imageId,
+            isFalsePositive
+          });
         }
       }
     }

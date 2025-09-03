@@ -19,6 +19,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { VulnerabilityUrlMenu } from "@/components/vulnerability-url-menu";
+import { VulnerabilityDetailsModal } from "@/components/vulnerability-details-modal";
 import {
   Card,
   CardContent,
@@ -85,6 +86,10 @@ export default function LibraryHomePage() {
     offset: 0,
     hasMore: false,
   });
+  
+  // Modal state
+  const [selectedVulnerability, setSelectedVulnerability] = React.useState<VulnerabilityData | null>(null);
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
 
   // Fetch vulnerabilities from API
   const fetchVulnerabilities = React.useCallback(async () => {
@@ -196,6 +201,12 @@ export default function LibraryHomePage() {
     { label: "Dashboard", href: "/" },
     { label: "Vulnerability Library" },
   ];
+  
+  // Handle vulnerability click
+  const handleVulnerabilityClick = (vuln: VulnerabilityData) => {
+    setSelectedVulnerability(vuln);
+    setIsModalOpen(true);
+  };
 
   // Calculate overall statistics
   const stats = React.useMemo(() => {
@@ -478,7 +489,8 @@ export default function LibraryHomePage() {
                       {sortedVulnerabilities.map((vuln) => (
                         <TableRow
                           key={vuln.cveId}
-                          className="hover:bg-muted/50"
+                          className="hover:bg-muted/50 cursor-pointer"
+                          onClick={() => handleVulnerabilityClick(vuln)}
                         >
                           <TableCell>
                             <div className="flex items-center gap-2">
@@ -503,7 +515,7 @@ export default function LibraryHomePage() {
                             </Badge>
                           </TableCell>
 
-                          <TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center gap-2">
                               <VulnerabilityUrlMenu
                                 vulnerabilityId={vuln.cveId}
@@ -625,6 +637,16 @@ export default function LibraryHomePage() {
           </Card>
         </div>
       </div>
+      
+      {/* Vulnerability Details Modal */}
+      <VulnerabilityDetailsModal
+        vulnerability={selectedVulnerability}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedVulnerability(null);
+        }}
+      />
     </div>
   );
 }
