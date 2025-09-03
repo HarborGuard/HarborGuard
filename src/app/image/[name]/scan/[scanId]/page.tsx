@@ -25,6 +25,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { VulnerabilityUrlMenu } from "@/components/vulnerability-url-menu";
+import { VulnerabilityDetailsModal } from "@/components/vulnerability-details-modal";
 import {
   Card,
   CardContent,
@@ -98,6 +99,8 @@ export default function ScanResultsPage() {
     React.useState(false);
   const [selectedCveId, setSelectedCveId] = React.useState<string>("");
   const [showFalsePositives, setShowFalsePositives] = React.useState(true);
+  const [selectedVulnerability, setSelectedVulnerability] = React.useState<any>(null);
+  const [isVulnModalOpen, setIsVulnModalOpen] = React.useState(false);
 
   // Decode the image name in case it has special characters
   const decodedImageName = decodeURIComponent(imageName);
@@ -330,6 +333,43 @@ export default function ScanResultsPage() {
   const handleCloseClassificationDialog = () => {
     setClassificationDialogOpen(false);
     setSelectedCveId("");
+  };
+
+  const handleVulnerabilityClick = (vuln: any, source: 'trivy' | 'grype') => {
+    // Transform the vulnerability data to match the modal's expected format
+    const transformedVuln = {
+      cveId: source === 'trivy' ? vuln.VulnerabilityID : vuln.vulnerability?.id,
+      severity: source === 'trivy' ? vuln.Severity?.toLowerCase() : vuln.vulnerability?.severity?.toLowerCase(),
+      description: source === 'trivy' 
+        ? (vuln.Description || vuln.Title) 
+        : vuln.vulnerability?.description,
+      cvssScore: source === 'trivy' 
+        ? (vuln.CVSS?.nvd?.V3Score || vuln.CVSS?.redhat?.V3Score)
+        : vuln.vulnerability?.cvss?.[0]?.metrics?.baseScore,
+      cvssVector: source === 'trivy'
+        ? (vuln.CVSS?.nvd?.V3Vector || vuln.CVSS?.redhat?.V3Vector)
+        : vuln.vulnerability?.cvss?.[0]?.vector,
+      packageName: source === 'trivy' ? vuln.PkgName : vuln.artifact?.name,
+      installedVersion: source === 'trivy' ? vuln.InstalledVersion : vuln.artifact?.version,
+      fixedVersion: source === 'trivy' 
+        ? vuln.FixedVersion 
+        : vuln.vulnerability?.fix?.versions?.[0],
+      publishedDate: source === 'trivy' 
+        ? vuln.PublishedDate 
+        : vuln.vulnerability?.dataSource,
+      references: source === 'trivy' 
+        ? (vuln.References || [])
+        : (vuln.vulnerability?.urls || []),
+      affectedImages: [{
+        imageName: decodedImageName,
+        imageId: scanData?.imageId || '',
+        isFalsePositive: isFalsePositive(source === 'trivy' ? vuln.VulnerabilityID : vuln.vulnerability?.id)
+      }],
+      falsePositiveImages: []
+    };
+    
+    setSelectedVulnerability(transformedVuln);
+    setIsVulnModalOpen(true);
   };
 
   const getSeverityColor = (severity: string) => {
@@ -1027,11 +1067,12 @@ export default function ScanResultsPage() {
                           return (
                             <TableRow
                               key={index}
-                              className={
+                              className={`${
                                 isMarkedFalsePositive ? "opacity-50" : ""
-                              }
+                              } hover:bg-muted/50 cursor-pointer`}
+                              onClick={() => handleVulnerabilityClick(vuln, 'trivy')}
                             >
-                              <TableCell>
+                              <TableCell onClick={(e) => e.stopPropagation()}>
                                 <div className="flex items-center gap-2">
                                   <Button
                                     variant="outline"
@@ -1222,11 +1263,12 @@ export default function ScanResultsPage() {
                         return (
                           <TableRow
                             key={index}
-                            className={
+                            className={`${
                               isMarkedFalsePositive ? "opacity-50" : ""
-                            }
+                            } hover:bg-muted/50 cursor-pointer`}
+                            onClick={() => handleVulnerabilityClick(match, 'grype')}
                           >
-                            <TableCell>
+                            <TableCell onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center gap-2">
                                 <Button
                                   variant="outline"
@@ -1969,6 +2011,16 @@ export default function ScanResultsPage() {
         imageId={scanData?.image?.id || ""} // Still pass for compatibility, but saveClassification handles image-name-wide logic
         currentClassification={getClassification(selectedCveId)}
         onSave={saveClassification}
+      />
+      
+      {/* Vulnerability Details Modal */}
+      <VulnerabilityDetailsModal
+        vulnerability={selectedVulnerability}
+        isOpen={isVulnModalOpen}
+        onClose={() => {
+          setIsVulnModalOpen(false);
+          setSelectedVulnerability(null);
+        }}
       />
     </div>
   );

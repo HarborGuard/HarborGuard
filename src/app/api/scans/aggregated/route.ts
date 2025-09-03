@@ -56,65 +56,79 @@ export async function GET(request: NextRequest) {
       
       // Always parse actual metadata to get real vulnerability counts
       const scanResults = (scan.metadata as any)?.scanResults
-      const trivyResults = scanResults?.trivy
       
+      // Track unique CVEs and their highest severity
+      const cveTracker = new Map<string, string>() // CVE ID -> highest severity
+      
+      // Helper function to get severity priority (higher number = higher severity)
+      const getSeverityPriority = (severity: string) => {
+        switch (severity.toUpperCase()) {
+          case 'CRITICAL': return 4
+          case 'HIGH': return 3
+          case 'MEDIUM': return 2
+          case 'LOW': 
+          case 'NEGLIGIBLE':
+          case 'INFO': return 1
+          default: return 0
+        }
+      }
+      
+      // Process Trivy vulnerabilities first
+      const trivyResults = scanResults?.trivy
       if (trivyResults?.Results) {
         // Parse all results to get accurate counts
         for (const result of trivyResults.Results) {
           if (result.Vulnerabilities && Array.isArray(result.Vulnerabilities)) {
             for (const vuln of result.Vulnerabilities) {
+              const cveId = vuln.VulnerabilityID || vuln.PkgID || `trivy-${vuln.PkgName}-${vuln.InstalledVersion}`
               const severity = (vuln.Severity || 'UNKNOWN').toUpperCase()
               
-              switch (severity) {
-                case 'CRITICAL':
-                  vulnCount.critical++
-                  break
-                case 'HIGH':
-                  vulnCount.high++
-                  break
-                case 'MEDIUM':
-                  vulnCount.medium++
-                  break
-                case 'LOW':
-                  vulnCount.low++
-                  break
-                case 'NEGLIGIBLE':
-                case 'INFO':
-                  vulnCount.low++
-                  break
+              // Track or update to highest severity
+              const existingSeverity = cveTracker.get(cveId)
+              if (!existingSeverity || getSeverityPriority(severity) > getSeverityPriority(existingSeverity)) {
+                cveTracker.set(cveId, severity)
               }
-              vulnCount.total++
             }
           }
         }
       }
       
-      // Also check grype results if trivy didn't find anything
-      if (vulnCount.total === 0) {
-        const grypeResults = scanResults?.grype
-        if (grypeResults?.matches) {
-          for (const match of grypeResults.matches) {
-            const severity = (match.vulnerability?.severity || 'UNKNOWN').toUpperCase()
-            
-            switch (severity) {
-              case 'CRITICAL':
-                vulnCount.critical++
-                break
-              case 'HIGH':
-                vulnCount.high++
-                break
-              case 'MEDIUM':
-                vulnCount.medium++
-                break
-              case 'LOW':
-              case 'NEGLIGIBLE':
-                vulnCount.low++
-                break
-            }
-            vulnCount.total++
+      // Process Grype vulnerabilities and combine with Trivy
+      const grypeResults = scanResults?.grype
+      if (grypeResults?.matches) {
+        for (const match of grypeResults.matches) {
+          const cveId = match.vulnerability?.id || `grype-${match.artifact?.name}-${match.artifact?.version}`
+          const severity = (match.vulnerability?.severity || 'UNKNOWN').toUpperCase()
+          
+          // Track or update to highest severity
+          const existingSeverity = cveTracker.get(cveId)
+          if (!existingSeverity || getSeverityPriority(severity) > getSeverityPriority(existingSeverity)) {
+            cveTracker.set(cveId, severity)
           }
         }
       }
+      
+      // Now count all unique vulnerabilities using their highest severity
+      for (const [cveId, severity] of cveTracker.entries()) {
+        switch (severity) {
+          case 'CRITICAL':
+            vulnCount.critical++
+            break
+          case 'HIGH':
+            vulnCount.high++
+            break
+          case 'MEDIUM':
+            vulnCount.medium++
+            break
+          case 'LOW':
+          case 'NEGLIGIBLE':
+          case 'INFO':
+            vulnCount.low++
+            break
+        }
+        vulnCount.total++
+      }
+      
       
       // Extract or calculate Dockle compliance grade
       let dockleGrade = null

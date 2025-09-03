@@ -340,7 +340,7 @@ export default function ImageDetailsPage() {
           misconfigs: 0, // TODO: Extract from dockle data
           secrets: 0, // TODO: Extract from trivy data
           compliance: {
-            dockle: scan.complianceScore?.dockle?.grade || "N/A",
+            dockle: scan.dockleGrade || scan.complianceScore?.dockle?.grade || "N/A",
           },
           dbVersion: "1.0", // TODO: Get from scan metadata
           scanEngine: "Multi-tool", // TODO: Get from scannerVersions
