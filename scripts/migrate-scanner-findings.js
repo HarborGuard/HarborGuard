@@ -14,15 +14,16 @@ function formatLicense(license) {
     return license.map(l => formatLicense(l)).filter(Boolean).join(', ');
   }
   if (typeof license === 'object') {
-    // Handle common license object structures
+    // Handle common license object structures - prioritize actual license value
+    if (license.value) return license.value;  // Syft format: {type: "declared", value: "MIT"}
+    if (license.spdxExpression) return license.spdxExpression;  // SPDX expression
     if (license.name) return license.name;
-    if (license.type) return license.type;
-    if (license.value) return license.value;
     if (license.license) return license.license;
     if (license.expression) return license.expression;
-    // Try to extract first string value from object
+    // Skip 'type' field as it usually contains "declared" which is not the actual license
+    // Try to extract first meaningful string value from object
     const values = Object.values(license);
-    const firstString = values.find(v => typeof v === 'string');
+    const firstString = values.find(v => typeof v === 'string' && v !== 'declared');
     if (firstString) return firstString;
   }
   return null;

@@ -451,18 +451,28 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     if (!license) return null;
     if (typeof license === 'string') return license;
     if (Array.isArray(license)) {
-      return license.map(l => this.formatLicense(l)).filter(Boolean).join(', ');
+      const formatted = license.map(l => this.formatLicense(l)).filter(Boolean);
+      if (formatted.length > 0) {
+        // Debug log
+        console.log('Formatted licenses array:', formatted);
+        return formatted.join(', ');
+      }
+      return null;
     }
     if (typeof license === 'object') {
-      // Handle common license object structures
+      // Handle common license object structures - prioritize actual license value
+      if (license.value) {
+        console.log('Found license.value:', license.value);
+        return license.value;  // Syft format: {type: "declared", value: "MIT"}
+      }
+      if (license.spdxExpression) return license.spdxExpression;  // SPDX expression
       if (license.name) return license.name;
-      if (license.type) return license.type;
-      if (license.value) return license.value;
       if (license.license) return license.license;
       if (license.expression) return license.expression;
-      // Try to extract first string value from object
+      // Skip 'type' field as it usually contains "declared" which is not the actual license
+      // Try to extract first meaningful string value from object
       const values = Object.values(license);
-      const firstString = values.find(v => typeof v === 'string');
+      const firstString = values.find(v => typeof v === 'string' && v !== 'declared');
       if (firstString) return firstString as string;
     }
     return null;
@@ -473,7 +483,12 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     
     // Process Syft results
     if (reports.syft?.artifacts) {
+      console.log(`Processing ${reports.syft.artifacts.length} Syft artifacts...`);
       for (const artifact of reports.syft.artifacts) {
+        const formattedLicense = this.formatLicense(artifact.licenses);
+        if (artifact.licenses && artifact.licenses.length > 0) {
+          console.log(`Package ${artifact.name}: licenses = ${JSON.stringify(artifact.licenses)}, formatted = ${formattedLicense}`);
+        }
         findings.push({
           scanId,
           source: 'syft',
@@ -481,7 +496,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
           version: artifact.version || null,
           type: artifact.type || 'unknown',
           purl: artifact.purl || null,
-          license: this.formatLicense(artifact.licenses) || null,
+          license: formattedLicense || null,
           vendor: artifact.vendor || null,
           publisher: artifact.publisher || null,
           ecosystem: artifact.language || null,
