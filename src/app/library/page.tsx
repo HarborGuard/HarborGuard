@@ -551,7 +551,7 @@ export default function LibraryHomePage() {
                               {vuln.packageName || "N/A"}
                             </span>
                           </TableCell>
-                          <TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
                             <div className="flex gap-1 flex-wrap max-w-xs">
                               {vuln.affectedImages
                                 .slice(0, 3)
@@ -563,7 +563,11 @@ export default function LibraryHomePage() {
                                         ? "secondary"
                                         : "outline"
                                     }
-                                    className="text-xs"
+                                    className="text-xs cursor-pointer hover:opacity-80"
+                                    onClick={() => {
+                                      const imageName = image.imageName.split(':')[0];
+                                      router.push(`/image/${encodeURIComponent(imageName)}`);
+                                    }}
                                   >
                                     {image.isFalsePositive && (
                                       <IconX className="w-3 h-3 mr-1" />
@@ -578,7 +582,7 @@ export default function LibraryHomePage() {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
                             {vuln.falsePositiveImages.length > 0 ? (
                               <div className="flex gap-1 flex-wrap max-w-xs">
                                 {vuln.falsePositiveImages
@@ -587,7 +591,11 @@ export default function LibraryHomePage() {
                                     <Badge
                                       key={`fp-${vuln.cveId}-${imageName}-${idx}`}
                                       variant="secondary"
-                                      className="text-xs"
+                                      className="text-xs cursor-pointer hover:opacity-80"
+                                      onClick={() => {
+                                        const imageNameOnly = imageName.split(':')[0];
+                                        router.push(`/image/${encodeURIComponent(imageNameOnly)}`);
+                                      }}
                                     >
                                       <IconX className="w-3 h-3 mr-1" />
                                       {imageName}
