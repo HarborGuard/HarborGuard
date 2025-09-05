@@ -72,10 +72,9 @@ export class ScannerService {
 
     if (queued) {
       logger.info(`Scan ${requestId} queued at position ${queuePosition}`);
-      // Update database to reflect queued status
+      // Update database to reflect queued status (without queuePosition in metadata)
       await this.databaseAdapter.updateScanRecord(scanId, {
-        status: 'PENDING',
-        metadata: { queuePosition } as any
+        status: 'PENDING'
       });
     }
 
