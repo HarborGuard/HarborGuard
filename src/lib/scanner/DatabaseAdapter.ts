@@ -145,25 +145,63 @@ export class DatabaseAdapter implements IDatabaseAdapter {
   }
 
   async uploadScanResults(scanId: string, reports: ScanReports): Promise<void> {
-    // Update scan record with completion status and metadata
+    // Update scan record with completion status
     const updateData: any = {
       status: 'SUCCESS',
       finishedAt: new Date(),
-      metadata: {
-        ...reports.metadata,
-        scanResults: {
-          trivy: reports.trivy,
-          grype: reports.grype,
-          syft: reports.syft,
-          dockle: reports.dockle,
-          osv: reports.osv,
-          dive: reports.dive,
-        }
-      } as any,
     };
 
     await this.updateScanRecord(scanId, updateData);
+    
+    // Create or update ScanMetadata record
+    await this.createOrUpdateScanMetadata(scanId, reports);
     await this.calculateAggregatedData(scanId, reports);
+  }
+  
+  async createOrUpdateScanMetadata(scanId: string, reports: ScanReports): Promise<void> {
+    const metadata = reports.metadata || {};
+    
+    const scanMetadataData = {
+      // Docker Image metadata
+      dockerId: metadata.Id || null,
+      dockerOs: metadata.Os || metadata.os || null,
+      dockerArchitecture: metadata.Architecture || metadata.architecture || null,
+      dockerSize: metadata.Size ? BigInt(metadata.Size) : null,
+      dockerAuthor: metadata.Author || null,
+      dockerCreated: metadata.Created ? new Date(metadata.Created) : null,
+      dockerVersion: metadata.DockerVersion || null,
+      dockerParent: metadata.Parent || null,
+      dockerComment: metadata.Comment || null,
+      dockerDigest: metadata.Digest || null,
+      dockerConfig: metadata.Config || null,
+      dockerRootFS: metadata.RootFS || null,
+      dockerGraphDriver: metadata.GraphDriver || null,
+      dockerRepoTags: metadata.RepoTags || null,
+      dockerRepoDigests: metadata.RepoDigests || null,
+      dockerMetadata: metadata.Metadata || null,
+      dockerLabels: metadata.Labels || metadata.Config?.Labels || null,
+      dockerEnv: metadata.Env || metadata.Config?.Env || null,
+      
+      // Scan Results
+      trivyResults: reports.trivy || null,
+      grypeResults: reports.grype || null,
+      syftResults: reports.syft || null,
+      dockleResults: reports.dockle || null,
+      osvResults: reports.osv || null,
+      diveResults: reports.dive || null,
+      
+      // Scanner versions
+      scannerVersions: metadata.scannerVersions || null
+    };
+    
+    await prisma.scanMetadata.upsert({
+      where: { scanId },
+      update: scanMetadataData,
+      create: {
+        scanId,
+        ...scanMetadataData
+      }
+    });
   }
 
   async calculateAggregatedData(scanId: string, reports: ScanReports): Promise<void> {
@@ -221,28 +259,45 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     }
 
     if (Object.keys(aggregates).length > 0) {
-      // Get current scan to merge metadata
-      const currentScan = await prisma.scan.findUnique({
-        where: { id: scanId },
-        select: { metadata: true }
-      });
-      
-      const currentMetadata = currentScan?.metadata as any || {};
-      
-      // Store aggregated data in metadata field and riskScore directly
-      const updateData: any = {
-        metadata: {
-          ...currentMetadata,
-          aggregatedData: aggregates
-        } as any
-      };
-      
-      // Extract riskScore to store in the dedicated field
+      // Update scan record with risk score
+      const scanUpdateData: any = {};
       if (aggregates.riskScore !== undefined) {
-        updateData.riskScore = aggregates.riskScore;
+        scanUpdateData.riskScore = aggregates.riskScore;
       }
       
-      await this.updateScanRecord(scanId, updateData);
+      if (Object.keys(scanUpdateData).length > 0) {
+        await this.updateScanRecord(scanId, scanUpdateData);
+      }
+      
+      // Update ScanMetadata with aggregated data
+      const metadataUpdateData: any = {};
+      
+      if (aggregates.vulnerabilityCount) {
+        metadataUpdateData.vulnerabilityCritical = aggregates.vulnerabilityCount.critical || 0;
+        metadataUpdateData.vulnerabilityHigh = aggregates.vulnerabilityCount.high || 0;
+        metadataUpdateData.vulnerabilityMedium = aggregates.vulnerabilityCount.medium || 0;
+        metadataUpdateData.vulnerabilityLow = aggregates.vulnerabilityCount.low || 0;
+        metadataUpdateData.vulnerabilityInfo = aggregates.vulnerabilityCount.info || 0;
+      }
+      
+      if (aggregates.riskScore !== undefined) {
+        metadataUpdateData.aggregatedRiskScore = aggregates.riskScore;
+      }
+      
+      if (aggregates.complianceScore?.dockle) {
+        const dockle = aggregates.complianceScore.dockle;
+        metadataUpdateData.complianceScore = dockle.score || null;
+        metadataUpdateData.complianceGrade = dockle.grade || null;
+        metadataUpdateData.complianceFatal = dockle.fatal || null;
+        metadataUpdateData.complianceWarn = dockle.warn || null;
+        metadataUpdateData.complianceInfo = dockle.info || null;
+        metadataUpdateData.compliancePass = dockle.pass || null;
+      }
+      
+      await prisma.scanMetadata.update({
+        where: { scanId },
+        data: metadataUpdateData
+      });
     }
   }
 

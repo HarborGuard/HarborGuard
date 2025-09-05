@@ -1097,30 +1097,6 @@
         }
       }
     },
-    "/api/scans/bulk/{batchId}/cancel": {
-      "post": {
-        "summary": "POST /api/scans/bulk/{batchId}/cancel",
-        "tags": [
-          "Scans"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "parameters": [
-          {
-            "name": "batchId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "batchId parameter"
-          }
-        ]
-      }
-    },
     "/api/scans/bulk/{batchId}": {
       "get": {
         "summary": "GET /api/scans/bulk/{batchId}",
@@ -1316,30 +1292,6 @@
     "/api/scans/local-bulk": {
       "post": {
         "summary": "POST /api/scans/local-bulk",
-        "tags": [
-          "Scans"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        }
-      }
-    },
-    "/api/scans/queue": {
-      "get": {
-        "summary": "GET /api/scans/queue",
-        "tags": [
-          "Scans"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        }
-      },
-      "delete": {
-        "summary": "DELETE /api/scans/queue",
         "tags": [
           "Scans"
         ],

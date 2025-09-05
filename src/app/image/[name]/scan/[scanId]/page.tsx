@@ -266,31 +266,37 @@ export default function ScanResultsPage() {
   }, [scanData, decodedImageName]);
 
   const trivyResults: TrivyReport | null =
+    scanData?.scanMetadata?.trivyResults ||
     scanData?.metadata?.scanResults?.trivy ||
     scanData?.scannerReports?.trivy ||
     scanData?.trivy ||
     null;
   const grypResults: GrypeReport | null =
+    scanData?.scanMetadata?.grypeResults ||
     scanData?.metadata?.scanResults?.grype ||
     scanData?.scannerReports?.grype ||
     scanData?.grype ||
     null;
   const syftResults: SyftReport | null =
+    scanData?.scanMetadata?.syftResults ||
     scanData?.metadata?.scanResults?.syft ||
     scanData?.scannerReports?.syft ||
     scanData?.syft ||
     null;
   const dockleResults: DockleReport | null =
+    scanData?.scanMetadata?.dockleResults ||
     scanData?.metadata?.scanResults?.dockle ||
     scanData?.scannerReports?.dockle ||
     scanData?.dockle ||
     null;
   const osvResults: OSVReport | null =
+    scanData?.scanMetadata?.osvResults ||
     scanData?.metadata?.scanResults?.osv ||
     scanData?.scannerReports?.osv ||
     scanData?.osv ||
     null;
   const diveResults: DiveReport | null =
+    scanData?.scanMetadata?.diveResults ||
     scanData?.metadata?.scanResults?.dive ||
     scanData?.scannerReports?.dive ||
     scanData?.dive ||

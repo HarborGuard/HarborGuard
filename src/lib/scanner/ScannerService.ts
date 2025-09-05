@@ -152,9 +152,11 @@ export class ScannerService {
     const reports = await this.scanExecutor.loadScanResults(requestId);
     
     const scannerVersions = await getScannerVersions();
-    await this.databaseAdapter.updateScanRecord(scanId, {
-      metadata: { scannerVersions } as any,
-    });
+    // Add scanner versions to reports metadata
+    if (!reports.metadata) {
+      reports.metadata = {};
+    }
+    reports.metadata.scannerVersions = scannerVersions;
 
     await this.databaseAdapter.uploadScanResults(scanId, reports);
 

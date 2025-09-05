@@ -43,13 +43,14 @@ model Scan {
   reportsDir       String?
   errorMessage     String?
   riskScore        Int?
-  metadata         Json?
+  metadata         Json?             // @deprecated - Will be removed after migration
   source           String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   bulkScanItems    BulkScanItem[]
   policyViolations PolicyViolation[]
   scanResults      ScanResult[]
+  scanMetadata     ScanMetadata?
   image            Image             @relation(fields: [imageId], references: [id], onDelete: Cascade)
 
   @@index([requestId])
@@ -62,6 +63,66 @@ model Scan {
   @@map("scans")
 }
 
+model ScanMetadata {
+  id                     String   @id @default(cuid())
+  scanId                 String   @unique
+  
+  // Docker Image metadata
+  dockerId               String?
+  dockerOs               String?
+  dockerArchitecture     String?
+  dockerSize             BigInt?
+  dockerAuthor           String?
+  dockerCreated          DateTime?
+  dockerVersion          String?
+  dockerParent           String?
+  dockerComment          String?
+  dockerDigest           String?
+  dockerConfig           Json?    // Complex nested object
+  dockerRootFS           Json?    // Layers array
+  dockerGraphDriver      Json?
+  dockerRepoTags         Json?    // Array of strings
+  dockerRepoDigests      Json?    // Array of strings
+  dockerMetadata         Json?    // Docker-specific metadata
+  dockerLabels           Json?    // Label key-value pairs
+  dockerEnv              Json?    // Environment variables array
+  
+  // Scan Results from each scanner
+  trivyResults           Json?
+  grypeResults           Json?
+  syftResults            Json?
+  dockleResults          Json?
+  osvResults             Json?
+  diveResults            Json?
+  
+  // Aggregated Data
+  vulnerabilityCritical  Int      @default(0)
+  vulnerabilityHigh      Int      @default(0)
+  vulnerabilityMedium    Int      @default(0)
+  vulnerabilityLow       Int      @default(0)
+  vulnerabilityInfo      Int      @default(0)
+  complianceScore        Int?
+  complianceGrade        String?
+  complianceFatal        Int?
+  complianceWarn         Int?
+  complianceInfo         Int?
+  compliancePass         Int?
+  aggregatedRiskScore    Int?
+  
+  // Scanner versions
+  scannerVersions        Json?
+  
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  
+  scan                   Scan     @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  
+  @@index([scanId])
+  @@index([dockerDigest])
+  @@index([aggregatedRiskScore])
+  @@map("scan_metadata")
+}
+
 model ScanResult {
   id           String           @id @default(cuid())
   scanId       String
@@ -70,8 +131,8 @@ model ScanResult {
   status       ScanResultStatus @default(SUCCESS)
   errorMessage String?
   createdAt    DateTime         @default(now())
-  scanner      Scanner          @relation(fields: [scannerId], references: [id])
   scan         Scan             @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  scanner      Scanner          @relation(fields: [scannerId], references: [id])
 
   @@index([scanId])
   @@index([scannerId])
@@ -119,9 +180,9 @@ model BulkScanItem {
   scanId  String
   imageId String
   status  ItemStatus
+  batch   BulkScanBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
   image   Image         @relation(fields: [imageId], references: [id], onDelete: Cascade)
   scan    Scan          @relation(fields: [scanId], references: [id], onDelete: Cascade)
-  batch   BulkScanBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
   @@index([batchId])
   @@index([status])
@@ -156,8 +217,8 @@ model ImageVulnerability {
   status             VulnerabilityStatus @default(DETECTED)
   detectedAt         DateTime            @default(now())
   cveClassifications CveClassification[]
-  vulnerability      Vulnerability       @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
   image              Image               @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  vulnerability      Vulnerability       @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
 
   @@unique([imageId, vulnerabilityId, packageName])
   @@index([imageId])
@@ -243,18 +304,18 @@ model AuditLog {
 }
 
 model Repository {
-  id                String            @id @default(cuid())
+  id                String           @id @default(cuid())
   name              String
   type              RepositoryType
   registryUrl       String
   username          String
   encryptedPassword String
   organization      String?
-  status            RepositoryStatus  @default(UNTESTED)
+  status            RepositoryStatus @default(UNTESTED)
   lastTested        DateTime?
   repositoryCount   Int?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   @@index([type])
   @@index([status])

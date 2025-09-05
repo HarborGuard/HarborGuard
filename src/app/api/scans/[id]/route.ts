@@ -13,7 +13,8 @@ export async function GET(
     let scan = await prisma.scan.findUnique({
       where: { id },
       include: {
-        image: true
+        image: true,
+        scanMetadata: true
       }
     })
     
@@ -21,7 +22,8 @@ export async function GET(
       scan = await prisma.scan.findUnique({
         where: { requestId: id },
         include: {
-          image: true
+          image: true,
+          scanMetadata: true
         }
       })
     }
@@ -75,7 +77,8 @@ export async function PATCH(
         updatedAt: new Date()
       },
       include: {
-        image: true
+        image: true,
+        scanMetadata: true
       }
     })
     

@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
       updatedAt: true,
       source: true,
       metadata: true, // Include metadata to calculate vulnerability counts
+      scanMetadata: true, // Include new ScanMetadata table
       image: {
         select: {
           id: true,
@@ -64,7 +65,8 @@ export async function GET(request: NextRequest) {
       scanQuery.select = selectFields
     } else {
       scanQuery.include = {
-        image: true
+        image: true,
+        scanMetadata: true
       }
     }
     
@@ -77,7 +79,18 @@ export async function GET(request: NextRequest) {
     const calculateVulnerabilityCounts = (scan: any) => {
       const counts = { total: 0, critical: 0, high: 0, medium: 0, low: 0 };
       
-      // Process if we have metadata
+      // Use new ScanMetadata if available, fallback to old metadata
+      if (scan.scanMetadata) {
+        // Use pre-calculated counts from ScanMetadata table
+        counts.critical = scan.scanMetadata.vulnerabilityCritical || 0;
+        counts.high = scan.scanMetadata.vulnerabilityHigh || 0;
+        counts.medium = scan.scanMetadata.vulnerabilityMedium || 0;
+        counts.low = scan.scanMetadata.vulnerabilityLow || 0;
+        counts.total = counts.critical + counts.high + counts.medium + counts.low;
+        return counts;
+      }
+      
+      // Fallback to old metadata structure
       if (scan.metadata) {
         const metadata = scan.metadata as any;
         const scanResults = metadata?.scanResults;
@@ -155,6 +168,12 @@ export async function GET(request: NextRequest) {
     
     // Helper function to calculate Dockle compliance grade
     const calculateDockleGrade = (scan: any) => {
+      // Use new ScanMetadata if available
+      if (scan.scanMetadata) {
+        return scan.scanMetadata.complianceGrade || null;
+      }
+      
+      // Fallback to old metadata structure
       if (scan.metadata) {
         const metadata = scan.metadata as any;
         const dockleResults = metadata?.scanResults?.dockle;
