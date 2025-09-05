@@ -17,8 +17,6 @@ import type {
   CveClassification,
   BulkScanBatch,
   BulkScanItem,
-  PolicyRule,
-  PolicyViolation,
   AuditLog,
   ScanStatus,
   Severity,
@@ -134,11 +132,6 @@ export class DatabaseService {
           scanner: true
         }
       };
-      include.policyViolations = {
-        include: {
-          policyRule: true
-        }
-      };
     }
 
     const [scans, total] = await Promise.all([
@@ -175,11 +168,6 @@ export class DatabaseService {
       include.scanResults = {
         include: {
           scanner: true
-        }
-      };
-      include.policyViolations = {
-        include: {
-          policyRule: true
         }
       };
     }

@@ -55,7 +55,6 @@ export function prismaToScanWithFullRelations(prismaData: PrismaScan & {
   image: PrismaImage;
   metadata?: PrismaScanMetadata | null;
   scanResults: (PrismaScanResult & { scanner: PrismaScanner })[];
-  policyViolations: any[];
 }): ScanWithFullRelations {
   return {
     ...prismaData,
@@ -64,7 +63,6 @@ export function prismaToScanWithFullRelations(prismaData: PrismaScan & {
       ...result,
       rawOutput: result.rawOutput as unknown as ScannerReport | undefined,
     })),
-    policyViolations: prismaData.policyViolations,
     metadata: prismaData.metadata as unknown as ImageMetadata | undefined,
   };
 }

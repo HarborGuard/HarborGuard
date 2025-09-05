@@ -11,8 +11,6 @@ import type {
   Vulnerability as PrismaVulnerability,
   ImageVulnerability as PrismaImageVulnerability,
   CveClassification as PrismaCveClassification,
-  PolicyRule as PrismaPolicyRule,
-  PolicyViolation as PrismaPolicyViolation,
   AuditLog as PrismaAuditLog,
   ScanStatus,
   ScanResultStatus,
@@ -21,7 +19,6 @@ import type {
   ItemStatus,
   Severity,
   VulnerabilityStatus,
-  PolicyCategory,
   EventType,
   LogCategory,
   LogAction
@@ -36,7 +33,6 @@ export type {
   ItemStatus,
   Severity,
   VulnerabilityStatus,
-  PolicyCategory,
   EventType,
   LogCategory,
   LogAction
@@ -50,8 +46,6 @@ export type BulkScanItem = PrismaBulkScanItem;
 export type Vulnerability = PrismaVulnerability;
 export type ImageVulnerability = PrismaImageVulnerability;
 export type CveClassification = PrismaCveClassification;
-export type PolicyRule = PrismaPolicyRule;
-export type PolicyViolation = PrismaPolicyViolation;
 export type AuditLog = PrismaAuditLog;
 
 // Enhanced types with proper JSON field typing
@@ -71,7 +65,6 @@ export type ScanWithImage = Scan & {
 export type ScanWithFullRelations = Scan & {
   image: Image;
   scanResults: (ScanResult & { scanner: Scanner })[];
-  policyViolations: (PolicyViolation & { policyRule: PolicyRule })[];
 };
 
 export type ImageWithScans = Image & {

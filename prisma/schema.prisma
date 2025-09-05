@@ -48,7 +48,6 @@ model Scan {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   bulkScanItems    BulkScanItem[]
-  policyViolations PolicyViolation[]
   scanResults      ScanResult[]
   metadata         ScanMetadata?     @relation(fields: [metadataId], references: [id], onDelete: SetNull)
   image            Image             @relation(fields: [imageId], references: [id], onDelete: Cascade)
@@ -245,41 +244,6 @@ model CveClassification {
   @@map("cve_classifications")
 }
 
-model PolicyRule {
-  id               String            @id @default(cuid())
-  name             String
-  description      String?
-  category         PolicyCategory
-  severity         Severity
-  conditions       Json
-  isActive         Boolean           @default(true)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  policyViolations PolicyViolation[]
-
-  @@index([category])
-  @@index([severity])
-  @@index([isActive])
-  @@map("policy_rules")
-}
-
-model PolicyViolation {
-  id           String     @id @default(cuid())
-  scanId       String
-  policyRuleId String
-  description  String?
-  severity     Severity
-  details      Json?
-  detectedAt   DateTime   @default(now())
-  policyRule   PolicyRule @relation(fields: [policyRuleId], references: [id], onDelete: Cascade)
-  scan         Scan       @relation(fields: [scanId], references: [id], onDelete: Cascade)
-
-  @@index([scanId])
-  @@index([policyRuleId])
-  @@index([severity])
-  @@index([detectedAt])
-  @@map("policy_violations")
-}
 
 model AuditLog {
   id        String      @id @default(cuid())
@@ -392,13 +356,6 @@ enum ImageSource {
   LOCAL_DOCKER
   FILE_UPLOAD
   REGISTRY_PRIVATE
-}
-
-enum PolicyCategory {
-  SECURITY
-  COMPLIANCE
-  BEST_PRACTICES
-  CUSTOM
 }
 
 enum EventType {
