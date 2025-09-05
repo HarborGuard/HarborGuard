@@ -107,7 +107,12 @@ export async function GET(request: NextRequest) {
         image: scan.image ? {
           ...scan.image,
           sizeBytes: scan.image.sizeBytes?.toString() || null
-        } : undefined
+        } : undefined,
+        // Handle metadata BigInt serialization
+        metadata: scan.metadata ? {
+          ...scan.metadata,
+          dockerSize: scan.metadata.dockerSize?.toString() || null
+        } : null
       } : prismaToScanWithImage(scan);
       
       // Add vulnerability counts and Dockle grade if metadata is available
@@ -122,7 +127,7 @@ export async function GET(request: NextRequest) {
     });
     
     return NextResponse.json({
-      scans: selectFields ? scansData : serializeScan(scansData),
+      scans: serializeScan(scansData),
       pagination: {
         total,
         limit,
