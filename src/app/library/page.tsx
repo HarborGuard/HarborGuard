@@ -131,17 +131,17 @@ export default function LibraryHomePage() {
           break;
         case "severity":
           const severityPriority = {
-            critical: 5,
-            high: 4,
-            medium: 3,
-            low: 2,
-            info: 1,
-            unknown: 0,
+            CRITICAL: 5,
+            HIGH: 4,
+            MEDIUM: 3,
+            LOW: 2,
+            INFO: 1,
+            UNKNOWN: 0,
           };
           aValue =
-            severityPriority[a.severity as keyof typeof severityPriority] || 0;
+            severityPriority[a.severity.toUpperCase() as keyof typeof severityPriority] || 0;
           bValue =
-            severityPriority[b.severity as keyof typeof severityPriority] || 0;
+            severityPriority[b.severity.toUpperCase() as keyof typeof severityPriority] || 0;
           break;
         case "cvssScore":
           aValue = a.cvssScore || 0;
@@ -181,16 +181,18 @@ export default function LibraryHomePage() {
   };
 
   const getSeverityColor = (
-    severity: "critical" | "high" | "medium" | "low"
+    severity: string
   ) => {
-    switch (severity) {
-      case "critical":
+    switch (severity.toUpperCase()) {
+      case "CRITICAL":
         return "destructive";
-      case "high":
+      case "HIGH":
         return "destructive";
-      case "medium":
+      case "MEDIUM":
         return "secondary";
-      case "low":
+      case "LOW":
+        return "outline";
+      case "INFO":
         return "outline";
       default:
         return "outline";
@@ -212,10 +214,10 @@ export default function LibraryHomePage() {
   const stats = React.useMemo(() => {
     const totalCves = vulnerabilities.length;
     const criticalCves = vulnerabilities.filter(
-      (v) => v.severity === "critical"
+      (v) => v.severity.toUpperCase() === "CRITICAL"
     ).length;
     const highCves = vulnerabilities.filter(
-      (v) => v.severity === "high"
+      (v) => v.severity.toUpperCase() === "HIGH"
     ).length;
     const fixableCves = vulnerabilities.filter((v) => v.fixedVersion).length;
     const totalFalsePositives = vulnerabilities.reduce(
@@ -502,16 +504,9 @@ export default function LibraryHomePage() {
                           </TableCell>
                           <TableCell>
                             <Badge
-                              variant={getSeverityColor(
-                                vuln.severity as
-                                  | "critical"
-                                  | "high"
-                                  | "medium"
-                                  | "low"
-                              )}
+                              variant={getSeverityColor(vuln.severity)}
                             >
-                              {vuln.severity.charAt(0).toUpperCase() +
-                                vuln.severity.slice(1)}
+                              {vuln.severity}
                             </Badge>
                           </TableCell>
 

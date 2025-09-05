@@ -103,6 +103,7 @@ export default function ScanResultsPage() {
   const [selectedVulnerability, setSelectedVulnerability] = React.useState<any>(null);
   const [isVulnModalOpen, setIsVulnModalOpen] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<'normalized' | 'raw'>('normalized');
+  const [showRawOutput, setShowRawOutput] = React.useState(false);
 
   // Decode the image name in case it has special characters
   const decodedImageName = decodeURIComponent(imageName);
@@ -266,6 +267,14 @@ export default function ScanResultsPage() {
       fetchConsolidatedClassifications();
     }
   }, [scanData, decodedImageName]);
+  
+  // Check if raw output should be shown
+  useEffect(() => {
+    fetch('/api/config/raw-output')
+      .then(res => res.json())
+      .then(data => setShowRawOutput(data.enabled))
+      .catch(() => setShowRawOutput(false));
+  }, []);
 
   const trivyResults: TrivyReport | null =
     scanData?.metadata?.trivyResults ||
@@ -894,35 +903,37 @@ export default function ScanResultsPage() {
           </CardContent>
         </Card>
 
-        {/* View Mode Toggle */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Scan Results View</CardTitle>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant={viewMode === 'normalized' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setViewMode('normalized')}
-                >
-                  <IconShield className="h-4 w-4 mr-2" />
-                  Normalized View
-                </Button>
-                <Button
-                  variant={viewMode === 'raw' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setViewMode('raw')}
-                >
-                  <IconBug className="h-4 w-4 mr-2" />
-                  Raw Scanner Output
-                </Button>
+        {/* View Mode Toggle - Only show if raw output is enabled */}
+        {showRawOutput ? (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Scan Results View</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant={viewMode === 'normalized' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setViewMode('normalized')}
+                  >
+                    <IconShield className="h-4 w-4 mr-2" />
+                    Normalized View
+                  </Button>
+                  <Button
+                    variant={viewMode === 'raw' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setViewMode('raw')}
+                  >
+                    <IconBug className="h-4 w-4 mr-2" />
+                    Raw Scanner Output
+                  </Button>
+                </div>
               </div>
-            </div>
-          </CardHeader>
-        </Card>
+            </CardHeader>
+          </Card>
+        ) : null}
 
-        {/* Display based on view mode */}
-        {viewMode === 'normalized' ? (
+        {/* Display based on view mode - Always show normalized if raw is disabled */}
+        {!showRawOutput || viewMode === 'normalized' ? (
           <ScanDetailsNormalized
             scanId={scanId}
             scanData={scanData}

@@ -12,6 +12,7 @@ import {
   IconSearch,
   IconSortAscending,
   IconSortDescending,
+  IconMessage,
 } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,8 +40,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { VulnerabilityUrlMenu } from "@/components/vulnerability-url-menu";
 import { CveClassificationDialog } from "@/components/cve-classification-dialog";
+import { VulnerabilityDetailModal } from "./VulnerabilityDetailModal";
+import { PackageDetailModal } from "./PackageDetailModal";
 
 interface ScanDetailsNormalizedProps {
   scanId: string;
@@ -65,7 +74,12 @@ export function ScanDetailsNormalized({
   const [sortField, setSortField] = useState("severity");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [selectedCveId, setSelectedCveId] = useState<string>("");
+  const [selectedPackageName, setSelectedPackageName] = useState<string>("");
   const [classificationDialogOpen, setClassificationDialogOpen] = useState(false);
+  const [selectedVulnerability, setSelectedVulnerability] = useState<any>(null);
+  const [vulnerabilityModalOpen, setVulnerabilityModalOpen] = useState(false);
+  const [selectedPackage, setSelectedPackage] = useState<any>(null);
+  const [packageModalOpen, setPackageModalOpen] = useState(false);
 
   // Fetch normalized findings
   useEffect(() => {
@@ -386,13 +400,32 @@ export function ScanDetailsNormalized({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortFindings(filterFalsePositives(findings.vulnerabilities?.findings || []), sortField).map((vuln: any) => (
-                    <TableRow key={`${vuln.id}-${vuln.source}`} className={isFalsePositive(vuln.cveId) ? 'opacity-50' : ''}>
-                      <TableCell className="font-mono text-sm">
-                        {vuln.cveId}
-                        {isFalsePositive(vuln.cveId) && (
-                          <Badge variant="outline" className="ml-2 text-xs">FP</Badge>
-                        )}
+                  {sortFindings(filterFalsePositives(findings.vulnerabilities?.findings || []), sortField).map((vuln: any) => {
+                    const comment = getComment(vuln.cveId);
+                    return (
+                    <TableRow 
+                      key={`${vuln.id}-${vuln.source}`} 
+                      className={`${isFalsePositive(vuln.cveId) ? 'opacity-50' : ''} cursor-pointer hover:bg-muted/50`}
+                      onClick={() => {
+                        setSelectedVulnerability(vuln);
+                        setVulnerabilityModalOpen(true);
+                      }}
+                    >
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-sm">{vuln.cveId}</span>
+                            {isFalsePositive(vuln.cveId) && (
+                              <Badge variant="outline" className="text-xs">FP</Badge>
+                            )}
+                          </div>
+                          {comment && (
+                            <div className="flex items-start gap-1 mt-1">
+                              <IconMessage className="h-3 w-3 text-muted-foreground mt-0.5 flex-shrink-0" />
+                              <span className="text-xs text-muted-foreground italic">{comment}</span>
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="font-mono text-sm">
                         {vuln.packageName}
@@ -406,7 +439,7 @@ export function ScanDetailsNormalized({
                       <TableCell className="font-mono text-sm text-green-600">
                         {vuln.fixedVersion || '-'}
                       </TableCell>
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex gap-2">
                           <VulnerabilityUrlMenu
                             cve={vuln.cveId}
@@ -415,8 +448,10 @@ export function ScanDetailsNormalized({
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setSelectedCveId(vuln.cveId);
+                              setSelectedPackageName(vuln.packageName);
                               setClassificationDialogOpen(true);
                             }}
                           >
@@ -425,7 +460,7 @@ export function ScanDetailsNormalized({
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )})}
                 </TableBody>
               </Table>
             </CardContent>
@@ -455,7 +490,14 @@ export function ScanDetailsNormalized({
                 </TableHeader>
                 <TableBody>
                   {(findings.packages?.findings || []).map((pkg: any) => (
-                    <TableRow key={`${pkg.id}-${pkg.source}`}>
+                    <TableRow 
+                      key={`${pkg.id}-${pkg.source}`}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => {
+                        setSelectedPackage(pkg);
+                        setPackageModalOpen(true);
+                      }}
+                    >
                       <TableCell className="font-mono text-sm">{pkg.packageName}</TableCell>
                       <TableCell className="font-mono text-sm">{pkg.version || '-'}</TableCell>
                       <TableCell>{pkg.type}</TableCell>
@@ -570,6 +612,20 @@ export function ScanDetailsNormalized({
         </TabsContent>
       </Tabs>
 
+      {/* Modals */}
+      <VulnerabilityDetailModal
+        isOpen={vulnerabilityModalOpen}
+        onClose={() => setVulnerabilityModalOpen(false)}
+        vulnerability={selectedVulnerability}
+        classification={selectedVulnerability ? getClassification(selectedVulnerability.cveId) : null}
+      />
+
+      <PackageDetailModal
+        isOpen={packageModalOpen}
+        onClose={() => setPackageModalOpen(false)}
+        packageData={selectedPackage}
+      />
+
       {/* CVE Classification Dialog */}
       <CveClassificationDialog
         isOpen={classificationDialogOpen}
@@ -578,8 +634,39 @@ export function ScanDetailsNormalized({
         imageId={scanData?.image?.id}
         currentClassification={getClassification(selectedCveId)}
         onSave={async (classification) => {
-          await onClassificationChange();
-          setClassificationDialogOpen(false);
+          if (!selectedPackageName || !scanData?.image?.id) {
+            console.error('Cannot save classification: missing package name or image ID');
+            return;
+          }
+          
+          try {
+            const response = await fetch(
+              `/api/scans/${scanId}/cve-classifications`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  cveId: classification.cveId,
+                  packageName: selectedPackageName,
+                  isFalsePositive: classification.isFalsePositive,
+                  comment: classification.comment,
+                  createdBy: classification.createdBy
+                })
+              }
+            );
+            
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.error || 'Failed to save classification');
+            }
+            
+            // Refresh classifications after successful save
+            await onClassificationChange();
+            setClassificationDialogOpen(false);
+          } catch (error) {
+            console.error('Failed to save CVE classification:', error);
+            alert(`Failed to save classification: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
         }}
       />
     </div>

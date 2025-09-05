@@ -3,10 +3,10 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const scanId = params.id;
+    const { id: scanId } = await params;
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'all';
     const search = searchParams.get('search') || '';
@@ -35,7 +35,7 @@ export async function GET(
     };
 
     // Build common where clause for filtering
-    const buildWhereClause = (additionalFilters = {}) => {
+    const buildWhereClause = (findingType: string, additionalFilters = {}) => {
       const where: any = { scanId, ...additionalFilters };
       
       if (source) {
@@ -43,21 +43,21 @@ export async function GET(
       }
       
       if (search) {
-        // Add search conditions based on type
-        if (type === 'vulnerabilities' || type === 'all') {
+        // Add search conditions based on finding type
+        if (findingType === 'vulnerabilities') {
           where.OR = [
             { cveId: { contains: search, mode: 'insensitive' } },
             { packageName: { contains: search, mode: 'insensitive' } },
             { description: { contains: search, mode: 'insensitive' } },
             { title: { contains: search, mode: 'insensitive' } }
           ];
-        } else if (type === 'packages') {
+        } else if (findingType === 'packages') {
           where.OR = [
             { packageName: { contains: search, mode: 'insensitive' } },
             { version: { contains: search, mode: 'insensitive' } },
             { type: { contains: search, mode: 'insensitive' } }
           ];
-        } else if (type === 'compliance') {
+        } else if (findingType === 'compliance') {
           where.OR = [
             { ruleName: { contains: search, mode: 'insensitive' } },
             { message: { contains: search, mode: 'insensitive' } },
@@ -66,7 +66,8 @@ export async function GET(
         }
       }
       
-      if (severity && (type === 'vulnerabilities' || type === 'compliance' || type === 'all')) {
+      // Only add severity filter for findings that have severity field
+      if (severity && (findingType === 'vulnerabilities' || findingType === 'compliance')) {
         where.severity = severity.toUpperCase();
       }
       
@@ -76,7 +77,7 @@ export async function GET(
     // Fetch vulnerabilities
     if (type === 'vulnerabilities' || type === 'all') {
       const vulnerabilities = await prisma.scanVulnerabilityFinding.findMany({
-        where: buildWhereClause(),
+        where: buildWhereClause('vulnerabilities'),
         orderBy: [
           { severity: 'desc' },
           { cvssScore: 'desc' },
@@ -118,7 +119,7 @@ export async function GET(
     // Fetch packages
     if (type === 'packages' || type === 'all') {
       const packages = await prisma.scanPackageFinding.findMany({
-        where: buildWhereClause(),
+        where: buildWhereClause('packages'),
         orderBy: [
           { packageName: 'asc' },
           { version: 'asc' }
@@ -150,7 +151,7 @@ export async function GET(
     // Fetch compliance findings
     if (type === 'compliance' || type === 'all') {
       const compliance = await prisma.scanComplianceFinding.findMany({
-        where: buildWhereClause(),
+        where: buildWhereClause('compliance'),
         orderBy: [
           { severity: 'desc' },
           { category: 'asc' },
