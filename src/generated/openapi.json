@@ -25,6 +25,10 @@
       "description": "Audit logging and history"
     },
     {
+      "name": "Config",
+      "description": "Config operations"
+    },
+    {
       "name": "Docker",
       "description": "Docker daemon and local image operations"
     },
@@ -144,6 +148,19 @@
                 ]
               }
             }
+          }
+        }
+      }
+    },
+    "/api/config/raw-output": {
+      "get": {
+        "summary": "GET /api/config/raw-output",
+        "tags": [
+          "Config"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
           }
         }
       }
