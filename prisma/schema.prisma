@@ -47,10 +47,15 @@ model Scan {
   source           String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
-  bulkScanItems    BulkScanItem[]
-  scanResults      ScanResult[]
-  metadata         ScanMetadata?     @relation(fields: [metadataId], references: [id], onDelete: SetNull)
-  image            Image             @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  bulkScanItems              BulkScanItem[]
+  scanResults                ScanResult[]
+  metadata                   ScanMetadata?              @relation(fields: [metadataId], references: [id], onDelete: SetNull)
+  image                      Image                      @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  vulnerabilityFindings      ScanVulnerabilityFinding[]
+  packageFindings            ScanPackageFinding[]
+  complianceFindings         ScanComplianceFinding[]
+  efficiencyFindings         ScanEfficiencyFinding[]
+  findingCorrelations        ScanFindingCorrelation[]
 
   @@index([requestId])
   @@index([status])
@@ -284,6 +289,185 @@ model Repository {
   @@index([status])
   @@index([createdAt])
   @@map("repositories")
+}
+
+// ============================================
+// Scanner Finding Tables - Normalized Results
+// ============================================
+
+model ScanVulnerabilityFinding {
+  id                String   @id @default(cuid())
+  scanId            String
+  source            String   // 'trivy', 'grype', 'osv'
+  
+  // Core vulnerability info
+  cveId             String
+  packageName       String
+  installedVersion  String?
+  fixedVersion      String?
+  severity          Severity
+  cvssScore         Float?
+  
+  // Source-specific metadata
+  dataSource        String?  // 'nvd', 'ghsa', 'redhat', etc.
+  vulnerabilityUrl  String?
+  title             String?
+  description       String?  @db.Text
+  publishedDate     DateTime?
+  lastModified      DateTime?
+  
+  // Location info
+  filePath          String?
+  layerId           String?
+  packageType       String?  // 'os', 'library', 'application'
+  
+  // Scanner-specific raw data
+  rawFinding        Json?    // Original finding from scanner
+  
+  createdAt         DateTime @default(now())
+  scan              Scan     @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  
+  @@index([scanId])
+  @@index([cveId])
+  @@index([source])
+  @@index([severity])
+  @@index([packageName])
+  @@index([scanId, cveId, source]) // For cross-scanner analysis
+  @@map("scan_vulnerability_findings")
+}
+
+model ScanPackageFinding {
+  id                String   @id @default(cuid())
+  scanId            String
+  source            String   // 'syft', 'trivy', 'grype'
+  
+  // Package identification
+  packageName       String
+  version           String?
+  type              String   // 'npm', 'python', 'go', 'os', etc.
+  purl              String?  // Package URL
+  
+  // Package metadata
+  license           String?
+  vendor            String?
+  publisher         String?
+  ecosystem         String?
+  language          String?
+  
+  // Location info
+  filePath          String?
+  layerId           String?
+  installedSize     BigInt?
+  
+  // Additional metadata
+  metadata          Json?    // Flexible field for scanner-specific data
+  dependencies      Json?    // Array of dependency purls
+  
+  createdAt         DateTime @default(now())
+  scan              Scan     @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  
+  @@index([scanId])
+  @@index([packageName])
+  @@index([source])
+  @@index([type])
+  @@index([ecosystem])
+  @@map("scan_package_findings")
+}
+
+model ScanComplianceFinding {
+  id                String   @id @default(cuid())
+  scanId            String
+  source            String   // 'dockle', future compliance scanners
+  
+  // Compliance violation info
+  ruleId            String
+  ruleName          String
+  category          String   // 'CIS', 'Security', 'BestPractice'
+  severity          Severity
+  
+  // Details
+  message           String   @db.Text
+  description       String?  @db.Text
+  remediation       String?  @db.Text
+  
+  // Context
+  filePath          String?
+  lineNumber        Int?
+  code              String?  @db.Text
+  
+  // Raw data
+  rawFinding        Json?
+  
+  createdAt         DateTime @default(now())
+  scan              Scan     @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  
+  @@index([scanId])
+  @@index([ruleId])
+  @@index([source])
+  @@index([severity])
+  @@index([category])
+  @@map("scan_compliance_findings")
+}
+
+model ScanEfficiencyFinding {
+  id                String   @id @default(cuid())
+  scanId            String
+  source            String   // 'dive', future efficiency scanners
+  
+  // Finding type
+  findingType       String   // 'wasted_space', 'duplicate_files', 'large_layer'
+  severity          String   // 'info', 'warning', 'critical'
+  
+  // Layer/file info
+  layerId           String?
+  layerIndex        Int?
+  layerCommand      String?  @db.Text
+  
+  // Size metrics
+  sizeBytes         BigInt?
+  wastedBytes       BigInt?
+  efficiencyScore   Float?   // 0-100
+  
+  // Details
+  description       String   @db.Text
+  filePaths         Json?    // Array of affected file paths
+  
+  // Raw data
+  rawFinding        Json?
+  
+  createdAt         DateTime @default(now())
+  scan              Scan     @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  
+  @@index([scanId])
+  @@index([findingType])
+  @@index([source])
+  @@index([layerId])
+  @@map("scan_efficiency_findings")
+}
+
+// Cross-scanner correlation for consensus analysis
+model ScanFindingCorrelation {
+  id                String   @id @default(cuid())
+  scanId            String
+  
+  findingType       String   // 'vulnerability', 'package', etc.
+  correlationKey    String   // CVE ID, package name, etc.
+  
+  sources           Json     // Array of scanner names that found this
+  sourceCount       Int      // Number of scanners that found this
+  confidenceScore   Float    // 0-1 based on agreement
+  
+  // Aggregated severity (highest from all sources)
+  severity          Severity?
+  
+  createdAt         DateTime @default(now())
+  scan              Scan     @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  
+  @@unique([scanId, findingType, correlationKey])
+  @@index([scanId])
+  @@index([correlationKey])
+  @@index([sourceCount])
+  @@map("scan_finding_correlations")
 }
 
 enum RepositoryType {
