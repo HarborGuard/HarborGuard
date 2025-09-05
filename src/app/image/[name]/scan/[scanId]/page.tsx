@@ -22,6 +22,7 @@ import {
 } from "@tabler/icons-react";
 
 import { AppSidebar } from "@/components/app-sidebar";
+import { ScanDetailsNormalized } from "@/components/scan/ScanDetailsNormalized";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { VulnerabilityUrlMenu } from "@/components/vulnerability-url-menu";
@@ -101,6 +102,7 @@ export default function ScanResultsPage() {
   const [showFalsePositives, setShowFalsePositives] = React.useState(true);
   const [selectedVulnerability, setSelectedVulnerability] = React.useState<any>(null);
   const [isVulnModalOpen, setIsVulnModalOpen] = React.useState(false);
+  const [viewMode, setViewMode] = React.useState<'normalized' | 'raw'>('normalized');
 
   // Decode the image name in case it has special characters
   const decodedImageName = decodeURIComponent(imageName);
@@ -892,7 +894,43 @@ export default function ScanResultsPage() {
           </CardContent>
         </Card>
 
-        {/* Scan Tools Results */}
+        {/* View Mode Toggle */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Scan Results View</CardTitle>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={viewMode === 'normalized' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('normalized')}
+                >
+                  <IconShield className="h-4 w-4 mr-2" />
+                  Normalized View
+                </Button>
+                <Button
+                  variant={viewMode === 'raw' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('raw')}
+                >
+                  <IconBug className="h-4 w-4 mr-2" />
+                  Raw Scanner Output
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+
+        {/* Display based on view mode */}
+        {viewMode === 'normalized' ? (
+          <ScanDetailsNormalized
+            scanId={scanId}
+            scanData={scanData}
+            showFalsePositives={showFalsePositives}
+            consolidatedClassifications={consolidatedClassifications}
+            onClassificationChange={fetchConsolidatedClassifications}
+          />
+        ) : (
         <Tabs defaultValue="trivy" className="w-full">
           <TabsList
             className={`grid w-full ${
@@ -2001,6 +2039,7 @@ export default function ScanResultsPage() {
             </TabsContent>
           )}
         </Tabs>
+        )}
       </div>
       <CveClassificationDialog
         isOpen={classificationDialogOpen}

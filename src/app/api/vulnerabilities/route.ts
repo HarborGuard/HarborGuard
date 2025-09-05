@@ -27,33 +27,36 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || '';
     const severity = searchParams.get('severity') || '';
 
-    // Get all scans with their scan results
-    const scans = await prisma.scan.findMany({
-      where: {
-        status: 'SUCCESS'
-      },
-      include: {
-        image: true,
-        metadata: true
-      }
-    });
+    // Build where clause for filtering
+    const whereClause: any = {};
+    if (severity) {
+      whereClause.severity = severity.toUpperCase();
+    }
+    if (search) {
+      whereClause.OR = [
+        { cveId: { contains: search, mode: 'insensitive' } },
+        { packageName: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+        { title: { contains: search, mode: 'insensitive' } }
+      ];
+    }
 
-    // Extract all vulnerabilities from scan metadata
-    const cveMap = new Map<string, {
-      cveId: string;
-      severity: string;
-      description: string;
-      cvssScore?: number;
-      packageNames: Set<string>;
-      fixedVersions: Set<string>;
-      publishedDate?: string;
-      references: Set<string>;
-      affectedImages: Map<string, {
-        imageName: string;
-        imageId: string;
-        isFalsePositive: boolean;
-      }>;
-    }>();
+    // Get vulnerability findings from normalized tables with aggregation
+    const vulnerabilityFindings = await prisma.scanVulnerabilityFinding.findMany({
+      where: whereClause,
+      include: {
+        scan: {
+          include: {
+            image: true
+          }
+        }
+      },
+      orderBy: [
+        { severity: 'desc' },
+        { cvssScore: 'desc' },
+        { cveId: 'asc' }
+      ]
+    });
 
     // Get all CVE classifications to check for false positives
     const allClassifications = await prisma.cveClassification.findMany({
@@ -81,209 +84,159 @@ export async function GET(request: NextRequest) {
     // Helper function to get severity priority (higher number = higher severity)
     const getSeverityPriority = (severity: string) => {
       const priority: { [key: string]: number } = {
-        'critical': 5,
-        'high': 4,
-        'medium': 3,
-        'low': 2,
-        'negligible': 1,
-        'info': 1,
-        'unknown': 0
+        'CRITICAL': 5,
+        'HIGH': 4,
+        'MEDIUM': 3,
+        'LOW': 2,
+        'INFO': 1,
+        'UNKNOWN': 0
       };
-      return priority[severity.toLowerCase()] || 0;
-    }
+      return priority[severity] || 0;
+    };
 
-    // Process each scan for vulnerabilities
-    for (const scan of scans) {
-      // Skip if no metadata
-      if (!scan.metadata) continue;
+    // Group vulnerabilities by CVE ID
+    const cveMap = new Map<string, {
+      cveId: string;
+      severity: string;
+      description: string;
+      cvssScore?: number;
+      packageNames: Set<string>;
+      fixedVersions: Set<string>;
+      publishedDate?: Date;
+      references: Set<string>;
+      affectedImages: Map<string, {
+        imageName: string;
+        imageId: string;
+        isFalsePositive: boolean;
+      }>;
+      sources: Set<string>;
+    }>();
+
+    // Process all vulnerability findings
+    for (const finding of vulnerabilityFindings) {
+      const cveId = finding.cveId;
       
-      // Access scan results from metadata
-      const scanResults = {
-        trivy: scan.metadata.trivyResults as any,
-        grype: scan.metadata.grypeResults as any
-      };
-      
-      // Process Trivy results
-      const trivyResults = scanResults?.trivy;
-      if (trivyResults?.Results) {
-        for (const result of trivyResults.Results) {
-          if (result.Vulnerabilities) {
-            for (const vuln of result.Vulnerabilities) {
-              const cveId = vuln.VulnerabilityID;
-              if (!cveId) continue;
+      // Check if this CVE is marked as false positive for this image
+      const imageClassifications = classificationMap.get(cveId);
+      const isFalsePositive = imageClassifications?.get(finding.scan.imageId) || false;
 
-              // Check if this CVE is marked as false positive for this image
-              const imageClassifications = classificationMap.get(cveId);
-              const isFalsePositive = imageClassifications?.get(scan.imageId) || false;
-
-              if (!cveMap.has(cveId)) {
-                cveMap.set(cveId, {
-                  cveId,
-                  severity: vuln.Severity?.toLowerCase() || 'unknown',
-                  description: vuln.Description || vuln.Title || '',
-                  cvssScore: vuln.CVSS?.nvd?.V3Score || vuln.CVSS?.redhat?.V3Score,
-                  packageNames: new Set(),
-                  fixedVersions: new Set(),
-                  publishedDate: vuln.PublishedDate,
-                  references: new Set(),
-                  affectedImages: new Map()
-                });
-              } else {
-                // Update to highest severity if this one is higher
-                const existing = cveMap.get(cveId)!;
-                const newSeverity = vuln.Severity?.toLowerCase() || 'unknown';
-                if (getSeverityPriority(newSeverity) > getSeverityPriority(existing.severity)) {
-                  existing.severity = newSeverity;
-                }
-                // Update CVSS if higher
-                const newCvss = vuln.CVSS?.nvd?.V3Score || vuln.CVSS?.redhat?.V3Score;
-                if (newCvss && (!existing.cvssScore || newCvss > existing.cvssScore)) {
-                  existing.cvssScore = newCvss;
-                }
-                // Update description if empty
-                if (!existing.description && (vuln.Description || vuln.Title)) {
-                  existing.description = vuln.Description || vuln.Title || '';
-                }
-              }
-
-              const cveData = cveMap.get(cveId)!;
-
-              // Add package information
-              if (vuln.PkgName) {
-                cveData.packageNames.add(vuln.PkgName);
-              }
-
-              // Add fixed version information
-              if (vuln.FixedVersion) {
-                cveData.fixedVersions.add(vuln.FixedVersion);
-              }
-
-              // Add references
-              if (vuln.References) {
-                vuln.References.forEach((ref: string) => cveData.references.add(ref));
-              }
-
-              // Add affected image (using imageId as key to avoid duplicates)
-              cveData.affectedImages.set(scan.imageId, {
-                imageName: scan.image.name,
-                imageId: scan.imageId,
-                isFalsePositive
-              });
-            }
-          }
+      if (!cveMap.has(cveId)) {
+        cveMap.set(cveId, {
+          cveId,
+          severity: finding.severity,
+          description: finding.description || finding.title || '',
+          cvssScore: finding.cvssScore || undefined,
+          packageNames: new Set(),
+          fixedVersions: new Set(),
+          publishedDate: finding.publishedDate || undefined,
+          references: new Set(),
+          affectedImages: new Map(),
+          sources: new Set()
+        });
+      } else {
+        // Update to highest severity if this one is higher
+        const existing = cveMap.get(cveId)!;
+        if (getSeverityPriority(finding.severity) > getSeverityPriority(existing.severity)) {
+          existing.severity = finding.severity;
+        }
+        // Update CVSS if higher
+        if (finding.cvssScore && (!existing.cvssScore || finding.cvssScore > existing.cvssScore)) {
+          existing.cvssScore = finding.cvssScore;
+        }
+        // Update description if empty
+        if (!existing.description && (finding.description || finding.title)) {
+          existing.description = finding.description || finding.title || '';
         }
       }
-      
-      // Process Grype results
-      const grypeResults = scanResults?.grype;
-      if (grypeResults?.matches) {
-        for (const match of grypeResults.matches) {
-          const vuln = match.vulnerability;
-          if (!vuln) continue;
-          
-          const cveId = vuln.id;
-          if (!cveId) continue;
 
-          // Check if this CVE is marked as false positive for this image
-          const imageClassifications = classificationMap.get(cveId);
-          const isFalsePositive = imageClassifications?.get(scan.imageId) || false;
+      const cveData = cveMap.get(cveId)!;
 
-          if (!cveMap.has(cveId)) {
-            cveMap.set(cveId, {
-              cveId,
-              severity: vuln.severity?.toLowerCase() || 'unknown',
-              description: vuln.description || '',
-              cvssScore: vuln.cvss?.[0]?.metrics?.baseScore,
-              packageNames: new Set(),
-              fixedVersions: new Set(),
-              publishedDate: vuln.publishedDate,
-              references: new Set(),
-              affectedImages: new Map()
-            });
-          } else {
-            // Update to highest severity if this one is higher
-            const existing = cveMap.get(cveId)!;
-            const newSeverity = vuln.severity?.toLowerCase() || 'unknown';
-            if (getSeverityPriority(newSeverity) > getSeverityPriority(existing.severity)) {
-              existing.severity = newSeverity;
-            }
-          }
-
-          const cveData = cveMap.get(cveId)!;
-
-          // Add package information from artifact
-          if (match.artifact?.name) {
-            cveData.packageNames.add(match.artifact.name);
-          }
-
-          // Add fixed version information
-          if (vuln.fix?.versions && vuln.fix.versions.length > 0) {
-            vuln.fix.versions.forEach((v: string) => cveData.fixedVersions.add(v));
-          }
-
-          // Add references from URLs
-          if (vuln.urls) {
-            vuln.urls.forEach((url: string) => cveData.references.add(url));
-          }
-
-          // Add affected image (using imageId as key to avoid duplicates)
-          cveData.affectedImages.set(scan.imageId, {
-            imageName: scan.image.name,
-            imageId: scan.imageId,
-            isFalsePositive
-          });
-        }
+      // Add package information
+      if (finding.packageName) {
+        cveData.packageNames.add(finding.packageName);
       }
+
+      // Add fixed version information
+      if (finding.fixedVersion) {
+        cveData.fixedVersions.add(finding.fixedVersion);
+      }
+
+      // Add vulnerability URL as reference
+      if (finding.vulnerabilityUrl) {
+        cveData.references.add(finding.vulnerabilityUrl);
+      }
+
+      // Add scanner source
+      cveData.sources.add(finding.source);
+
+      // Add affected image (using imageId as key to avoid duplicates)
+      cveData.affectedImages.set(finding.scan.imageId, {
+        imageName: finding.scan.image.name,
+        imageId: finding.scan.imageId,
+        isFalsePositive
+      });
     }
+
+    // Also check for correlations to get multi-scanner consensus
+    const correlations = await prisma.scanFindingCorrelation.findMany({
+      where: {
+        findingType: 'vulnerability'
+      },
+      select: {
+        correlationKey: true,
+        sources: true,
+        sourceCount: true,
+        confidenceScore: true
+      }
+    });
+
+    // Add correlation data to CVEs
+    const correlationMap = new Map<string, any>();
+    correlations.forEach(corr => {
+      correlationMap.set(corr.correlationKey, corr);
+    });
 
     // Convert to array and apply filters
-    let vulnerabilities = Array.from(cveMap.values()).map(cve => ({
-      cveId: cve.cveId,
-      severity: cve.severity,
-      description: cve.description,
-      cvssScore: cve.cvssScore,
-      packageName: Array.from(cve.packageNames)[0], // Just show first package for simplicity
-      affectedImages: Array.from(cve.affectedImages.values()),
-      totalAffectedImages: cve.affectedImages.size,
-      falsePositiveImages: Array.from(cve.affectedImages.values())
-        .filter(img => img.isFalsePositive)
-        .map(img => img.imageName),
-      fixedVersion: Array.from(cve.fixedVersions)[0], // Just show first fixed version
-      publishedDate: cve.publishedDate,
-      references: Array.from(cve.references)
-    }));
-
-    // Apply severity filter
-    if (severity) {
-      vulnerabilities = vulnerabilities.filter(v => 
-        v.severity.toLowerCase() === severity.toLowerCase()
-      );
-    }
-
-    // Apply search filter
-    if (search) {
-      const searchLower = search.toLowerCase();
-      vulnerabilities = vulnerabilities.filter(v =>
-        v.cveId.toLowerCase().includes(searchLower) ||
-        v.description.toLowerCase().includes(searchLower) ||
-        v.packageName?.toLowerCase().includes(searchLower)
-      );
-    }
+    let vulnerabilities = Array.from(cveMap.values()).map(cve => {
+      const correlation = correlationMap.get(cve.cveId);
+      return {
+        cveId: cve.cveId,
+        severity: cve.severity,
+        description: cve.description,
+        cvssScore: cve.cvssScore,
+        packageName: Array.from(cve.packageNames)[0], // Just show first package for simplicity
+        affectedImages: Array.from(cve.affectedImages.values()),
+        totalAffectedImages: cve.affectedImages.size,
+        falsePositiveImages: Array.from(cve.affectedImages.values())
+          .filter(img => img.isFalsePositive)
+          .map(img => img.imageName),
+        fixedVersion: Array.from(cve.fixedVersions)[0], // Just show first fixed version
+        publishedDate: cve.publishedDate?.toISOString(),
+        references: Array.from(cve.references),
+        sources: Array.from(cve.sources),
+        sourceCount: correlation?.sourceCount || cve.sources.size,
+        confidenceScore: correlation?.confidenceScore
+      };
+    });
 
     // Sort by severity (critical > high > medium > low > unknown)
     const severityPriority: { [key: string]: number } = {
-      'critical': 5,
-      'high': 4,
-      'medium': 3,
-      'low': 2,
-      'info': 1,
-      'unknown': 0
+      'CRITICAL': 5,
+      'HIGH': 4,
+      'MEDIUM': 3,
+      'LOW': 2,
+      'INFO': 1,
+      'UNKNOWN': 0
     };
 
     vulnerabilities.sort((a, b) => {
       const aPriority = severityPriority[a.severity] || 0;
       const bPriority = severityPriority[b.severity] || 0;
-      return bPriority - aPriority; // Descending order
+      if (bPriority !== aPriority) {
+        return bPriority - aPriority; // Descending order
+      }
+      // Secondary sort by source count (more sources = higher confidence)
+      return (b.sourceCount || 1) - (a.sourceCount || 1);
     });
 
     // Apply pagination
