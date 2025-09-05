@@ -14,7 +14,8 @@ export async function GET(
     const scan = await prisma.scan.findUnique({
       where: { id: scanId },
       include: {
-        image: true
+        image: true,
+        metadata: true
       }
     })
 
@@ -31,16 +32,15 @@ export async function GET(
     const zip = new JSZip()
     const reportsFolder = zip.folder('reports')
 
-    // Add available reports to the ZIP - check both new and old schema locations
-    const scanResults = (scan as any).metadata?.scanResults || {};
-    const scannerReports = (scan as any).scannerReports || {};
+    // Add available reports to the ZIP from metadata
+    const metadata = scan.metadata;
     const reports = [
-      { name: 'trivy', data: scanResults.trivy || scannerReports.trivy || (scan as any).trivy },
-      { name: 'grype', data: scanResults.grype || scannerReports.grype || (scan as any).grype },
-      { name: 'syft', data: scanResults.syft || scannerReports.syft || (scan as any).syft },
-      { name: 'dockle', data: scanResults.dockle || scannerReports.dockle || (scan as any).dockle },
-      { name: 'osv', data: scanResults.osv || scannerReports.osv || (scan as any).osv },
-      { name: 'dive', data: scanResults.dive || scannerReports.dive || (scan as any).dive }
+      { name: 'trivy', data: metadata?.trivyResults },
+      { name: 'grype', data: metadata?.grypeResults },
+      { name: 'syft', data: metadata?.syftResults },
+      { name: 'dockle', data: metadata?.dockleResults },
+      { name: 'osv', data: metadata?.osvResults },
+      { name: 'dive', data: metadata?.diveResults }
     ]
 
     let hasReports = false
@@ -56,22 +56,28 @@ export async function GET(
     }
 
     // Add scan metadata
-    const metadata = {
+    const scanMetadata = {
       scanId: scan.id,
       imageName: scan.image.name,
       imageTag: scan.image.tag,
       startedAt: scan.startedAt,
       finishedAt: scan.finishedAt,
       status: scan.status,
-      requestId: (scan as any).requestId,
-      vulnerabilityCount: (scan as any).vulnerabilityCount,
-      riskScore: (scan as any).riskScore,
-      complianceScore: (scan as any).complianceScore,
-      scannerVersions: (scan as any).scannerVersions,
+      requestId: scan.requestId,
+      vulnerabilityCount: metadata ? {
+        critical: metadata.vulnerabilityCritical || 0,
+        high: metadata.vulnerabilityHigh || 0,
+        medium: metadata.vulnerabilityMedium || 0,
+        low: metadata.vulnerabilityLow || 0,
+        info: metadata.vulnerabilityInfo || 0
+      } : undefined,
+      riskScore: scan.riskScore,
+      complianceScore: metadata?.complianceScore,
+      scannerVersions: metadata?.scannerVersions,
       exportedAt: new Date().toISOString()
     }
     
-    zip.file('scan-metadata.json', JSON.stringify(metadata, null, 2))
+    zip.file('scan-metadata.json', JSON.stringify(scanMetadata, null, 2))
 
     // Generate the ZIP file
     const zipBuffer = await zip.generateAsync({ type: 'arraybuffer' })
