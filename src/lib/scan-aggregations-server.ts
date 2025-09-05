@@ -14,7 +14,8 @@ export async function recalculateImageRiskScores(imageId: string): Promise<void>
     const scans = await prisma.scan.findMany({
       where: { imageId },
       include: {
-        image: true
+        image: true,
+        metadata: true
       }
     });
 
@@ -32,7 +33,8 @@ export async function recalculateImageRiskScores(imageId: string): Promise<void>
         let vulnerabilityCount = 0;
 
         // Get scan results from metadata
-        const scanResults = (scan.metadata as any)?.scanResults;
+        const trivyResults = scan.metadata?.trivyResults as any;
+        const scanResults = { trivy: trivyResults };
         
         if (scanResults?.trivy?.Results) {
           for (const result of scanResults.trivy.Results) {

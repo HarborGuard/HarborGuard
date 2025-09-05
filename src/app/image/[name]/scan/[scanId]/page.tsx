@@ -22,6 +22,7 @@ import {
 } from "@tabler/icons-react";
 
 import { AppSidebar } from "@/components/app-sidebar";
+import { ScanDetailsNormalized } from "@/components/scan/ScanDetailsNormalized";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { VulnerabilityUrlMenu } from "@/components/vulnerability-url-menu";
@@ -101,6 +102,8 @@ export default function ScanResultsPage() {
   const [showFalsePositives, setShowFalsePositives] = React.useState(true);
   const [selectedVulnerability, setSelectedVulnerability] = React.useState<any>(null);
   const [isVulnModalOpen, setIsVulnModalOpen] = React.useState(false);
+  const [viewMode, setViewMode] = React.useState<'normalized' | 'raw'>('normalized');
+  const [showRawOutput, setShowRawOutput] = React.useState(false);
 
   // Decode the image name in case it has special characters
   const decodedImageName = decodeURIComponent(imageName);
@@ -264,34 +267,42 @@ export default function ScanResultsPage() {
       fetchConsolidatedClassifications();
     }
   }, [scanData, decodedImageName]);
+  
+  // Check if raw output should be shown
+  useEffect(() => {
+    fetch('/api/config/raw-output')
+      .then(res => res.json())
+      .then(data => setShowRawOutput(data.enabled))
+      .catch(() => setShowRawOutput(false));
+  }, []);
 
   const trivyResults: TrivyReport | null =
-    scanData?.metadata?.scanResults?.trivy ||
+    scanData?.metadata?.trivyResults ||
     scanData?.scannerReports?.trivy ||
     scanData?.trivy ||
     null;
   const grypResults: GrypeReport | null =
-    scanData?.metadata?.scanResults?.grype ||
+    scanData?.metadata?.grypeResults ||
     scanData?.scannerReports?.grype ||
     scanData?.grype ||
     null;
   const syftResults: SyftReport | null =
-    scanData?.metadata?.scanResults?.syft ||
+    scanData?.metadata?.syftResults ||
     scanData?.scannerReports?.syft ||
     scanData?.syft ||
     null;
   const dockleResults: DockleReport | null =
-    scanData?.metadata?.scanResults?.dockle ||
+    scanData?.metadata?.dockleResults ||
     scanData?.scannerReports?.dockle ||
     scanData?.dockle ||
     null;
   const osvResults: OSVReport | null =
-    scanData?.metadata?.scanResults?.osv ||
+    scanData?.metadata?.osvResults ||
     scanData?.scannerReports?.osv ||
     scanData?.osv ||
     null;
   const diveResults: DiveReport | null =
-    scanData?.metadata?.scanResults?.dive ||
+    scanData?.metadata?.diveResults ||
     scanData?.scannerReports?.dive ||
     scanData?.dive ||
     null;
@@ -300,10 +311,8 @@ export default function ScanResultsPage() {
   console.log("🔍 Debug Scan Data Structure:", {
     scanData: scanData ? Object.keys(scanData) : "null",
     hasMetadata: !!scanData?.metadata,
-    hasScanResults: !!scanData?.metadata?.scanResults,
-    scanResultsKeys: scanData?.metadata?.scanResults
-      ? Object.keys(scanData.metadata.scanResults)
-      : "none",
+    hasTrivyResults: !!scanData?.metadata?.trivyResults,
+    hasGrypeResults: !!scanData?.metadata?.grypeResults,
     hasTrivyDirect: !!scanData?.trivy,
     hasGrypeDirect: !!scanData?.grype,
     hasScannerReports: !!scanData?.scannerReports,
@@ -894,7 +903,45 @@ export default function ScanResultsPage() {
           </CardContent>
         </Card>
 
-        {/* Scan Tools Results */}
+        {/* View Mode Toggle - Only show if raw output is enabled */}
+        {showRawOutput ? (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Scan Results View</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant={viewMode === 'normalized' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setViewMode('normalized')}
+                  >
+                    <IconShield className="h-4 w-4 mr-2" />
+                    Normalized View
+                  </Button>
+                  <Button
+                    variant={viewMode === 'raw' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setViewMode('raw')}
+                  >
+                    <IconBug className="h-4 w-4 mr-2" />
+                    Raw Scanner Output
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+          </Card>
+        ) : null}
+
+        {/* Display based on view mode - Always show normalized if raw is disabled */}
+        {!showRawOutput || viewMode === 'normalized' ? (
+          <ScanDetailsNormalized
+            scanId={scanId}
+            scanData={scanData}
+            showFalsePositives={showFalsePositives}
+            consolidatedClassifications={consolidatedClassifications}
+            onClassificationChange={fetchConsolidatedClassifications}
+          />
+        ) : (
         <Tabs defaultValue="trivy" className="w-full">
           <TabsList
             className={`grid w-full ${
@@ -2003,6 +2050,7 @@ export default function ScanResultsPage() {
             </TabsContent>
           )}
         </Tabs>
+        )}
       </div>
       <CveClassificationDialog
         isOpen={classificationDialogOpen}

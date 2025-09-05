@@ -13,7 +13,8 @@ export async function GET(
     const scan = await prisma.scan.findUnique({
       where: { id: scanId },
       include: {
-        image: true
+        image: true,
+        metadata: true
       }
     })
 
@@ -30,32 +31,32 @@ export async function GET(
     let reportData: any = null
     let filename: string = ''
 
-    // Get scan results from the new schema structure
-    const scanResults = (scan as any).metadata?.scanResults;
+    // Get scan results from the metadata
+    const metadata = scan.metadata;
     
     switch (reportType.toLowerCase()) {
       case 'trivy':
-        reportData = scanResults?.trivy || (scan as any).scannerReports?.trivy || (scan as any).trivy
+        reportData = metadata?.trivyResults
         filename = `${decodedImageName.replace('/', '_')}_${scanId}_trivy.json`
         break
       case 'grype':
-        reportData = scanResults?.grype || (scan as any).scannerReports?.grype || (scan as any).grype
+        reportData = metadata?.grypeResults
         filename = `${decodedImageName.replace('/', '_')}_${scanId}_grype.json`
         break
       case 'syft':
-        reportData = scanResults?.syft || (scan as any).scannerReports?.syft || (scan as any).syft
+        reportData = metadata?.syftResults
         filename = `${decodedImageName.replace('/', '_')}_${scanId}_syft.json`
         break
       case 'dockle':
-        reportData = scanResults?.dockle || (scan as any).scannerReports?.dockle || (scan as any).dockle
+        reportData = metadata?.dockleResults
         filename = `${decodedImageName.replace('/', '_')}_${scanId}_dockle.json`
         break
       case 'osv':
-        reportData = scanResults?.osv || (scan as any).scannerReports?.osv || (scan as any).osv
+        reportData = metadata?.osvResults
         filename = `${decodedImageName.replace('/', '_')}_${scanId}_osv.json`
         break
       case 'dive':
-        reportData = scanResults?.dive || (scan as any).scannerReports?.dive || (scan as any).dive
+        reportData = metadata?.diveResults
         filename = `${decodedImageName.replace('/', '_')}_${scanId}_dive.json`
         break
       default:

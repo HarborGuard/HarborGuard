@@ -335,9 +335,7 @@ export class BulkScanService {
               startedAt: new Date(),
               finishedAt: new Date(),
               source: 'registry',
-              metadata: {
-                error: error instanceof Error ? error.message : String(error)
-              }
+              errorMessage: error instanceof Error ? error.message : String(error)
             }
           });
 

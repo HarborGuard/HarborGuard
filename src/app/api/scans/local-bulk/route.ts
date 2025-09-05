@@ -122,9 +122,7 @@ export async function POST(request: NextRequest) {
                   startedAt: new Date(),
                   finishedAt: new Date(),
                   source: 'local',
-                  metadata: {
-                    error: error instanceof Error ? error.message : String(error)
-                  }
+                  errorMessage: error instanceof Error ? error.message : String(error)
                 }
               });
               
