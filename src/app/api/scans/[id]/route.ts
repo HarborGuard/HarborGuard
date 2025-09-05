@@ -14,7 +14,7 @@ export async function GET(
       where: { id },
       include: {
         image: true,
-        scanMetadata: true
+        metadata: true
       }
     })
     
@@ -23,7 +23,7 @@ export async function GET(
         where: { requestId: id },
         include: {
           image: true,
-          scanMetadata: true
+          metadata: true
         }
       })
     }
@@ -78,7 +78,7 @@ export async function PATCH(
       },
       include: {
         image: true,
-        scanMetadata: true
+        metadata: true
       }
     })
     

@@ -8,6 +8,7 @@ import type {
   Scanner as PrismaScanner,
   Vulnerability as PrismaVulnerability,
   ImageVulnerability as PrismaImageVulnerability,
+  ScanMetadata as PrismaScanMetadata,
   ScanStatus,
   Severity
 } from '@/generated/prisma';
@@ -25,7 +26,7 @@ import type {
 /**
  * Convert Prisma Scan to UI Scan with proper type handling
  */
-export function prismaToScan(prismaData: PrismaScan): Scan {
+export function prismaToScan(prismaData: PrismaScan & { metadata?: PrismaScanMetadata | null }): Scan {
   return {
     ...prismaData,
     metadata: prismaData.metadata as unknown as ImageMetadata | undefined,
@@ -37,6 +38,7 @@ export function prismaToScan(prismaData: PrismaScan): Scan {
  */
 export function prismaToScanWithImage(prismaData: PrismaScan & { 
   image: PrismaImage;
+  metadata?: PrismaScanMetadata | null;
   scanResults?: (PrismaScanResult & { scanner: PrismaScanner })[];
 }): ScanWithImage {
   return {
@@ -51,6 +53,7 @@ export function prismaToScanWithImage(prismaData: PrismaScan & {
  */
 export function prismaToScanWithFullRelations(prismaData: PrismaScan & { 
   image: PrismaImage;
+  metadata?: PrismaScanMetadata | null;
   scanResults: (PrismaScanResult & { scanner: PrismaScanner })[];
   policyViolations: any[];
 }): ScanWithFullRelations {

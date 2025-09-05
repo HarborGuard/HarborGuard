@@ -266,38 +266,32 @@ export default function ScanResultsPage() {
   }, [scanData, decodedImageName]);
 
   const trivyResults: TrivyReport | null =
-    scanData?.scanMetadata?.trivyResults ||
-    scanData?.metadata?.scanResults?.trivy ||
+    scanData?.metadata?.trivyResults ||
     scanData?.scannerReports?.trivy ||
     scanData?.trivy ||
     null;
   const grypResults: GrypeReport | null =
-    scanData?.scanMetadata?.grypeResults ||
-    scanData?.metadata?.scanResults?.grype ||
+    scanData?.metadata?.grypeResults ||
     scanData?.scannerReports?.grype ||
     scanData?.grype ||
     null;
   const syftResults: SyftReport | null =
-    scanData?.scanMetadata?.syftResults ||
-    scanData?.metadata?.scanResults?.syft ||
+    scanData?.metadata?.syftResults ||
     scanData?.scannerReports?.syft ||
     scanData?.syft ||
     null;
   const dockleResults: DockleReport | null =
-    scanData?.scanMetadata?.dockleResults ||
-    scanData?.metadata?.scanResults?.dockle ||
+    scanData?.metadata?.dockleResults ||
     scanData?.scannerReports?.dockle ||
     scanData?.dockle ||
     null;
   const osvResults: OSVReport | null =
-    scanData?.scanMetadata?.osvResults ||
-    scanData?.metadata?.scanResults?.osv ||
+    scanData?.metadata?.osvResults ||
     scanData?.scannerReports?.osv ||
     scanData?.osv ||
     null;
   const diveResults: DiveReport | null =
-    scanData?.scanMetadata?.diveResults ||
-    scanData?.metadata?.scanResults?.dive ||
+    scanData?.metadata?.diveResults ||
     scanData?.scannerReports?.dive ||
     scanData?.dive ||
     null;
@@ -306,10 +300,8 @@ export default function ScanResultsPage() {
   console.log("🔍 Debug Scan Data Structure:", {
     scanData: scanData ? Object.keys(scanData) : "null",
     hasMetadata: !!scanData?.metadata,
-    hasScanResults: !!scanData?.metadata?.scanResults,
-    scanResultsKeys: scanData?.metadata?.scanResults
-      ? Object.keys(scanData.metadata.scanResults)
-      : "none",
+    hasTrivyResults: !!scanData?.metadata?.trivyResults,
+    hasGrypeResults: !!scanData?.metadata?.grypeResults,
     hasTrivyDirect: !!scanData?.trivy,
     hasGrypeDirect: !!scanData?.grype,
     hasScannerReports: !!scanData?.scannerReports,

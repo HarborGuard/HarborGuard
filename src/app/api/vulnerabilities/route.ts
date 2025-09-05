@@ -33,7 +33,8 @@ export async function GET(request: NextRequest) {
         status: 'SUCCESS'
       },
       include: {
-        image: true
+        image: true,
+        metadata: true
       }
     });
 
@@ -93,7 +94,14 @@ export async function GET(request: NextRequest) {
 
     // Process each scan for vulnerabilities
     for (const scan of scans) {
-      const scanResults = (scan.metadata as any)?.scanResults;
+      // Skip if no metadata
+      if (!scan.metadata) continue;
+      
+      // Access scan results from metadata
+      const scanResults = {
+        trivy: scan.metadata.trivyResults as any,
+        grype: scan.metadata.grypeResults as any
+      };
       
       // Process Trivy results
       const trivyResults = scanResults?.trivy;

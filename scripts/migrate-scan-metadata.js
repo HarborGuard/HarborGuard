@@ -27,20 +27,15 @@ async function migrateScanMetadata() {
       try {
         const metadata = scan.metadata;
         
-        // Check if metadata already migrated
-        const existingMetadata = await prisma.scanMetadata.findUnique({
-          where: { scanId: scan.id }
-        });
-        
-        if (existingMetadata) {
-          console.log(`✓ Scan ${scan.requestId} already migrated`);
+        // Check if scan already has metadata linked
+        if (scan.metadataId) {
+          console.log(`✓ Scan ${scan.requestId} already has metadata linked`);
           successCount++;
           continue;
         }
         
-        // Prepare the new metadata record
+        // Prepare the new metadata record (no scanId field anymore)
         const scanMetadata = {
-          scanId: scan.id,
           
           // Docker Image metadata
           dockerId: metadata.Id || null,
@@ -90,12 +85,18 @@ async function migrateScanMetadata() {
           scannerVersions: metadata.scannerVersions || null
         };
         
-        // Create the new metadata record
-        await prisma.scanMetadata.create({
+        // Create the new metadata record and link it to the scan
+        const createdMetadata = await prisma.scanMetadata.create({
           data: scanMetadata
         });
         
-        console.log(`✓ Migrated scan ${scan.requestId}`);
+        // Update the scan to link to the metadata
+        await prisma.scan.update({
+          where: { id: scan.id },
+          data: { metadataId: createdMetadata.id }
+        });
+        
+        console.log(`✓ Migrated scan ${scan.requestId} with metadata ID ${createdMetadata.id}`);
         successCount++;
         
       } catch (error) {

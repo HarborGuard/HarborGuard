@@ -43,14 +43,14 @@ model Scan {
   reportsDir       String?
   errorMessage     String?
   riskScore        Int?
-  metadata         Json?             // @deprecated - Will be removed after migration
+  metadataId       String?           @unique
   source           String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   bulkScanItems    BulkScanItem[]
   policyViolations PolicyViolation[]
   scanResults      ScanResult[]
-  scanMetadata     ScanMetadata?
+  metadata         ScanMetadata?     @relation(fields: [metadataId], references: [id], onDelete: SetNull)
   image            Image             @relation(fields: [imageId], references: [id], onDelete: Cascade)
 
   @@index([requestId])
@@ -60,12 +60,12 @@ model Scan {
   @@index([imageId, status])
   @@index([imageId, startedAt])
   @@index([status, startedAt])
+  @@index([metadataId])
   @@map("scans")
 }
 
 model ScanMetadata {
   id                     String   @id @default(cuid())
-  scanId                 String   @unique
   
   // Docker Image metadata
   dockerId               String?
@@ -115,9 +115,8 @@ model ScanMetadata {
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
   
-  scan                   Scan     @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  scan                   Scan?
   
-  @@index([scanId])
   @@index([dockerDigest])
   @@index([aggregatedRiskScore])
   @@map("scan_metadata")

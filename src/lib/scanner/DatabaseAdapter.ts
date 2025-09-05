@@ -154,11 +154,11 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     await this.updateScanRecord(scanId, updateData);
     
     // Create or update ScanMetadata record
-    await this.createOrUpdateScanMetadata(scanId, reports);
-    await this.calculateAggregatedData(scanId, reports);
+    const metadataId = await this.createOrUpdateScanMetadata(scanId, reports);
+    await this.calculateAggregatedData(scanId, reports, metadataId);
   }
   
-  async createOrUpdateScanMetadata(scanId: string, reports: ScanReports): Promise<void> {
+  async createOrUpdateScanMetadata(scanId: string, reports: ScanReports): Promise<string> {
     const metadata = reports.metadata || {};
     
     const scanMetadataData = {
@@ -194,17 +194,39 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       scannerVersions: metadata.scannerVersions || null
     };
     
-    await prisma.scanMetadata.upsert({
-      where: { scanId },
-      update: scanMetadataData,
-      create: {
-        scanId,
-        ...scanMetadataData
-      }
+    // Check if scan already has metadata
+    const scan = await prisma.scan.findUnique({
+      where: { id: scanId },
+      select: { metadataId: true }
     });
+    
+    let metadataId: string;
+    
+    if (scan?.metadataId) {
+      // Update existing metadata
+      await prisma.scanMetadata.update({
+        where: { id: scan.metadataId },
+        data: scanMetadataData
+      });
+      metadataId = scan.metadataId;
+    } else {
+      // Create new metadata
+      const newMetadata = await prisma.scanMetadata.create({
+        data: scanMetadataData
+      });
+      metadataId = newMetadata.id;
+      
+      // Link to scan
+      await prisma.scan.update({
+        where: { id: scanId },
+        data: { metadataId }
+      });
+    }
+    
+    return metadataId;
   }
 
-  async calculateAggregatedData(scanId: string, reports: ScanReports): Promise<void> {
+  async calculateAggregatedData(scanId: string, reports: ScanReports, metadataId?: string): Promise<void> {
     const aggregates: AggregatedData = {};
 
     if (reports.trivy?.Results) {
@@ -294,10 +316,13 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         metadataUpdateData.compliancePass = dockle.pass || null;
       }
       
-      await prisma.scanMetadata.update({
-        where: { scanId },
-        data: metadataUpdateData
-      });
+      // Only update metadata if we have a metadataId
+      if (metadataId) {
+        await prisma.scanMetadata.update({
+          where: { id: metadataId },
+          data: metadataUpdateData
+        });
+      }
     }
   }
 

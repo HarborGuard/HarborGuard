@@ -54,8 +54,13 @@ export async function GET(request: NextRequest) {
     const serializedData = scans.map((scan: any) => {
       let vulnCount = { total: 0, critical: 0, high: 0, medium: 0, low: 0 }
       
-      // Always parse actual metadata to get real vulnerability counts
-      const scanResults = (scan.metadata as any)?.scanResults
+      // Get scan results from metadata
+      const metadata = scan.metadata as any
+      const scanResults = metadata ? {
+        trivy: metadata.trivyResults,
+        grype: metadata.grypeResults,
+        dockle: metadata.dockleResults
+      } : null
       
       // Track unique CVEs and their highest severity
       const cveTracker = new Map<string, string>() // CVE ID -> highest severity
