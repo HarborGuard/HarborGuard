@@ -447,6 +447,27 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     }
   }
 
+  private formatLicense(license: any): string | null {
+    if (!license) return null;
+    if (typeof license === 'string') return license;
+    if (Array.isArray(license)) {
+      return license.map(l => this.formatLicense(l)).filter(Boolean).join(', ');
+    }
+    if (typeof license === 'object') {
+      // Handle common license object structures
+      if (license.name) return license.name;
+      if (license.type) return license.type;
+      if (license.value) return license.value;
+      if (license.license) return license.license;
+      if (license.expression) return license.expression;
+      // Try to extract first string value from object
+      const values = Object.values(license);
+      const firstString = values.find(v => typeof v === 'string');
+      if (firstString) return firstString as string;
+    }
+    return null;
+  }
+
   private async populatePackageFindings(scanId: string, reports: ScanReports): Promise<void> {
     const findings: any[] = [];
     
@@ -460,7 +481,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
           version: artifact.version || null,
           type: artifact.type || 'unknown',
           purl: artifact.purl || null,
-          license: artifact.licenses?.join(', ') || null,
+          license: this.formatLicense(artifact.licenses) || null,
           vendor: artifact.vendor || null,
           publisher: artifact.publisher || null,
           ecosystem: artifact.language || null,
@@ -485,7 +506,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
               version: pkg.Version || null,
               type: result.Type || 'unknown',
               purl: null,
-              license: pkg.License || null,
+              license: this.formatLicense(pkg.License) || null,
               vendor: null,
               publisher: null,
               ecosystem: result.Type || null,

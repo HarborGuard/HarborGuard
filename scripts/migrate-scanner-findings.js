@@ -6,6 +6,28 @@
 const { PrismaClient } = require('../src/generated/prisma');
 const prisma = new PrismaClient();
 
+// Helper function to format license data
+function formatLicense(license) {
+  if (!license) return null;
+  if (typeof license === 'string') return license;
+  if (Array.isArray(license)) {
+    return license.map(l => formatLicense(l)).filter(Boolean).join(', ');
+  }
+  if (typeof license === 'object') {
+    // Handle common license object structures
+    if (license.name) return license.name;
+    if (license.type) return license.type;
+    if (license.value) return license.value;
+    if (license.license) return license.license;
+    if (license.expression) return license.expression;
+    // Try to extract first string value from object
+    const values = Object.values(license);
+    const firstString = values.find(v => typeof v === 'string');
+    if (firstString) return firstString;
+  }
+  return null;
+}
+
 async function migrateVulnerabilityFindings(scan, metadata) {
   const findings = [];
   
@@ -113,7 +135,7 @@ async function migratePackageFindings(scan, metadata) {
         version: artifact.version || null,
         type: artifact.type || 'unknown',
         purl: artifact.purl || null,
-        license: artifact.licenses?.join(', ') || null,
+        license: formatLicense(artifact.licenses) || null,
         vendor: artifact.vendor || null,
         publisher: artifact.publisher || null,
         ecosystem: artifact.language || null,
@@ -138,7 +160,7 @@ async function migratePackageFindings(scan, metadata) {
             version: pkg.Version || null,
             type: result.Type || 'unknown',
             purl: null,
-            license: pkg.License || null,
+            license: formatLicense(pkg.License) || null,
             vendor: null,
             publisher: null,
             ecosystem: result.Type || null,
