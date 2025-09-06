@@ -181,9 +181,9 @@ export function DockerImageSelector({ onImageSelect, disabled, className }: Dock
 
       {isOpen && filteredImages.length > 0 && (
         <div className="z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-72 overflow-y-auto">
-          {filteredImages.map((image) => (
+          {filteredImages.map((image, index) => (
             <Button
-              key={image.id}
+              key={`${image.repository}-${image.tag}-${image.id}-${index}`}
               variant="ghost"
               className="w-full justify-start p-3 h-auto text-left hover:bg-muted/50"
               onClick={() => handleImageSelect(image)}
