@@ -132,38 +132,36 @@ export function NewScanModal({ children }: NewScanModalProps) {
   }
 
   const fetchRepositoryImages = async (repository: any) => {
-    setSelectedRepository(repository)
-    setRepositoryImages([])
-    setSelectedImage(null)
-    setRepositoryTags([])
-    setSelectedTag("")
+    setLoadingImages(prev => ({ ...prev, [repository.id]: true }))
 
     try {
       const response = await fetch(`/api/repositories/${repository.id}/images`)
       if (response.ok) {
         const data = await response.json()
-        setRepositoryImages(data)
+        setRepositoryImages(prev => ({ ...prev, [repository.id]: data }))
       }
     } catch (error) {
       console.error('Failed to fetch repository images:', error)
       toast.error('Failed to fetch repository images')
+    } finally {
+      setLoadingImages(prev => ({ ...prev, [repository.id]: false }))
     }
   }
 
-  const fetchImageTags = async (image: any) => {
-    setSelectedImage(image)
-    setRepositoryTags([])
-    setSelectedTag("")
-
+  const fetchImageTags = async (repository: any, image: any) => {
+    setLoadingTags(prev => ({ ...prev, [repository.id]: true }))
+    
     try {
-      const response = await fetch(`/api/repositories/${selectedRepository.id}/images/${encodeURIComponent(image.name)}/tags`)
+      const response = await fetch(`/api/repositories/${repository.id}/images/${encodeURIComponent(image.name)}/tags`)
       if (response.ok) {
         const data = await response.json()
-        setRepositoryTags(data)
+        setRepositoryTags(prev => ({ ...prev, [repository.id]: data }))
       }
     } catch (error) {
       console.error('Failed to fetch image tags:', error)
       toast.error('Failed to fetch image tags')
+    } finally {
+      setLoadingTags(prev => ({ ...prev, [repository.id]: false }))
     }
   }
   
@@ -175,13 +173,17 @@ export function NewScanModal({ children }: NewScanModalProps) {
     state.scans
       .filter(scan => scan.status === 'Complete')
       .forEach(scan => {
-        const key = scan.image
+        // Handle both string and object formats for scan.image
+        const imageName = typeof scan.image === 'string' 
+          ? scan.image 
+          : `${(scan.image as any)?.name}:${(scan.image as any)?.tag}`;
+        const key = imageName;
         const existing = imageMap.get(key)
         
         if (!existing || new Date(scan.lastScan || '').getTime() > new Date(existing.lastScan).getTime()) {
           imageMap.set(key, {
-            id: `${scan.id}_${scan.image}_${scan.lastScan}`, // Create unique composite key
-            name: scan.image,
+            id: `${scan.id}_${imageName}_${scan.lastScan}`, // Create unique composite key
+            name: imageName,
             lastScan: scan.lastScan || '',
             riskScore: scan.riskScore,
             source: scan.source || 'registry'
@@ -203,12 +205,15 @@ export function NewScanModal({ children }: NewScanModalProps) {
   const [selectedExistingImage, setSelectedExistingImage] = React.useState<{source: string, name: string} | null>(null)
   const [repositories, setRepositories] = React.useState<any[]>([])
   const [selectedRepository, setSelectedRepository] = React.useState<any>(null)
-  const [repositoryImages, setRepositoryImages] = React.useState<any[]>([])
-  const [selectedImage, setSelectedImage] = React.useState<any>(null)
-  const [repositoryTags, setRepositoryTags] = React.useState<any[]>([])
-  const [selectedTag, setSelectedTag] = React.useState<string>("")
+  const [repositoryImages, setRepositoryImages] = React.useState<Record<string, any[]>>({})
+  const [loadingImages, setLoadingImages] = React.useState<Record<string, boolean>>({})
+  const [selectedImages, setSelectedImages] = React.useState<Record<string, any>>({})
+  const [repositoryTags, setRepositoryTags] = React.useState<Record<string, any[]>>({})
+  const [selectedTags, setSelectedTags] = React.useState<Record<string, string>>({})
+  const [loadingTags, setLoadingTags] = React.useState<Record<string, boolean>>({})
   const [scanAllLocalImages, setScanAllLocalImages] = React.useState(false)
   const [localImageCount, setLocalImageCount] = React.useState(0)
+  const [scanAllRepoImages, setScanAllRepoImages] = React.useState<Record<string, boolean>>({})
   
   // Fetch repositories when modal opens
   React.useEffect(() => {
@@ -224,9 +229,11 @@ export function NewScanModal({ children }: NewScanModalProps) {
     }
   }, [scanAllLocalImages, dockerInfo?.hasAccess])
 
-  const filteredImages = existingImages.filter(image =>
-    image.name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredImages = existingImages.filter(image => {
+    // Handle both string and object formats
+    const imageName = typeof image === 'string' ? image : (image?.name || '');
+    return imageName.toLowerCase().includes(searchQuery.toLowerCase());
+  })
 
 
   const parseImageString = (imageString: string): { imageName: string; imageTag: string; registry?: string } => {
@@ -272,7 +279,12 @@ export function NewScanModal({ children }: NewScanModalProps) {
       case 'existing':
         return imageUrl
       case 'private':
-        return selectedImage && selectedTag ? `${selectedImage.name}:${selectedTag}` : ''
+        if (selectedRepository) {
+          const image = selectedImages[selectedRepository.id]
+          const tag = selectedTags[selectedRepository.id]
+          return image && tag ? `${image.name}:${tag}` : ''
+        }
+        return ''
       default:
         return ''
     }
@@ -371,10 +383,16 @@ export function NewScanModal({ children }: NewScanModalProps) {
       }
 
       // For private repositories, set registry and repository ID
-      if (selectedSource === 'private' && selectedRepository && selectedImage && selectedTag) {
-        scanRequest.registry = selectedRepository.registryUrl
-        scanRequest.repositoryId = selectedRepository.id
-        scanRequest.source = 'registry'
+      if (selectedSource === 'private' && selectedRepository) {
+        const selectedImage = selectedImages[selectedRepository.id]
+        const selectedTag = selectedTags[selectedRepository.id]
+        if (selectedImage && selectedTag) {
+          // Include protocol with registry URL for proper skopeo handling
+          const protocol = selectedRepository.protocol || 'https'
+          scanRequest.registry = selectedRepository.registryUrl
+          scanRequest.repositoryId = selectedRepository.id
+          scanRequest.source = 'registry'
+        }
       }
       
       const response = await fetch('/api/scans/start', {
@@ -633,108 +651,257 @@ export function NewScanModal({ children }: NewScanModalProps) {
                       Manage Repositories
                     </Button>
                   </div>
-                ) : !selectedRepository ? (
+                ) : (
                   <div className="space-y-3">
-                    <Label>Select Repository</Label>
-                    <div className="grid gap-2">
+                    <Label>Select Repository and Image</Label>
+                    <div className="grid gap-3">
                       {repositories.map((repo) => (
-                        <Button
+                        <div
                           key={repo.id}
-                          variant="outline"
-                          className="flex items-center justify-start gap-3 p-4 h-auto"
-                          onClick={() => fetchRepositoryImages(repo)}
+                          className="border rounded-lg p-4 space-y-3"
                         >
-                          {repo.type === 'DOCKERHUB' && <IconBrandDocker className="h-5 w-5" />}
-                          {repo.type === 'GHCR' && <IconBrandGithub className="h-5 w-5" />}
-                          {repo.type === 'GENERIC' && <IconServer className="h-5 w-5" />}
-                          <div className="text-left">
-                            <div className="font-medium">{repo.name}</div>
-                            <div className="text-sm text-muted-foreground">{repo.registryUrl}</div>
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-3">
+                              {repo.type === 'DOCKERHUB' && <IconBrandDocker className="h-5 w-5 mt-0.5" />}
+                              {repo.type === 'GHCR' && <IconBrandGithub className="h-5 w-5 mt-0.5" />}
+                              {repo.type === 'GENERIC' && <IconServer className="h-5 w-5 mt-0.5" />}
+                              <div className="space-y-1">
+                                <div className="font-medium">{repo.name}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  {repo.type === 'GENERIC' && repo.protocol ? `${repo.protocol}://${repo.registryUrl}` : repo.registryUrl}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                              {!repositoryImages[repo.id] && !loadingImages[repo.id] && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => fetchRepositoryImages(repo)}
+                                  >
+                                    Load Images
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={async () => {
+                                      setIsLoading(true);
+                                      try {
+                                        // Always fetch fresh images to ensure we have the latest data
+                                        setLoadingImages(prev => ({ ...prev, [repo.id]: true }));
+                                        const response = await fetch(`/api/repositories/${repo.id}/images`);
+                                        
+                                        if (!response.ok) {
+                                          throw new Error(`Failed to fetch images: ${response.statusText}`);
+                                        }
+                                        
+                                        const data = await response.json();
+                                        console.log('Fetched images for scan all:', data);
+                                        // The API returns the images array directly, not wrapped in an object
+                                        const images = Array.isArray(data) ? data : (data.images || data || []);
+                                        
+                                        // Update state for UI
+                                        setRepositoryImages(prev => ({ ...prev, [repo.id]: images }));
+                                        setLoadingImages(prev => ({ ...prev, [repo.id]: false }));
+                                        
+                                        if (images.length === 0) {
+                                          toast.error('No images found in repository');
+                                          return;
+                                        }
+                                        
+                                        toast.info(`Starting scans for ${images.length} images...`);
+                                        
+                                        let successCount = 0;
+                                        let failCount = 0;
+                                        
+                                        // Start scanning all images
+                                        for (const image of images) {
+                                          // Fetch actual tags for this image from the registry
+                                          const tagsResponse = await fetch(`/api/repositories/${repo.id}/images/${encodeURIComponent(image.name)}/tags`);
+                                          
+                                          if (!tagsResponse.ok) {
+                                            console.error(`Failed to fetch tags for ${image.name}`);
+                                            continue; // Skip this image if we can't get tags
+                                          }
+                                          
+                                          const tagsData = await tagsResponse.json();
+                                          console.log(`Tags response for ${image.name}:`, tagsData);
+                                          
+                                          // Extract tags - handle both array and object formats
+                                          let tags = [];
+                                          if (Array.isArray(tagsData)) {
+                                            // If it's an array of objects with name property
+                                            tags = tagsData.map((t: any) => typeof t === 'string' ? t : t.name || t.tag);
+                                          } else if (tagsData.tags) {
+                                            // If it has a tags property
+                                            tags = Array.isArray(tagsData.tags) 
+                                              ? tagsData.tags.map((t: any) => typeof t === 'string' ? t : t.name || t.tag)
+                                              : [];
+                                          } else if (Array.isArray(tagsData.data)) {
+                                            // If it has a data property with array
+                                            tags = tagsData.data.map((t: any) => typeof t === 'string' ? t : t.name || t.tag);
+                                          }
+                                          
+                                          // Filter out any undefined/null values
+                                          tags = tags.filter((t: any) => t);
+                                          
+                                          // If no tags found, skip this image
+                                          if (tags.length === 0) {
+                                            console.warn(`No tags found for ${image.name}, skipping`);
+                                            continue;
+                                          }
+                                          
+                                          console.log(`Found ${tags.length} tags for ${image.name}:`, tags);
+                                          
+                                          // Scan ALL tags found for this image
+                                          for (const tag of tags) {
+                                            // Build the full image string based on repository type
+                                            const fullImageString = repo.type === 'GENERIC' 
+                                              ? `${repo.registryUrl}/${image.name}`
+                                              : image.name;
+                                            
+                                            // The scan API expects either (image & tag) or (imageName & imageTag)
+                                            const scanRequest = {
+                                              image: fullImageString,
+                                              tag: tag,
+                                              source: 'registry',
+                                              repositoryId: repo.id
+                                            };
+                                            
+                                            try {
+                                              const response = await fetch('/api/scans/start', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify(scanRequest)
+                                              });
+                                              
+                                              if (response.ok) {
+                                                const result = await response.json();
+                                                if (result.requestId) {
+                                                  addScanJob({
+                                                    requestId: result.requestId,
+                                                    scanId: result.scanId || '',
+                                                    imageId: result.imageId || '',
+                                                    imageName: `${fullImageString}:${tag}`,
+                                                    status: 'RUNNING' as const,
+                                                    progress: 0
+                                                  });
+                                                  successCount++;
+                                                  console.log(`✓ Started scan for ${fullImageString}:${tag}`);
+                                                }
+                                              } else {
+                                                failCount++;
+                                                console.error(`Failed to start scan for ${fullImageString}:${tag}`);
+                                              }
+                                            } catch (error) {
+                                              failCount++;
+                                              console.error(`Failed to scan ${fullImageString}:${tag}:`, error);
+                                            }
+                                            
+                                            // Small delay between scans to avoid overwhelming the system
+                                            await new Promise(resolve => setTimeout(resolve, 500));
+                                          }
+                                        }
+                                        
+                                        // Show final results
+                                        if (successCount > 0 && failCount === 0) {
+                                          toast.success(`Successfully started ${successCount} scans`);
+                                        } else if (successCount > 0 && failCount > 0) {
+                                          toast.warning(`Started ${successCount} scans, ${failCount} failed`);
+                                        } else if (failCount > 0) {
+                                          toast.error(`Failed to start scans (${failCount} failures)`);
+                                        }
+                                        
+                                        if (successCount > 0) {
+                                          setIsOpen(false);
+                                          await refreshData();
+                                        }
+                                      } catch (error) {
+                                        console.error('Failed to scan all images:', error);
+                                        toast.error('Failed to scan all images');
+                                      } finally {
+                                        setIsLoading(false);
+                                      }
+                                    }}
+                                    disabled={isLoading}
+                                  >
+                                    {isLoading ? 'Scanning...' : 'Scan All Images'}
+                                  </Button>
+                                </>
+                              )}
+                              
+                              {loadingImages[repo.id] && (
+                                <div className="text-sm text-muted-foreground">Loading...</div>
+                              )}
+                              
+                              {repositoryImages[repo.id] && repositoryImages[repo.id].length > 0 && (
+                                <div className="flex items-center gap-2">
+                                  <Select
+                                    value={selectedImages[repo.id]?.name || ""}
+                                    onValueChange={(imageName) => {
+                                      const image = repositoryImages[repo.id].find((img: any) => img.name === imageName)
+                                      if (image) {
+                                        setSelectedRepository(repo)
+                                        setSelectedImages(prev => ({ ...prev, [repo.id]: image }))
+                                        setSelectedTags(prev => ({ ...prev, [repo.id]: '' })) // Reset tag when image changes
+                                        fetchImageTags(repo, image)
+                                      }
+                                    }}
+                                  >
+                                    <SelectTrigger className="w-[200px]">
+                                      <SelectValue placeholder="Select image" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {repositoryImages[repo.id].map((image: any) => (
+                                        <SelectItem key={image.name} value={image.name}>
+                                          {image.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  
+                                  {selectedImages[repo.id] && (
+                                    <Select
+                                      value={selectedTags[repo.id] || ""}
+                                      onValueChange={(tag) => {
+                                        setSelectedTags(prev => ({ ...prev, [repo.id]: tag }))
+                                        setSelectedRepository(repo) // Ensure repo is selected when tag is chosen
+                                      }}
+                                      disabled={loadingTags[repo.id]}
+                                    >
+                                      <SelectTrigger className="w-[120px]">
+                                        <SelectValue placeholder={loadingTags[repo.id] ? "Loading..." : "Select tag"} />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {loadingTags[repo.id] ? (
+                                          <div className="p-2 text-sm text-muted-foreground">Loading tags...</div>
+                                        ) : repositoryTags[repo.id] && repositoryTags[repo.id].length > 0 ? (
+                                          repositoryTags[repo.id].map((tag: any) => (
+                                            <SelectItem key={tag.name} value={tag.name}>
+                                              {tag.name}
+                                            </SelectItem>
+                                          ))
+                                        ) : (
+                                          <div className="p-2 text-sm text-muted-foreground">No tags found</div>
+                                        )}
+                                      </SelectContent>
+                                    </Select>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {repositoryImages[repo.id] && repositoryImages[repo.id].length === 0 && (
+                                <div className="text-sm text-muted-foreground">No images found</div>
+                              )}
+                            </div>
                           </div>
-                        </Button>
+                        </div>
                       ))}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Select a repository to browse available images.
-                    </p>
-                  </div>
-                ) : !selectedImage ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label>Select Image from {selectedRepository.name}</Label>
-                      <Button variant="ghost" size="sm" onClick={() => setSelectedRepository(null)}>
-                        <IconX className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {repositoryImages.length === 0 ? (
-                      <div className="text-center py-4 text-muted-foreground">
-                        Loading images...
-                      </div>
-                    ) : (
-                      <div className="grid gap-2 max-h-64 overflow-y-auto">
-                        {repositoryImages.map((image, index) => (
-                          <Button
-                            key={index}
-                            variant="outline"
-                            className="flex items-center justify-start gap-3 p-3 h-auto"
-                            onClick={() => fetchImageTags(image)}
-                          >
-                            <div className="text-left">
-                              <div className="font-medium">{image.name}</div>
-                              {image.description && (
-                                <div className="text-sm text-muted-foreground line-clamp-1">
-                                  {image.description}
-                                </div>
-                              )}
-                            </div>
-                          </Button>
-                        ))}
-                      </div>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      Select an image to view available tags.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label>Select Tag for {selectedImage.name}</Label>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => setSelectedImage(null)}>
-                          Back
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setSelectedRepository(null)}>
-                          <IconX className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    {repositoryTags.length === 0 ? (
-                      <div className="text-center py-4 text-muted-foreground">
-                        Loading tags...
-                      </div>
-                    ) : (
-                      <Select value={selectedTag} onValueChange={setSelectedTag}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a tag" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {repositoryTags.map((tag) => (
-                            <SelectItem key={tag.name} value={tag.name}>
-                              <div className="flex items-center gap-2">
-                                <span>{tag.name}</span>
-                                {tag.size && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {(tag.size / 1024 / 1024).toFixed(1)}MB
-                                  </Badge>
-                                )}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      Select a tag to scan this private repository image.
+                      Load images from your repositories and select an image with tag to scan.
                     </p>
                   </div>
                 )}
@@ -771,7 +938,7 @@ export function NewScanModal({ children }: NewScanModalProps) {
               (selectedSource === 'local' && !scanAllLocalImages && !selectedDockerImage && !localImageName) ||
               (selectedSource === 'custom' && !customRegistry) ||
               (selectedSource === 'existing' && !imageUrl) ||
-              (selectedSource === 'private' && (!selectedRepository || !selectedImage || !selectedTag))
+              (selectedSource === 'private' && (!selectedRepository || !selectedImages[selectedRepository?.id] || !selectedTags[selectedRepository?.id]))
             }
           >
             {isLoading ? 'Starting Scan...' : 

@@ -313,6 +313,8 @@ export default function ImageDetailsPage() {
           scanId: scan.id, // Real scan ID for navigation
           scanDate: scan.startedAt,
           version: `${scan.image.name}:${scan.image.tag}`, // Show specific tag for each scan
+          registry: scan.image.registry || 'docker.io', // Include registry information
+          source: scan.source || 'registry', // Include scan source
           riskScore: scan.riskScore || 0,
           severities: (() => {
             const adjustedCounts = getAdjustedVulnerabilityCount(scan);

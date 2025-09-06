@@ -246,7 +246,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           imageId: scan.imageId,
           imageName: scan.image.name,
           uid: scan.requestId,
-          image: `${scan.image.name}:${scan.image.tag}`,
+          image: scan.image, // Keep the full image object to preserve registry info
           source: scan.source,
           digestShort: scan.image.digest?.slice(7, 19) || '',
           platform: 'unknown',
@@ -271,7 +271,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           osvPackages: 0,
           osvVulnerable: 0,
           osvEcosystems: [],
-          baseImage: scan.image.name.split(':')[0], // Simplified extraction
+          baseImage: scan.image?.name?.split(':')[0] || 'unknown', // Simplified extraction
           osInfo: undefined,
           lastScan: scan.finishedAt || scan.startedAt,
           registry: scan.image.registry

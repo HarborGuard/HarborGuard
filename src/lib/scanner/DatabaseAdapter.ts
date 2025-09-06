@@ -783,6 +783,14 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         return '';
       }
 
+      let authArgs = '';
+      
+      // Add TLS verification flag for HTTP registries
+      if (repository.protocol === 'http') {
+        authArgs += '--tls-verify=false ';
+        console.log(`[DatabaseAdapter] Adding --tls-verify=false for HTTP registry ${repository.registryUrl}`);
+      }
+
       // For now, treating encryptedPassword as plaintext password
       // In production, this should be properly decrypted
       const username = repository.username;
@@ -792,11 +800,12 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         // Escape credentials to prevent command injection
         const escapedUsername = username.replace(/"/g, '\\"');
         const escapedPassword = password.replace(/"/g, '\\"');
-        return `--creds "${escapedUsername}:${escapedPassword}"`;
+        authArgs += `--creds "${escapedUsername}:${escapedPassword}"`;
+      } else if (!authArgs) {
+        console.warn(`Invalid or missing credentials for repository ${repositoryId}`);
       }
 
-      console.warn(`Invalid or missing credentials for repository ${repositoryId}`);
-      return '';
+      return authArgs.trim();
     } catch (error) {
       console.error(`Failed to get authentication for repository ${repositoryId}:`, error);
       return '';

@@ -28,7 +28,8 @@ export class ScanExecutor implements IScanExecutor {
     this.progressTracker.updateProgress(requestId, 10, 'Setting up scan environment');
 
     const imageName = request.dockerImageId || `${request.image}:${request.tag}`;
-    const safeImageName = request.image.replace(/\//g, '_');
+    // Replace both slashes and colons to create a safe filename
+    const safeImageName = request.image.replace(/[/:]/g, '_');
     const tarPath = path.join(imageDir, `${safeImageName}-${requestId}.tar`);
 
     const env = this.setupEnvironmentVariables(cacheDir);
@@ -68,25 +69,36 @@ export class ScanExecutor implements IScanExecutor {
     
     // Get authentication arguments for inspect command
     const inspectAuthArgs = await this.getInspectAuthArgs(request.repositoryId, request.image);
+    // Add insecure registry flag if needed (for registries without auth)
+    const insecureFlag = this.isInsecureRegistry(request.registry) && !request.repositoryId ? '--tls-verify=false ' : '';
 
     const { stdout: digestOutput } = await execAsync(
-      `skopeo inspect ${inspectAuthArgs} --format '{{.Digest}}' docker://${imageRef}`,
+      `skopeo inspect ${insecureFlag}${inspectAuthArgs} --format '{{.Digest}}' docker://${imageRef}`,
       { env }
     );
     const digest = digestOutput.trim();
     const imageHash = digest.replace('sha256:', '');
-    const safeImageName = request.image.replace(/\//g, '_');
+    // Replace both slashes and colons to create a safe filename
+    const safeImageName = request.image.replace(/[/:]/g, '_');
     const tarPath = path.join(imageDir, `${safeImageName}-${imageHash}.tar`);
 
     logger.scanner(`Scanning ${imageRef} (${digest})`);
+
+    // Check if tar file already exists and remove it
+    if (await fs.access(tarPath).then(() => true).catch(() => false)) {
+      logger.scanner(`Removing existing tar file: ${tarPath}`);
+      await fs.unlink(tarPath);
+    }
 
     this.progressTracker.updateProgress(requestId, 1, 'Starting image download');
     
     // Get authentication arguments for copy command
     const copyAuthArgs = await this.getCopyAuthArgs(request.repositoryId, request.image);
+    // Add insecure registry flag if needed (for registries without auth)
+    const insecureCopyFlag = this.isInsecureRegistry(request.registry) && !request.repositoryId ? '--src-tls-verify=false ' : '';
     
-    console.log(`skopeo copy ${copyAuthArgs} docker://${imageRef} docker-archive:${tarPath}`);
-    await execAsync(`skopeo copy ${copyAuthArgs} docker://${imageRef} docker-archive:${tarPath}`, { env });
+    console.log(`skopeo copy ${insecureCopyFlag}${copyAuthArgs} docker://${imageRef} docker-archive:${tarPath}`);
+    await execAsync(`skopeo copy ${insecureCopyFlag}${copyAuthArgs} docker://${imageRef} docker-archive:${tarPath}`, { env });
     
     this.progressTracker.updateProgress(requestId, 50, 'Image download completed');
 
@@ -235,6 +247,17 @@ export class ScanExecutor implements IScanExecutor {
   }
 
   /**
+   * Check if a registry should use insecure/HTTP connection
+   */
+  private isInsecureRegistry(registry?: string): boolean {
+    if (!registry) return false;
+    // Common local/insecure registries
+    return registry.startsWith('localhost:') || 
+           registry.startsWith('127.0.0.1:') || 
+           registry.startsWith('host.docker.internal:');
+  }
+
+  /**
    * Find a repository that might contain the given image
    */
   private async findMatchingRepositoryForImage(imageName: string): Promise<string | null> {
@@ -296,14 +319,27 @@ export class ScanExecutor implements IScanExecutor {
 
       const username = repository.username;
       const password = repository.encryptedPassword;
+      let authArgs = '';
+
+      // Debug logging
+      logger.info(`Repository ${repository.id} protocol: ${repository.protocol}, registryUrl: ${repository.registryUrl}`);
+
+      // Add TLS verification flag for HTTP registries
+      if (repository.protocol === 'http') {
+        authArgs += '--tls-verify=false ';
+        logger.info(`Adding --tls-verify=false for HTTP registry`);
+      }
 
       if (username && password) {
         const escapedUsername = username.replace(/"/g, '\\"');
         const escapedPassword = password.replace(/"/g, '\\"');
-        return `--creds "${escapedUsername}:${escapedPassword}"`;
+        authArgs += `--creds "${escapedUsername}:${escapedPassword}"`;
+      } else {
+        authArgs += '--no-creds';
       }
 
-      return '--no-creds';
+      logger.info(`Final auth args for repository ${repository.id}: ${authArgs.trim()}`);
+      return authArgs.trim();
     } catch (error) {
       logger.error(`Failed to get authentication for repository ${repoId}:`, error);
       return '--no-creds';
@@ -338,14 +374,27 @@ export class ScanExecutor implements IScanExecutor {
 
       const username = repository.username;
       const password = repository.encryptedPassword;
+      let authArgs = '';
+
+      // Debug logging
+      logger.info(`[Copy] Repository ${repository.id} protocol: ${repository.protocol}, registryUrl: ${repository.registryUrl}`);
+
+      // Add TLS verification flag for HTTP registries
+      if (repository.protocol === 'http') {
+        authArgs += '--src-tls-verify=false ';
+        logger.info(`[Copy] Adding --src-tls-verify=false for HTTP registry`);
+      }
 
       if (username && password) {
         const escapedUsername = username.replace(/"/g, '\\"');
         const escapedPassword = password.replace(/"/g, '\\"');
-        return `--src-creds "${escapedUsername}:${escapedPassword}"`;
+        authArgs += `--src-creds "${escapedUsername}:${escapedPassword}"`;
+      } else {
+        authArgs += '--src-no-creds';
       }
 
-      return '--src-no-creds';
+      logger.info(`[Copy] Final auth args for repository ${repository.id}: ${authArgs.trim()}`);
+      return authArgs.trim();
     } catch (error) {
       logger.error(`Failed to get authentication for repository ${repoId}:`, error);
       return '--src-no-creds';

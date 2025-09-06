@@ -42,8 +42,10 @@ export async function GET(
           break
 
         case 'GENERIC':
+          // Combine protocol and registryUrl for API calls
+          const fullUrl = `${repository.protocol || 'https'}://${repository.registryUrl}`
           tags = await getGenericRegistryTags(
-            repository.registryUrl,
+            fullUrl,
             repository.username,
             repository.encryptedPassword, // Should be decrypted
             imageName
@@ -135,7 +137,13 @@ async function getGHCRTags(username: string, token: string, imageName: string, o
 async function getGenericRegistryTags(registryUrl: string, username: string, password: string, imageName: string): Promise<any[]> {
   const auth = Buffer.from(`${username}:${password}`).toString('base64')
   
-  const tagsResponse = await fetch(`https://${registryUrl}/v2/${imageName}/tags/list`, {
+  // registryUrl already includes protocol from the caller
+  let url = registryUrl
+  if (!url.endsWith('/')) {
+    url += '/'
+  }
+  
+  const tagsResponse = await fetch(`${url}v2/${imageName}/tags/list`, {
     headers: {
       'Authorization': `Basic ${auth}`,
     },

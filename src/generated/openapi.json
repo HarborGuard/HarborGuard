@@ -967,6 +967,10 @@
                   "organization": {
                     "type": "string",
                     "description": "organization parameter"
+                  },
+                  "testResult": {
+                    "type": "string",
+                    "description": "testResult parameter"
                   }
                 }
               }

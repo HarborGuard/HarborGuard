@@ -134,17 +134,19 @@ async function testGHCRConnection(username: string, token: string, organization?
 async function testGenericRegistryConnection(registryUrl: string, username: string, password: string): Promise<number> {
   const auth = Buffer.from(`${username}:${password}`).toString('base64')
   
-  // Ensure the URL has a protocol, default to https if not specified
-  let fullUrl = registryUrl
-  if (!registryUrl.startsWith('http://') && !registryUrl.startsWith('https://')) {
-    fullUrl = `https://${registryUrl}`
+  // For API calls, ensure we have a protocol
+  let url = registryUrl
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = `https://${url}`
   }
   
-  // Remove trailing slash if present
-  fullUrl = fullUrl.replace(/\/$/, '')
+  // Ensure the URL ends properly for the catalog endpoint
+  if (!url.endsWith('/')) {
+    url += '/'
+  }
   
   // Test catalog endpoint
-  const catalogResponse = await fetch(`${fullUrl}/v2/_catalog`, {
+  const catalogResponse = await fetch(`${url}v2/_catalog`, {
     headers: {
       'Authorization': `Basic ${auth}`,
     },

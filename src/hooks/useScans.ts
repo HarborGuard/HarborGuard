@@ -15,12 +15,22 @@ export function useScans() {
     const totalScans = scans.length
     
     // Count unique image:tag combinations
-    const uniqueImageTags = new Set(scans.map(scan => scan.image)).size
+    const uniqueImageTags = new Set(scans.map(scan => {
+      // Handle both string and object formats
+      return typeof scan.image === 'string' 
+        ? scan.image 
+        : `${(scan.image as any)?.name}:${(scan.image as any)?.tag}`
+    })).size
     
     // Group scans by image name (without tag) to get latest scan per image
     const imageGroups = new Map<string, any>()
     scans.forEach(scan => {
-      const imageName = scan.image ? scan.image.split(':')[0] : 'unknown'
+      // Handle both string and object formats for scan.image
+      const imageName = scan.image 
+        ? (typeof scan.image === 'string' 
+            ? scan.image.split(':')[0] 
+            : (scan.image as any).name)
+        : 'unknown'
       // Keep only the most recent scan for each image
       if (!imageGroups.has(imageName) || 
           new Date(scan.lastScan) > new Date(imageGroups.get(imageName).lastScan)) {

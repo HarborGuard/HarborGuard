@@ -29,6 +29,7 @@ interface Repository {
   id: string;
   name: string;
   type: "DOCKERHUB" | "GHCR" | "GENERIC";
+  protocol?: string;
   registryUrl: string;
   username?: string;
   lastTested?: string;
@@ -213,7 +214,7 @@ export default function RepositoriesPage() {
                       {getStatusBadge(repo.status)}
                     </div>
                     <CardDescription className="text-sm">
-                      {repo.registryUrl}
+                      {repo.type === 'GENERIC' && repo.protocol ? `${repo.protocol}://${repo.registryUrl}` : repo.registryUrl}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
