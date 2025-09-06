@@ -66,8 +66,14 @@ export default function LibraryDetailsPage() {
     const imageMap = new Map<string, Set<string>>(); // CVE ID -> Set of image names
 
     scans.forEach((scan) => {
-      const imageName = scan.imageName || scan.image.split(":")[0] || "unknown";
-      const imageTag = scan.image.split(":")[1] || "latest";
+      // Handle both string and object formats for scan.image
+      const imageName = scan.imageName || 
+        (typeof scan.image === 'string' 
+          ? scan.image.split(":")[0] 
+          : (scan.image as any)?.name) || "unknown";
+      const imageTag = typeof scan.image === 'string'
+        ? scan.image.split(":")[1] || "latest"
+        : (scan.image as any)?.tag || "latest";
       const fullImageName = `${imageName}:${imageTag}`;
 
       // Process Trivy results
@@ -315,8 +321,14 @@ export default function LibraryDetailsPage() {
     // Calculate unique affected images from original scan data
     const affectedImagesSet = new Set<string>();
     scans.forEach((scan) => {
-      const imageName = scan.imageName || scan.image.split(":")[0] || "unknown";
-      const imageTag = scan.image.split(":")[1] || "latest";
+      // Handle both string and object formats for scan.image
+      const imageName = scan.imageName || 
+        (typeof scan.image === 'string' 
+          ? scan.image.split(":")[0] 
+          : (scan.image as any)?.name) || "unknown";
+      const imageTag = typeof scan.image === 'string'
+        ? scan.image.split(":")[1] || "latest"
+        : (scan.image as any)?.tag || "latest";
       const fullImageName = `${imageName}:${imageTag}`;
 
       // Check if this scan contains the library we're looking at

@@ -40,8 +40,10 @@ export async function GET(
           break
 
         case 'GENERIC':
+          // Combine protocol and registryUrl for API calls
+          const fullUrl = `${repository.protocol || 'https'}://${repository.registryUrl}`
           repositories = await getGenericRegistryRepositories(
-            repository.registryUrl,
+            fullUrl,
             repository.username,
             repository.encryptedPassword // Should be decrypted
           )
@@ -157,7 +159,13 @@ async function getGHCRRepositories(username: string, token: string, organization
 async function getGenericRegistryRepositories(registryUrl: string, username: string, password: string): Promise<any[]> {
   const auth = Buffer.from(`${username}:${password}`).toString('base64')
   
-  const catalogResponse = await fetch(`https://${registryUrl}/v2/_catalog`, {
+  // registryUrl already includes protocol from the caller
+  let url = registryUrl
+  if (!url.endsWith('/')) {
+    url += '/'
+  }
+  
+  const catalogResponse = await fetch(`${url}v2/_catalog`, {
     headers: {
       'Authorization': `Basic ${auth}`,
     },

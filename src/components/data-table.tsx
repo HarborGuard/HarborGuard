@@ -226,7 +226,11 @@ function createColumns(handleDeleteClick: (imageName: string) => void): ColumnDe
       )
     },
     cell: ({ row }) => {
-      const imageName = row.original.image;
+      const imageData = row.original.image;
+      // Handle both string and object formats
+      const imageName = typeof imageData === 'string' 
+        ? imageData 
+        : `${(imageData as any)?.name}:${(imageData as any)?.tag}`;
       const tagCount = (row.original as any)._tagCount || 1;
       const allTags = (row.original as any)._allTags || '';
       
@@ -278,13 +282,21 @@ function createColumns(handleDeleteClick: (imageName: string) => void): ColumnDe
         </Button>
       )
     },
-    cell: ({ row }) => (
-      <ImageStatusCell 
-        imageName={row.original.imageName || row.original.image.split(':')[0]}
-        imageId={row.original.imageId}
-        status={row.original.status}
-      />
-    ),
+    cell: ({ row }) => {
+      const imageData = row.original.image;
+      const imageName = row.original.imageName || 
+        (typeof imageData === 'string' 
+          ? imageData.split(':')[0] 
+          : (imageData as any)?.name);
+      
+      return (
+        <ImageStatusCell 
+          imageName={imageName}
+          imageId={row.original.imageId}
+          status={row.original.status}
+        />
+      );
+    },
   },
   
   {
@@ -391,12 +403,73 @@ function createColumns(handleDeleteClick: (imageName: string) => void): ColumnDe
     accessorKey: "registry",
     header: "Registry",
     cell: ({ row }) => {
-      const registry = row.original.registry;
+      // Use pre-computed registries from the grouping phase
+      const allRegistries = (row.original as any)._allRegistries;
       
-      if (!registry || registry === "docker.io" || registry === null) {
-        return <Badge variant="outline" className="text-xs">Docker Hub</Badge>;
+      // If we have pre-computed registries, use them
+      if (allRegistries && allRegistries.length > 0) {
+        // Sort registries for consistent display
+        const sortedRegistries = allRegistries.sort((a: string, b: string) => {
+          // Put Docker Hub first, then local, then others alphabetically
+          if (a === "docker.io") return -1;
+          if (b === "docker.io") return 1;
+          if (a === "local") return -1;
+          if (b === "local") return 1;
+          return a.localeCompare(b);
+        });
+        
+        // Create badges for all unique registries
+        const badges = sortedRegistries.map((reg: string) => {
+          if (reg === "local") {
+            return (
+              <Badge key="local" variant="secondary" className="text-xs">
+                Local Docker
+              </Badge>
+            );
+          } else if (reg === "docker.io") {
+            return (
+              <Badge key="dockerhub" variant="default" className="text-xs">
+                Docker Hub
+              </Badge>
+            );
+          } else {
+            return (
+              <Badge key={reg} variant="outline" className="text-xs">
+                {reg}
+              </Badge>
+            );
+          }
+        });
+        
+        return <div className="flex flex-wrap gap-1">{badges}</div>;
       }
-      return <Badge variant="secondary" className="text-xs">{registry}</Badge>;
+      
+      // Fallback to single registry from current row
+      const imageData = row.original.image;
+      const currentRegistry = typeof imageData === 'object' ? (imageData as any)?.registry : null;
+      const source = row.original.source;
+      
+      let registry = "docker.io";
+      if (source === "local") {
+        registry = "local";
+      } else if (currentRegistry) {
+        registry = currentRegistry;
+      }
+      
+      return (
+        <Badge 
+          variant={
+            registry === "docker.io" ? "default" : 
+            registry === "local" ? "secondary" : 
+            "outline"
+          }
+          className="text-xs"
+        >
+          {registry === "docker.io" ? "Docker Hub" : 
+           registry === "local" ? "Local Docker" : 
+           registry}
+        </Badge>
+      );
     },
   },
 
@@ -587,7 +660,10 @@ export function DataTable({
     const grouped = new Map<string, z.infer<typeof schema>[]>()
     
     initialData.forEach(item => {
-      const imageName = item.image.split(':')[0] // Remove tag part
+      // Handle both string and object formats for item.image
+      const imageName = typeof item.image === 'string'
+        ? item.image.split(':')[0]
+        : (item.image as any)?.name || 'unknown'
       if (!grouped.has(imageName)) {
         grouped.set(imageName, [])
       }
@@ -617,10 +693,25 @@ export function DataTable({
         : baseItem.riskScore
       
       
+      // Collect all registries from grouped items
+      const allRegistries = new Set<string>();
+      items.forEach(item => {
+        const reg = typeof item.image === 'object' ? (item.image as any)?.registry : null;
+        const src = item.source;
+        
+        if (src === "local") {
+          allRegistries.add("local");
+        } else if (!reg || reg === null) {
+          allRegistries.add("docker.io");
+        } else {
+          allRegistries.add(reg);
+        }
+      });
+      
       return {
         ...baseItem,
         id: baseItem.id, // Keep original ID for key purposes
-        image: imageName, // Show just the image name without tag
+        image: baseItem.image, // Keep the original image data (object or string)
         imageName, // For navigation
         severities: aggregatedSeverities,
         riskScore: weightedRiskScore,
@@ -631,8 +722,20 @@ export function DataTable({
           new Date(current.lastScan) > new Date(latest) ? current.lastScan : latest
         , baseItem.lastScan),
         // Add metadata about multiple tags (deduplicated)
-        _tagCount: [...new Set(items.map(item => item.image.split(':')[1] || 'latest'))].length,
-        _allTags: [...new Set(items.map(item => item.image.split(':')[1] || 'latest'))].join(', ')
+        _tagCount: [...new Set(items.map(item => {
+          const tag = typeof item.image === 'string'
+            ? item.image.split(':')[1] || 'latest'
+            : (item.image as any)?.tag || 'latest'
+          return tag
+        }))].length,
+        _allTags: [...new Set(items.map(item => {
+          const tag = typeof item.image === 'string'
+            ? item.image.split(':')[1] || 'latest'
+            : (item.image as any)?.tag || 'latest'
+          return tag
+        }))].join(', '),
+        // Store all registries for this image
+        _allRegistries: Array.from(allRegistries)
       }
     })
   }, [initialData])
@@ -684,7 +787,7 @@ export function DataTable({
   }
 
   const dataIds = React.useMemo<UniqueIdentifier[]>(
-    () => data?.map(({ image }) => image) || [],
+    () => data?.map(({ image }) => typeof image === 'string' ? image : `${(image as any)?.name}:${(image as any)?.tag}`) || [],
     [data]
   )
 

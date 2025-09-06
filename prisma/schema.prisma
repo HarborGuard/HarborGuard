@@ -275,6 +275,7 @@ model Repository {
   id                String           @id @default(cuid())
   name              String
   type              RepositoryType
+  protocol          String           @default("https")
   registryUrl       String
   username          String
   encryptedPassword String

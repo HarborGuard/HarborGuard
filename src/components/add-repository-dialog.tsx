@@ -39,6 +39,7 @@ interface RepositoryConfig {
 export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: AddRepositoryDialogProps) {
   const [step, setStep] = useState<'select' | 'configure' | 'test'>('select')
   const [selectedType, setSelectedType] = useState<RepositoryType>('dockerhub')
+  const [protocol, setProtocol] = useState<'https' | 'http'>('https')
   const [config, setConfig] = useState<RepositoryConfig>({
     name: '',
     type: 'dockerhub',
@@ -90,13 +91,19 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
     setTestStatus('testing')
     setTestResult(null)
 
+    // Prepare the config with protocol for generic registries
+    const testConfig = { ...config }
+    if (config.type === 'generic' && config.registryUrl) {
+      testConfig.registryUrl = `${protocol}://${config.registryUrl.replace(/^https?:\/\//, '')}`
+    }
+
     try {
       const response = await fetch('/api/repositories/test', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(config),
+        body: JSON.stringify(testConfig),
       })
 
       const result = await response.json()
@@ -119,13 +126,28 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
   }
 
   const handleAddRepository = async () => {
+    // Prepare the config with protocol for generic registries
+    const saveConfig = { ...config }
+    if (config.type === 'generic' && config.registryUrl) {
+      saveConfig.registryUrl = `${protocol}://${config.registryUrl.replace(/^https?:\/\//, '')}`
+    }
+
+    // Include test results if the test was successful
+    const requestBody = {
+      ...saveConfig,
+      testResult: testStatus === 'success' ? {
+        success: true,
+        repositoryCount: testResult?.repositoryCount
+      } : undefined
+    }
+
     try {
       const response = await fetch('/api/repositories', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(config),
+        body: JSON.stringify(requestBody),
       })
 
       if (response.ok) {
@@ -145,6 +167,7 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
   const handleClose = () => {
     setStep('select')
     setSelectedType('dockerhub')
+    setProtocol('https')
     setConfig({
       name: '',
       type: 'dockerhub',
@@ -212,12 +235,38 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
             {config.type === 'generic' && (
               <div className="space-y-2">
                 <Label htmlFor="registryUrl">Registry URL</Label>
-                <Input
-                  id="registryUrl"
-                  value={config.registryUrl}
-                  onChange={(e) => setConfig(prev => ({ ...prev, registryUrl: e.target.value }))}
-                  placeholder="e.g., registry.company.com"
-                />
+                <div className="flex gap-2">
+                  <Select value={protocol} onValueChange={(value: 'https' | 'http') => setProtocol(value)}>
+                    <SelectTrigger className="w-[100px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="https">HTTPS</SelectItem>
+                      <SelectItem value="http">HTTP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    id="registryUrl"
+                    value={config.registryUrl}
+                    onChange={(e) => {
+                      let value = e.target.value
+                      // If user pastes a URL with protocol, extract it
+                      if (value.startsWith('http://')) {
+                        setProtocol('http')
+                        value = value.substring(7)
+                      } else if (value.startsWith('https://')) {
+                        setProtocol('https')
+                        value = value.substring(8)
+                      }
+                      setConfig(prev => ({ ...prev, registryUrl: value }))
+                    }}
+                    placeholder="registry.company.com"
+                    className="flex-1"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Use HTTP for insecure registries (e.g., localhost or internal registries)
+                </p>
               </div>
             )}
 
@@ -280,7 +329,7 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
               <div className="space-y-2 text-sm">
                 <div><strong>Name:</strong> {config.name}</div>
                 <div><strong>Type:</strong> {repositoryTypes.find(t => t.type === config.type)?.title}</div>
-                <div><strong>Registry:</strong> {config.registryUrl}</div>
+                <div><strong>Registry:</strong> {config.type === 'generic' && config.registryUrl ? `${protocol}://${config.registryUrl}` : config.registryUrl}</div>
                 <div><strong>Username:</strong> {config.username}</div>
               </div>
             </div>
