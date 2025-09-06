@@ -34,7 +34,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, type, registryUrl, username, password, organization } = body
+    const { name, type, registryUrl, username, password, organization, testResult } = body
 
     if (!name || !type || !username || !password) {
       return NextResponse.json(
@@ -66,6 +66,17 @@ export async function POST(request: NextRequest) {
       cleanRegistryUrl = cleanRegistryUrl.replace(/\/$/, '')
     }
 
+    // Determine status based on test results
+    let status: 'ACTIVE' | 'ERROR' | 'UNTESTED' = 'UNTESTED'
+    let repositoryCount: number | undefined
+    let lastTested: Date | undefined
+    
+    if (testResult) {
+      status = testResult.success ? 'ACTIVE' : 'ERROR'
+      repositoryCount = testResult.repositoryCount
+      lastTested = new Date()
+    }
+
     // For security, we'll encrypt the password/token before storing
     // For now, we'll store it as plain text but in production you should encrypt it
     const repository = await prisma.repository.create({
@@ -77,7 +88,9 @@ export async function POST(request: NextRequest) {
         username,
         encryptedPassword: password, // Should be encrypted
         organization,
-        status: 'UNTESTED',
+        status,
+        repositoryCount,
+        lastTested,
       },
     })
 

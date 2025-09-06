@@ -132,13 +132,22 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
       saveConfig.registryUrl = `${protocol}://${config.registryUrl.replace(/^https?:\/\//, '')}`
     }
 
+    // Include test results if the test was successful
+    const requestBody = {
+      ...saveConfig,
+      testResult: testStatus === 'success' ? {
+        success: true,
+        repositoryCount: testResult?.repositoryCount
+      } : undefined
+    }
+
     try {
       const response = await fetch('/api/repositories', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(saveConfig),
+        body: JSON.stringify(requestBody),
       })
 
       if (response.ok) {
