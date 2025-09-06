@@ -12,6 +12,9 @@ import {
   IconX,
   IconDownload,
   IconTrash,
+  IconBrandDocker,
+  IconServer,
+  IconCloud,
 } from "@tabler/icons-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -53,6 +56,8 @@ interface HistoricalScan {
   scanId: string // Real scan ID for navigation
   scanDate: string
   version: string
+  registry?: string // Registry location
+  source?: string // Scan source (local, registry, etc)
   riskScore: number
   severities: {
     crit: number
@@ -188,6 +193,7 @@ export function HistoricalScansTable({ data, imageId, onScanDeleted }: Historica
           <TableRow>
             <TableHead>Scan Date</TableHead>
             <TableHead>Version</TableHead>
+            <TableHead>Registry</TableHead>
             <TableHead>Risk Score</TableHead>
             <TableHead>Findings</TableHead>
             <TableHead>Changes</TableHead>
@@ -229,6 +235,36 @@ export function HistoricalScansTable({ data, imageId, onScanDeleted }: Historica
                 
                 <TableCell>
                   <Badge variant="outline">{scan.version}</Badge>
+                </TableCell>
+                
+                <TableCell>
+                  {scan.registry && (
+                    <Badge 
+                      variant={
+                        scan.registry === 'local' ? 'secondary' : 
+                        scan.registry === 'docker.io' ? 'default' : 
+                        'outline'
+                      }
+                      className="flex items-center gap-1 w-fit"
+                    >
+                      {scan.registry === 'local' ? (
+                        <>
+                          <IconServer className="h-3 w-3" />
+                          Local Docker
+                        </>
+                      ) : scan.registry === 'docker.io' ? (
+                        <>
+                          <IconBrandDocker className="h-3 w-3" />
+                          Docker Hub
+                        </>
+                      ) : (
+                        <>
+                          <IconCloud className="h-3 w-3" />
+                          {scan.registry}
+                        </>
+                      )}
+                    </Badge>
+                  )}
                 </TableCell>
                 
                 <TableCell>
