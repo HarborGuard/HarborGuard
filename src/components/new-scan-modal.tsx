@@ -176,7 +176,7 @@ export function NewScanModal({ children }: NewScanModalProps) {
         // Handle both string and object formats for scan.image
         const imageName = typeof scan.image === 'string' 
           ? scan.image 
-          : `${scan.image?.name}:${scan.image?.tag}`;
+          : `${(scan.image as any)?.name}:${(scan.image as any)?.tag}`;
         const key = imageName;
         const existing = imageMap.get(key)
         
@@ -733,19 +733,19 @@ export function NewScanModal({ children }: NewScanModalProps) {
                                           let tags = [];
                                           if (Array.isArray(tagsData)) {
                                             // If it's an array of objects with name property
-                                            tags = tagsData.map(t => typeof t === 'string' ? t : t.name || t.tag);
+                                            tags = tagsData.map((t: any) => typeof t === 'string' ? t : t.name || t.tag);
                                           } else if (tagsData.tags) {
                                             // If it has a tags property
                                             tags = Array.isArray(tagsData.tags) 
-                                              ? tagsData.tags.map(t => typeof t === 'string' ? t : t.name || t.tag)
+                                              ? tagsData.tags.map((t: any) => typeof t === 'string' ? t : t.name || t.tag)
                                               : [];
                                           } else if (Array.isArray(tagsData.data)) {
                                             // If it has a data property with array
-                                            tags = tagsData.data.map(t => typeof t === 'string' ? t : t.name || t.tag);
+                                            tags = tagsData.data.map((t: any) => typeof t === 'string' ? t : t.name || t.tag);
                                           }
                                           
                                           // Filter out any undefined/null values
-                                          tags = tags.filter(t => t);
+                                          tags = tags.filter((t: any) => t);
                                           
                                           // If no tags found, skip this image
                                           if (tags.length === 0) {
@@ -782,10 +782,11 @@ export function NewScanModal({ children }: NewScanModalProps) {
                                                 if (result.requestId) {
                                                   addScanJob({
                                                     requestId: result.requestId,
+                                                    scanId: result.scanId || '',
+                                                    imageId: result.imageId || '',
                                                     imageName: `${fullImageString}:${tag}`,
-                                                    status: 'pending',
-                                                    progress: 0,
-                                                    startTime: new Date().toISOString()
+                                                    status: 'RUNNING' as const,
+                                                    progress: 0
                                                   });
                                                   successCount++;
                                                   console.log(`✓ Started scan for ${fullImageString}:${tag}`);

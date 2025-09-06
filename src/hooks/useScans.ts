@@ -19,7 +19,7 @@ export function useScans() {
       // Handle both string and object formats
       return typeof scan.image === 'string' 
         ? scan.image 
-        : `${scan.image?.name}:${scan.image?.tag}`
+        : `${(scan.image as any)?.name}:${(scan.image as any)?.tag}`
     })).size
     
     // Group scans by image name (without tag) to get latest scan per image
@@ -29,7 +29,7 @@ export function useScans() {
       const imageName = scan.image 
         ? (typeof scan.image === 'string' 
             ? scan.image.split(':')[0] 
-            : scan.image.name)
+            : (scan.image as any).name)
         : 'unknown'
       // Keep only the most recent scan for each image
       if (!imageGroups.has(imageName) || 

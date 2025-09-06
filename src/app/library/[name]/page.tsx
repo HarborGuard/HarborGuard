@@ -70,10 +70,10 @@ export default function LibraryDetailsPage() {
       const imageName = scan.imageName || 
         (typeof scan.image === 'string' 
           ? scan.image.split(":")[0] 
-          : scan.image?.name) || "unknown";
+          : (scan.image as any)?.name) || "unknown";
       const imageTag = typeof scan.image === 'string'
         ? scan.image.split(":")[1] || "latest"
-        : scan.image?.tag || "latest";
+        : (scan.image as any)?.tag || "latest";
       const fullImageName = `${imageName}:${imageTag}`;
 
       // Process Trivy results
@@ -325,10 +325,10 @@ export default function LibraryDetailsPage() {
       const imageName = scan.imageName || 
         (typeof scan.image === 'string' 
           ? scan.image.split(":")[0] 
-          : scan.image?.name) || "unknown";
+          : (scan.image as any)?.name) || "unknown";
       const imageTag = typeof scan.image === 'string'
         ? scan.image.split(":")[1] || "latest"
-        : scan.image?.tag || "latest";
+        : (scan.image as any)?.tag || "latest";
       const fullImageName = `${imageName}:${imageTag}`;
 
       // Check if this scan contains the library we're looking at

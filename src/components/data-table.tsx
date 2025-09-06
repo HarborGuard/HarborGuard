@@ -230,7 +230,7 @@ function createColumns(handleDeleteClick: (imageName: string) => void): ColumnDe
       // Handle both string and object formats
       const imageName = typeof imageData === 'string' 
         ? imageData 
-        : `${imageData.name}:${imageData.tag}`;
+        : `${(imageData as any)?.name}:${(imageData as any)?.tag}`;
       const tagCount = (row.original as any)._tagCount || 1;
       const allTags = (row.original as any)._allTags || '';
       
@@ -287,7 +287,7 @@ function createColumns(handleDeleteClick: (imageName: string) => void): ColumnDe
       const imageName = row.original.imageName || 
         (typeof imageData === 'string' 
           ? imageData.split(':')[0] 
-          : imageData?.name);
+          : (imageData as any)?.name);
       
       return (
         <ImageStatusCell 
@@ -446,7 +446,7 @@ function createColumns(handleDeleteClick: (imageName: string) => void): ColumnDe
       
       // Fallback to single registry from current row
       const imageData = row.original.image;
-      const currentRegistry = typeof imageData === 'object' ? imageData?.registry : null;
+      const currentRegistry = typeof imageData === 'object' ? (imageData as any)?.registry : null;
       const source = row.original.source;
       
       let registry = "docker.io";
@@ -663,7 +663,7 @@ export function DataTable({
       // Handle both string and object formats for item.image
       const imageName = typeof item.image === 'string'
         ? item.image.split(':')[0]
-        : item.image?.name || 'unknown'
+        : (item.image as any)?.name || 'unknown'
       if (!grouped.has(imageName)) {
         grouped.set(imageName, [])
       }
@@ -696,7 +696,7 @@ export function DataTable({
       // Collect all registries from grouped items
       const allRegistries = new Set<string>();
       items.forEach(item => {
-        const reg = typeof item.image === 'object' ? item.image?.registry : null;
+        const reg = typeof item.image === 'object' ? (item.image as any)?.registry : null;
         const src = item.source;
         
         if (src === "local") {
@@ -725,13 +725,13 @@ export function DataTable({
         _tagCount: [...new Set(items.map(item => {
           const tag = typeof item.image === 'string'
             ? item.image.split(':')[1] || 'latest'
-            : item.image?.tag || 'latest'
+            : (item.image as any)?.tag || 'latest'
           return tag
         }))].length,
         _allTags: [...new Set(items.map(item => {
           const tag = typeof item.image === 'string'
             ? item.image.split(':')[1] || 'latest'
-            : item.image?.tag || 'latest'
+            : (item.image as any)?.tag || 'latest'
           return tag
         }))].join(', '),
         // Store all registries for this image
@@ -787,7 +787,7 @@ export function DataTable({
   }
 
   const dataIds = React.useMemo<UniqueIdentifier[]>(
-    () => data?.map(({ image }) => typeof image === 'string' ? image : `${image.name}:${image.tag}`) || [],
+    () => data?.map(({ image }) => typeof image === 'string' ? image : `${(image as any)?.name}:${(image as any)?.tag}`) || [],
     [data]
   )
 
