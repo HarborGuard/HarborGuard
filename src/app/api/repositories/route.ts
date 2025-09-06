@@ -8,6 +8,7 @@ export async function GET() {
         id: true,
         name: true,
         type: true,
+        protocol: true,
         registryUrl: true,
         username: true,
         lastTested: true,
@@ -49,13 +50,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Extract protocol from registryUrl if present
+    let protocol = 'https'
+    let cleanRegistryUrl = registryUrl || (type === 'dockerhub' ? 'docker.io' : type === 'ghcr' ? 'ghcr.io' : '')
+    
+    if (cleanRegistryUrl) {
+      if (cleanRegistryUrl.startsWith('http://')) {
+        protocol = 'http'
+        cleanRegistryUrl = cleanRegistryUrl.substring(7)
+      } else if (cleanRegistryUrl.startsWith('https://')) {
+        protocol = 'https'
+        cleanRegistryUrl = cleanRegistryUrl.substring(8)
+      }
+      // Remove trailing slash
+      cleanRegistryUrl = cleanRegistryUrl.replace(/\/$/, '')
+    }
+
     // For security, we'll encrypt the password/token before storing
     // For now, we'll store it as plain text but in production you should encrypt it
     const repository = await prisma.repository.create({
       data: {
         name,
         type: type.toUpperCase() as 'DOCKERHUB' | 'GHCR' | 'GENERIC',
-        registryUrl: registryUrl || (type === 'dockerhub' ? 'docker.io' : type === 'ghcr' ? 'ghcr.io' : ''),
+        protocol,
+        registryUrl: cleanRegistryUrl,
         username,
         encryptedPassword: password, // Should be encrypted
         organization,
@@ -67,6 +85,7 @@ export async function POST(request: NextRequest) {
       id: repository.id,
       name: repository.name,
       type: repository.type,
+      protocol: repository.protocol,
       registryUrl: repository.registryUrl,
       username: repository.username,
       status: repository.status,

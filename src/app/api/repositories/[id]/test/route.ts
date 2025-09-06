@@ -43,8 +43,10 @@ export async function POST(
           break
 
         case 'GENERIC':
+          // Combine protocol and registryUrl for testing
+          const fullUrl = `${repository.protocol || 'https'}://${repository.registryUrl}`
           repositoryCount = await testGenericRegistryConnection(
-            repository.registryUrl,
+            fullUrl,
             repository.username,
             repository.encryptedPassword // Should be decrypted
           )
