@@ -14,7 +14,42 @@ export async function GET(
       where: { id },
       include: {
         image: true,
-        metadata: true
+        metadata: {
+          include: {
+            grypeResult: {
+              include: {
+                vulnerabilities: true
+              }
+            },
+            trivyResult: {
+              include: {
+                vulnerabilities: true,
+                misconfigurations: true,
+                secrets: true
+              }
+            },
+            diveResult: {
+              include: {
+                layers: true
+              }
+            },
+            syftResult: {
+              include: {
+                packages: true
+              }
+            },
+            dockleResult: {
+              include: {
+                violations: true
+              }
+            },
+            osvResult: {
+              include: {
+                vulnerabilities: true
+              }
+            }
+          }
+        }
       }
     })
     
@@ -23,7 +58,42 @@ export async function GET(
         where: { requestId: id },
         include: {
           image: true,
-          metadata: true
+          metadata: {
+            include: {
+              grypeResult: {
+                include: {
+                  vulnerabilities: true
+                }
+              },
+              trivyResult: {
+                include: {
+                  vulnerabilities: true,
+                  misconfigurations: true,
+                  secrets: true
+                }
+              },
+              diveResult: {
+                include: {
+                  layers: true
+                }
+              },
+              syftResult: {
+                include: {
+                  packages: true
+                }
+              },
+              dockleResult: {
+                include: {
+                  violations: true
+                }
+              },
+              osvResult: {
+                include: {
+                  vulnerabilities: true
+                }
+              }
+            }
+          }
         }
       })
     }
