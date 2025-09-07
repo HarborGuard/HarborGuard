@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PatchExecutor } from '@/lib/patcher/PatchExecutor';
+import { PatchExecutorTar } from '@/lib/patcher/PatchExecutorTar';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
 
@@ -53,7 +54,8 @@ export async function POST(request: NextRequest) {
 
     logger.info(`Executing patch for image ${sourceImageId} based on scan ${scanId}`);
     
-    const executor = new PatchExecutor();
+    // Use tar-based executor which integrates with existing scan workflow
+    const executor = new PatchExecutorTar();
     const patchOperation = await executor.executePatch({
       sourceImageId,
       scanId,
