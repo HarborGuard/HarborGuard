@@ -450,22 +450,37 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     });
 
     if (syftData.artifacts && syftData.artifacts.length > 0) {
-      const packages = syftData.artifacts.map((artifact: any) => ({
-        syftResultsId: syftResult.id,
-        packageId: artifact.id || '',
-        name: artifact.name || 'unknown',
-        version: artifact.version || '',
-        type: artifact.type || 'unknown',
-        foundBy: artifact.foundBy || null,
-        purl: artifact.purl || null,
-        cpe: artifact.cpes?.[0] || null,
-        language: artifact.language || null,
-        licenses: artifact.licenses || null,
-        size: artifact.metadata?.installedSize ? BigInt(artifact.metadata.installedSize) : null,
-        locations: artifact.locations || null,
-        layerId: artifact.locations?.[0]?.layerID || null,
-        metadata: artifact.metadata || null,
-      }));
+      const packages = syftData.artifacts.map((artifact: any) => {
+        // Extract CPE string - handle various formats
+        let cpeString: string | null = null;
+        if (artifact.cpes && artifact.cpes.length > 0) {
+          const firstCpe = artifact.cpes[0];
+          if (typeof firstCpe === 'string') {
+            cpeString = firstCpe;
+          } else if (typeof firstCpe === 'object' && firstCpe.cpe) {
+            cpeString = firstCpe.cpe;
+          } else if (typeof firstCpe === 'object' && firstCpe.value) {
+            cpeString = firstCpe.value;
+          }
+        }
+        
+        return {
+          syftResultsId: syftResult.id,
+          packageId: artifact.id || '',
+          name: artifact.name || 'unknown',
+          version: artifact.version || '',
+          type: artifact.type || 'unknown',
+          foundBy: artifact.foundBy || null,
+          purl: artifact.purl || null,
+          cpe: cpeString,
+          language: artifact.language || null,
+          licenses: artifact.licenses || null,
+          size: artifact.metadata?.installedSize ? BigInt(artifact.metadata.installedSize) : null,
+          locations: artifact.locations || null,
+          layerId: artifact.locations?.[0]?.layerID || null,
+          metadata: artifact.metadata || null,
+        };
+      });
 
       await prisma.syftPackage.createMany({ data: packages });
     }
