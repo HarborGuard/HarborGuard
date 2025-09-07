@@ -276,7 +276,7 @@ export class PatchExecutor {
 
   private async createWorkingContainer(imageRef: string): Promise<string> {
     logger.info(`Creating working container from ${imageRef}`);
-    const { stdout } = await execAsync(`buildah from ${imageRef}`);
+    const { stdout } = await execAsync(`buildah --storage-driver vfs from ${imageRef}`);
     const containerId = stdout.trim();
     logger.info(`Created container: ${containerId}`);
     return containerId;
@@ -284,7 +284,7 @@ export class PatchExecutor {
 
   private async mountContainer(containerId: string): Promise<string> {
     logger.info(`Mounting container ${containerId}`);
-    const { stdout } = await execAsync(`buildah mount ${containerId}`);
+    const { stdout } = await execAsync(`buildah --storage-driver vfs mount ${containerId}`);
     const mountPath = stdout.trim();
     logger.info(`Mounted at: ${mountPath}`);
     return mountPath;
@@ -341,11 +341,11 @@ export class PatchExecutor {
     logger.info(`Committing patched image as ${imageName}`);
     
     // Commit the container
-    await execAsync(`buildah commit ${containerId} ${imageName}`);
+    await execAsync(`buildah --storage-driver vfs commit ${containerId} ${imageName}`);
     
     // Push to registry
     logger.info(`Pushing image to registry`);
-    await execAsync(`buildah push ${imageName}`);
+    await execAsync(`buildah --storage-driver vfs push ${imageName}`);
     
     return imageName;
   }
@@ -398,8 +398,8 @@ export class PatchExecutor {
   private async cleanupContainer(containerId: string): Promise<void> {
     try {
       logger.info(`Cleaning up container ${containerId}`);
-      await execAsync(`buildah umount ${containerId}`);
-      await execAsync(`buildah rm ${containerId}`);
+      await execAsync(`buildah --storage-driver vfs umount ${containerId}`);
+      await execAsync(`buildah --storage-driver vfs rm ${containerId}`);
     } catch (error) {
       logger.warn(`Failed to cleanup container ${containerId}:`, error);
     }
