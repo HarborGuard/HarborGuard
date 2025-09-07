@@ -152,10 +152,12 @@ export class PatchExecutorTarUnshare {
         await prisma.patchResult.create({
           data: {
             patchOperationId: patchOperation.id,
+            vulnerabilityId: vuln.id,
             cveId: vuln.cveId,
             packageName: vuln.packageName,
             originalVersion: vuln.currentVersion,
             targetVersion: vuln.fixedVersion,
+            patchCommand: '', // Will be populated with actual command
             status: request.dryRun ? 'SKIPPED' : 'SUCCESS',
             packageManager: vuln.packageManager
           }
