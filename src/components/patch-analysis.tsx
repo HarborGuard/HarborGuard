@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { VulnerabilitySelectionModal } from '@/components/vulnerability-selection-modal';
 import { 
   Shield, 
   AlertTriangle, 
@@ -27,6 +28,7 @@ export function PatchAnalysis({ scanId, imageId, onPatchExecute }: PatchAnalysis
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [patching, setPatching] = useState(false);
+  const [showVulnModal, setShowVulnModal] = useState(false);
 
   useEffect(() => {
     analyzeScan();
@@ -56,7 +58,7 @@ export function PatchAnalysis({ scanId, imageId, onPatchExecute }: PatchAnalysis
     }
   };
 
-  const executePatch = async (dryRun = false) => {
+  const executePatch = async (dryRun = false, selectedVulnerabilityIds?: string[]) => {
     setPatching(true);
     setError(null);
 
@@ -67,7 +69,8 @@ export function PatchAnalysis({ scanId, imageId, onPatchExecute }: PatchAnalysis
         body: JSON.stringify({
           sourceImageId: imageId,
           scanId,
-          dryRun
+          dryRun,
+          selectedVulnerabilityIds
         })
       });
 
@@ -85,6 +88,10 @@ export function PatchAnalysis({ scanId, imageId, onPatchExecute }: PatchAnalysis
     } finally {
       setPatching(false);
     }
+  };
+
+  const handlePatchWithSelection = (selectedVulnerabilityIds: string[]) => {
+    executePatch(false, selectedVulnerabilityIds);
   };
 
   if (loading) {
@@ -117,6 +124,7 @@ export function PatchAnalysis({ scanId, imageId, onPatchExecute }: PatchAnalysis
     : 0;
 
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -145,7 +153,7 @@ export function PatchAnalysis({ scanId, imageId, onPatchExecute }: PatchAnalysis
             </Button>
             <Button
               size="sm"
-              onClick={() => executePatch(false)}
+              onClick={() => setShowVulnModal(true)}
               disabled={patching || analysis.patchableVulnerabilities === 0}
             >
               {patching ? (
@@ -253,5 +261,13 @@ export function PatchAnalysis({ scanId, imageId, onPatchExecute }: PatchAnalysis
         )}
       </CardContent>
     </Card>
+    
+    <VulnerabilitySelectionModal
+      open={showVulnModal}
+      onOpenChange={setShowVulnModal}
+      scanId={scanId}
+      onConfirm={handlePatchWithSelection}
+    />
+    </>
   );
 }

@@ -23,6 +23,7 @@ export interface PatchRequest {
   targetRegistry?: string;
   targetTag?: string;
   dryRun?: boolean;
+  selectedVulnerabilityIds?: string[];
 }
 
 export interface PatchableVulnerability {
@@ -79,9 +80,21 @@ export class PatchExecutorTar {
       }
 
       // Analyze vulnerabilities for patchability
-      const patchableVulns = await this.analyzePatchableVulnerabilities(
+      let patchableVulns = await this.analyzePatchableVulnerabilities(
         scan.vulnerabilityFindings
       );
+      
+      // Filter by selected vulnerability IDs if provided
+      if (request.selectedVulnerabilityIds && request.selectedVulnerabilityIds.length > 0) {
+        patchableVulns = patchableVulns.filter(vuln => 
+          request.selectedVulnerabilityIds!.includes(
+            scan.vulnerabilityFindings.find(f => 
+              f.cveId === vuln.cveId && f.packageName === vuln.packageName
+            )?.id || ''
+          )
+        );
+        logger.info(`Filtered to ${patchableVulns.length} selected vulnerabilities from ${request.selectedVulnerabilityIds.length} IDs`);
+      }
 
       if (patchableVulns.length === 0) {
         logger.info('No patchable vulnerabilities found');
