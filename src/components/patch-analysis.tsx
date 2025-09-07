@@ -20,10 +20,12 @@ import {
 interface PatchAnalysisProps {
   scanId: string;
   imageId: string;
+  imageName?: string;
+  imageTag?: string;
   onPatchExecute?: (analysis: any) => void;
 }
 
-export function PatchAnalysis({ scanId, imageId, onPatchExecute }: PatchAnalysisProps) {
+export function PatchAnalysis({ scanId, imageId, imageName = 'image', imageTag = 'latest', onPatchExecute }: PatchAnalysisProps) {
   const [analysis, setAnalysis] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export function PatchAnalysis({ scanId, imageId, onPatchExecute }: PatchAnalysis
     }
   };
 
-  const executePatch = async (dryRun = false, selectedVulnerabilityIds?: string[]) => {
+  const executePatch = async (dryRun = false, selectedVulnerabilityIds?: string[], newImageName?: string, newImageTag?: string) => {
     setPatching(true);
     setError(null);
 
@@ -70,7 +72,9 @@ export function PatchAnalysis({ scanId, imageId, onPatchExecute }: PatchAnalysis
           sourceImageId: imageId,
           scanId,
           dryRun,
-          selectedVulnerabilityIds
+          selectedVulnerabilityIds,
+          newImageName,
+          newImageTag
         })
       });
 
@@ -90,8 +94,8 @@ export function PatchAnalysis({ scanId, imageId, onPatchExecute }: PatchAnalysis
     }
   };
 
-  const handlePatchWithSelection = (selectedVulnerabilityIds: string[]) => {
-    executePatch(false, selectedVulnerabilityIds);
+  const handlePatchWithSelection = (selectedVulnerabilityIds: string[], newImageName: string, newImageTag: string) => {
+    executePatch(false, selectedVulnerabilityIds, newImageName, newImageTag);
   };
 
   if (loading) {
@@ -266,6 +270,8 @@ export function PatchAnalysis({ scanId, imageId, onPatchExecute }: PatchAnalysis
       open={showVulnModal}
       onOpenChange={setShowVulnModal}
       scanId={scanId}
+      imageName={imageName}
+      imageTag={imageTag}
       onConfirm={handlePatchWithSelection}
     />
     </>

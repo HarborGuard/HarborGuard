@@ -20,6 +20,8 @@ export interface PatchRequest {
   targetTag?: string;
   dryRun?: boolean;
   selectedVulnerabilityIds?: string[];
+  newImageName?: string;
+  newImageTag?: string;
 }
 
 export interface PatchableVulnerability {
@@ -170,20 +172,29 @@ export class PatchExecutorTarUnshare {
       if (!request.dryRun && successCount > 0) {
         await this.updatePatchOperationStatus(patchOperation.id, 'PUSHING');
         
+        // Determine the final image name and tag
+        const finalImageName = request.newImageName || image.name;
+        const finalImageTag = request.newImageTag || request.targetTag || `${image.tag}-patched`;
+        
+        // Load patched image into Docker for scanning
+        logger.info(`Loading patched image as ${finalImageName}:${finalImageTag}`);
+        await execAsync(`docker load -i ${patchedTarPath}`);
+        await execAsync(`docker tag patched-image:latest ${finalImageName}:${finalImageTag}`);
+        
         // If target registry specified, push to registry
         if (request.targetRegistry) {
           await this.pushToRegistry(
             patchedTarPath,
             request.targetRegistry,
-            image.name,
-            request.targetTag || `${image.tag}-patched`
+            finalImageName,
+            finalImageTag
           );
         }
         
         // Create new image record for patched version
         const patchedImage = await this.createPatchedImageRecord(
           image,
-          `${image.name}:${request.targetTag || image.tag + '-patched'}`,
+          `${finalImageName}:${finalImageTag}`,
           patchOperation.id
         );
         
@@ -192,6 +203,10 @@ export class PatchExecutorTarUnshare {
         // Move patched tar to reports directory for download
         const reportsDir = path.join(this.workDir, 'reports', scan.requestId);
         await fs.copyFile(patchedTarPath, path.join(reportsDir, 'patched-image.tar'));
+        
+        // Automatically trigger a scan of the patched image
+        logger.info(`Triggering automatic scan of patched image ${finalImageName}:${finalImageTag}`);
+        await this.triggerScan(finalImageName, finalImageTag, patchedImage.id);
       }
 
       // Update final status
@@ -455,8 +470,8 @@ export class PatchExecutorTarUnshare {
       data: {
         name,
         tag,
-        registry: originalImage.registry,
-        source: 'REGISTRY',
+        registry: 'local',
+        source: 'LOCAL_DOCKER',
         digest,
         platform: originalImage.platform,
         sizeBytes: originalImage.sizeBytes
@@ -476,5 +491,39 @@ export class PatchExecutorTarUnshare {
     });
     
     return patchedImage;
+  }
+
+  private async triggerScan(imageName: string, imageTag: string, imageId: string): Promise<void> {
+    try {
+      const scanRequest = {
+        image: imageName,
+        tag: imageTag,
+        scanners: {
+          trivy: true,
+          grype: true,
+          syft: true,
+          dockle: true,
+          osv: true,
+          dive: false
+        }
+      };
+
+      logger.info(`Initiating scan for patched image ${imageName}:${imageTag}`);
+      
+      const response = await fetch('http://localhost:3003/api/scans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(scanRequest)
+      });
+
+      if (!response.ok) {
+        logger.error(`Failed to trigger scan: ${response.statusText}`);
+      } else {
+        const result = await response.json();
+        logger.info(`Scan triggered successfully: ${result.scanId}`);
+      }
+    } catch (error) {
+      logger.error('Failed to trigger automatic scan:', error);
+    }
   }
 }

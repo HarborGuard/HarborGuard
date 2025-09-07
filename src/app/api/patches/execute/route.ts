@@ -14,7 +14,9 @@ export async function POST(request: NextRequest) {
       targetRegistry, 
       targetTag, 
       dryRun = false,
-      selectedVulnerabilityIds 
+      selectedVulnerabilityIds,
+      newImageName,
+      newImageTag 
     } = body;
     
     if (!sourceImageId || !scanId) {
@@ -62,9 +64,11 @@ export async function POST(request: NextRequest) {
       sourceImageId,
       scanId,
       targetRegistry,
-      targetTag,
+      targetTag: newImageTag || targetTag,
       dryRun,
-      selectedVulnerabilityIds
+      selectedVulnerabilityIds,
+      newImageName,
+      newImageTag
     });
     
     return NextResponse.json({

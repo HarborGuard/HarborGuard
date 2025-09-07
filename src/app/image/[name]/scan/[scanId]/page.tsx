@@ -1153,6 +1153,8 @@ export default function ScanResultsPage() {
           <PatchAnalysis 
             scanId={scanId} 
             imageId={scanData.imageId || scanData.scan?.imageId}
+            imageName={imageName}
+            imageTag={scanData.image?.tag || scanData.scan?.image?.tag || 'latest'}
             onPatchExecute={(patchOperation) => {
               console.log('Patch operation started:', patchOperation);
               // You can add additional handling here, like showing a notification
