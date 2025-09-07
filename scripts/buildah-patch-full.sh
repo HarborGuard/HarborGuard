@@ -28,6 +28,10 @@ echo "Mounting container..."
 mountpoint=\$(buildah --storage-driver vfs mount \$container)
 echo "MOUNT_PATH:\$mountpoint"
 
+# Setup DNS for network operations in chroot
+echo "=== Setting up DNS resolution ==="
+cp /etc/resolv.conf \$mountpoint/etc/resolv.conf || true
+
 # Apply patches if provided and not dry run
 if [ ! -z "$PATCH_COMMANDS" ] && [ "$DRY_RUN" = "false" ]; then
   echo "=== Applying patches ==="

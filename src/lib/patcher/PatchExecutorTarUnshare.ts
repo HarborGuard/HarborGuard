@@ -243,9 +243,17 @@ export class PatchExecutorTarUnshare {
         // Update apk cache
         commands.push('chroot $mountpoint apk update');
         
-        // Upgrade packages
-        const packages = vulns.map(v => v.packageName).join(' ');
-        commands.push(`chroot $mountpoint apk upgrade ${packages}`);
+        // For Alpine, we need to upgrade both libssl3 and libcrypto3 together as they're linked
+        const packages = new Set(vulns.map(v => v.packageName));
+        
+        // If libssl3 is being patched, also include libcrypto3 and vice versa
+        if (packages.has('libssl3') || packages.has('libcrypto3')) {
+          packages.add('libssl3');
+          packages.add('libcrypto3');
+        }
+        
+        const packageList = Array.from(packages).join(' ');
+        commands.push(`chroot $mountpoint apk upgrade ${packageList}`);
         
         // Clean cache
         commands.push('chroot $mountpoint rm -rf /var/cache/apk/*');
