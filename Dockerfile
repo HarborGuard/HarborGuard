@@ -25,12 +25,13 @@ ARG DIVE_VERSION=0.13.1
 # Install Prisma CLI only (minimal size)
 RUN npm install -g prisma@6.14.0 --no-save
 
-# Install PostgreSQL 16 and other dependencies
+# Install PostgreSQL 16, Buildah, and other dependencies
 RUN apk add --no-cache \
     postgresql16 \
     postgresql16-client \
     postgresql16-contrib \
     ca-certificates skopeo curl tar gzip xz gnupg docker-cli openssl \
+    buildah fuse-overlayfs shadow-uidmap slirp4netns \
   && set -eux \
   # Install Trivy
   && curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin "${TRIVY_VERSION}" \
@@ -60,11 +61,27 @@ RUN apk add --no-cache \
 
 ENV TRIVY_CACHE_DIR=/workspace/cache/trivy \
     GRYPE_DB_CACHE_DIR=/workspace/cache/grype \
-    SYFT_CACHE_DIR=/workspace/cache/syft
+    SYFT_CACHE_DIR=/workspace/cache/syft \
+    BUILDAH_ISOLATION=chroot \
+    STORAGE_DRIVER=vfs
 
 RUN mkdir -p /workspace && chown node:node /workspace
 RUN mkdir -p /workspace/cache/trivy/db /workspace/cache/grype /workspace/cache/syft /workspace/cache/dockle && \
     chmod -R 755 /workspace/cache
+
+# Setup Buildah configuration
+RUN mkdir -p /etc/containers /workspace/patches && \
+    echo 'root:100000:65536' > /etc/subuid && \
+    echo 'root:100000:65536' > /etc/subgid && \
+    chmod 644 /etc/subuid /etc/subgid
+
+# Create Buildah storage configuration
+RUN echo '[storage]' > /etc/containers/storage.conf && \
+    echo 'driver = "vfs"' >> /etc/containers/storage.conf && \
+    echo 'runroot = "/var/run/containers/storage"' >> /etc/containers/storage.conf && \
+    echo 'graphroot = "/var/lib/containers/storage"' >> /etc/containers/storage.conf && \
+    mkdir -p /var/lib/containers /var/run/containers && \
+    chmod -R 755 /var/lib/containers /var/run/containers
 
 # Setup PostgreSQL
 RUN mkdir -p /var/lib/postgresql/data /run/postgresql && \

@@ -71,6 +71,7 @@ import {
 } from "@/types";
 import { CveClassificationDialog } from "@/components/cve-classification-dialog";
 import { useCveClassifications } from "@/hooks/useCveClassifications";
+import { PatchAnalysis } from "@/components/patch-analysis";
 
 export default function ScanResultsPage() {
   const params = useParams();
@@ -1146,6 +1147,18 @@ export default function ScanResultsPage() {
             </CardHeader>
           </Card>
         ) : null}
+
+        {/* Patch Analysis Component */}
+        {scanData && (
+          <PatchAnalysis 
+            scanId={scanId} 
+            imageId={scanData.imageId || scanData.scan?.imageId}
+            onPatchExecute={(patchOperation) => {
+              console.log('Patch operation started:', patchOperation);
+              // You can add additional handling here, like showing a notification
+            }}
+          />
+        )}
 
         {/* Display based on view mode - Always show normalized if raw is disabled */}
         {!showRawOutput || viewMode === 'normalized' ? (
