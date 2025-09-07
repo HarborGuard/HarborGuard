@@ -4,10 +4,6 @@ import path from 'path';
 import fs from 'fs/promises';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { PatchStrategy } from './strategies/PatchStrategy';
-import { AptPatchStrategy } from './strategies/AptPatchStrategy';
-import { YumPatchStrategy } from './strategies/YumPatchStrategy';
-import { ApkPatchStrategy } from './strategies/ApkPatchStrategy';
 import type { 
   PatchOperation, 
   PatchOperationStatus, 
@@ -27,6 +23,7 @@ export interface PatchRequest {
 }
 
 export interface PatchableVulnerability {
+  id: string;
   cveId: string;
   packageName: string;
   currentVersion: string;
@@ -34,21 +31,12 @@ export interface PatchableVulnerability {
   packageManager: string;
 }
 
-export class PatchExecutorTar {
-  private strategies: Map<string, PatchStrategy>;
+export class PatchExecutorTarUnshare {
   private workDir = process.env.SCANNER_WORKDIR || '/workspace';
   private patchDir = path.join(this.workDir, 'patches');
 
-  constructor() {
-    this.strategies = new Map([
-      ['apt', new AptPatchStrategy()],
-      ['yum', new YumPatchStrategy()],
-      ['apk', new ApkPatchStrategy()],
-    ]);
-  }
-
   async executePatch(request: PatchRequest): Promise<PatchOperation> {
-    logger.info(`Starting tar-based patch operation for image ${request.sourceImageId}`);
+    logger.info(`Starting unshare tar-based patch operation for image ${request.sourceImageId}`);
     
     // Create patch operation record
     const patchOperation = await this.createPatchOperation(request);
@@ -87,13 +75,9 @@ export class PatchExecutorTar {
       // Filter by selected vulnerability IDs if provided
       if (request.selectedVulnerabilityIds && request.selectedVulnerabilityIds.length > 0) {
         patchableVulns = patchableVulns.filter(vuln => 
-          request.selectedVulnerabilityIds!.includes(
-            scan.vulnerabilityFindings.find(f => 
-              f.cveId === vuln.cveId && f.packageName === vuln.packageName
-            )?.id || ''
-          )
+          request.selectedVulnerabilityIds!.includes(vuln.id)
         );
-        logger.info(`Filtered to ${patchableVulns.length} selected vulnerabilities from ${request.selectedVulnerabilityIds.length} IDs`);
+        logger.info(`Filtered to ${patchableVulns.length} selected vulnerabilities`);
       }
 
       if (patchableVulns.length === 0) {
@@ -119,60 +103,70 @@ export class PatchExecutorTar {
       const patchWorkDir = path.join(this.patchDir, patchOperation.id);
       await fs.mkdir(patchWorkDir, { recursive: true });
       
-      // Copy tar to working directory
-      const workingTarPath = path.join(patchWorkDir, 'image.tar');
-      await fs.copyFile(originalTarPath, workingTarPath);
+      // Define output tar path
+      const patchedTarPath = path.join(patchWorkDir, 'patched-image.tar');
       
-      // Update status to building
-      await this.updatePatchOperationStatus(patchOperation.id, 'BUILDING');
-      
-      // Import tar into Buildah
-      const containerId = await this.importTarToBuildah(workingTarPath);
-      
-      // Mount container filesystem
-      const mountPath = await this.mountContainer(containerId);
-      
-      // Update buildah details
-      await prisma.patchOperation.update({
-        where: { id: patchOperation.id },
-        data: {
-          buildahContainerId: containerId,
-          buildahMountPath: mountPath
-        }
-      });
-
       // Update status to patching
       await this.updatePatchOperationStatus(patchOperation.id, 'PATCHING');
       
-      // Apply patches
-      const patchResults = await this.applyPatches(
-        patchOperation.id,
-        mountPath,
-        patchableVulns,
-        request.dryRun
-      );
+      // Generate patch commands
+      const patchCommands = this.generatePatchCommands(patchableVulns);
+      
+      // Execute patch using buildah unshare script
+      const scriptPath = path.join(process.cwd(), 'scripts', 'buildah-patch-full.sh');
+      const dryRunFlag = request.dryRun ? 'true' : 'false';
+      
+      logger.info(`Executing patch script with ${patchableVulns.length} vulnerabilities`);
+      
+      try {
+        const { stdout, stderr } = await execAsync(
+          `bash ${scriptPath} "${originalTarPath}" '${patchCommands}' "${patchedTarPath}" ${dryRunFlag}`,
+          { maxBuffer: 10 * 1024 * 1024 } // 10MB buffer for large outputs
+        );
+        
+        if (stderr && !stderr.includes('warning')) {
+          logger.warn(`Patch script stderr: ${stderr}`);
+        }
+        
+        // Check if patch was successful
+        if (!stdout.includes('PATCH_STATUS:SUCCESS')) {
+          throw new Error('Patch operation did not complete successfully');
+        }
+        
+        logger.info('Patch operation completed successfully');
+      } catch (error) {
+        logger.error('Patch script failed:', error);
+        await this.updatePatchOperationStatus(patchOperation.id, 'FAILED', {
+          failedCount: patchableVulns.length,
+          completedAt: new Date()
+        });
+        throw error;
+      }
 
       // Calculate results
-      const successCount = patchResults.filter(r => r.status === 'SUCCESS').length;
-      const failedCount = patchResults.filter(r => r.status === 'FAILED').length;
+      const successCount = request.dryRun ? 0 : patchableVulns.length;
+      const failedCount = 0;
 
-      // Export patched image if not dry run
+      // Save patch results to database
+      for (const vuln of patchableVulns) {
+        await prisma.patchResult.create({
+          data: {
+            patchOperationId: patchOperation.id,
+            cveId: vuln.cveId,
+            packageName: vuln.packageName,
+            originalVersion: vuln.currentVersion,
+            targetVersion: vuln.fixedVersion,
+            status: request.dryRun ? 'SKIPPED' : 'SUCCESS',
+            packageManager: vuln.packageManager
+          }
+        });
+      }
+
+      // Handle patched image
       let patchedImageId: string | null = null;
-      let patchedTarPath: string | null = null;
       
       if (!request.dryRun && successCount > 0) {
         await this.updatePatchOperationStatus(patchOperation.id, 'PUSHING');
-        
-        // Commit the container
-        const patchedImageRef = await this.commitContainer(
-          containerId,
-          image,
-          request.targetTag
-        );
-        
-        // Export to tar
-        patchedTarPath = path.join(patchWorkDir, 'patched-image.tar');
-        await this.exportToTar(patchedImageRef, patchedTarPath);
         
         // If target registry specified, push to registry
         if (request.targetRegistry) {
@@ -187,7 +181,7 @@ export class PatchExecutorTar {
         // Create new image record for patched version
         const patchedImage = await this.createPatchedImageRecord(
           image,
-          patchedImageRef,
+          `${image.name}:${request.targetTag || image.tag + '-patched'}`,
           patchOperation.id
         );
         
@@ -198,9 +192,6 @@ export class PatchExecutorTar {
         await fs.copyFile(patchedTarPath, path.join(reportsDir, 'patched-image.tar'));
       }
 
-      // Cleanup
-      await this.cleanupContainer(containerId);
-
       // Update final status
       await this.updatePatchOperationStatus(patchOperation.id, 'COMPLETED', {
         patchedCount: successCount,
@@ -209,57 +200,93 @@ export class PatchExecutorTar {
         completedAt: new Date()
       });
 
-      // Save patch summary to reports directory
-      if (!request.dryRun) {
-        await this.savePatchReport(scan.requestId, patchOperation.id, patchResults);
-      }
+      // Save patch report
+      await this.savePatchReport(scan.requestId, patchOperation.id, patchableVulns, request.dryRun);
 
-      return await prisma.patchOperation.findUniqueOrThrow({
-        where: { id: patchOperation.id },
-        include: { patchResults: true }
-      });
+      return patchOperation;
 
     } catch (error) {
       logger.error('Patch operation failed:', error);
       await this.updatePatchOperationStatus(patchOperation.id, 'FAILED', {
-        errorMessage: error instanceof Error ? error.message : String(error),
         completedAt: new Date()
       });
       throw error;
     }
   }
 
-  private async getImageTar(image: any, requestId: string): Promise<string> {
-    // Check if tar already exists from scan
-    const imageDir = path.join(this.workDir, 'images');
-    const safeImageName = image.name.replace(/[/:]/g, '_');
-    const tarPath = path.join(imageDir, `${safeImageName}-${requestId}.tar`);
+  private generatePatchCommands(vulnerabilities: PatchableVulnerability[]): string {
+    // Group by package manager
+    const grouped = new Map<string, PatchableVulnerability[]>();
+    for (const vuln of vulnerabilities) {
+      if (!grouped.has(vuln.packageManager)) {
+        grouped.set(vuln.packageManager, []);
+      }
+      grouped.get(vuln.packageManager)!.push(vuln);
+    }
     
+    const commands: string[] = [];
+    
+    for (const [packageManager, vulns] of grouped) {
+      if (packageManager === 'apt') {
+        // Update package lists first
+        commands.push('chroot $mountpoint apt-get update');
+        
+        // Install fixed versions
+        const packages = vulns.map(v => `${v.packageName}=${v.fixedVersion}`).join(' ');
+        commands.push(`chroot $mountpoint apt-get install -y ${packages}`);
+        
+        // Clean apt cache
+        commands.push('chroot $mountpoint apt-get clean');
+        commands.push('chroot $mountpoint rm -rf /var/lib/apt/lists/*');
+        
+      } else if (packageManager === 'apk') {
+        // Update apk cache
+        commands.push('chroot $mountpoint apk update');
+        
+        // Upgrade packages
+        const packages = vulns.map(v => v.packageName).join(' ');
+        commands.push(`chroot $mountpoint apk upgrade ${packages}`);
+        
+        // Clean cache
+        commands.push('chroot $mountpoint rm -rf /var/cache/apk/*');
+        
+      } else if (packageManager === 'yum') {
+        // Update packages
+        const packages = vulns.map(v => `${v.packageName}-${v.fixedVersion}`).join(' ');
+        commands.push(`chroot $mountpoint yum update -y ${packages}`);
+        
+        // Clean cache
+        commands.push('chroot $mountpoint yum clean all');
+      }
+    }
+    
+    return commands.join(' && ');
+  }
+
+  private async getImageTar(image: any, requestId: string): Promise<string> {
+    const safeImageName = image.name.replace(/[/:]/g, '_');
+    const tarPath = path.join(this.workDir, 'images', `${safeImageName}-${requestId}.tar`);
+    
+    // Check if tar file already exists
     try {
       const stats = await fs.stat(tarPath);
       if (stats.size > 0) {
         logger.info(`Using existing tar file: ${tarPath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
         return tarPath;
-      } else {
-        logger.info(`Tar file exists but is empty, will re-export`);
       }
     } catch {
       logger.info(`Tar file not found at ${tarPath}`);
     }
 
-    // Export from Docker if local source, otherwise download from registry
+    // Export from Docker if local source
     if (image.source === 'LOCAL_DOCKER' || image.registry === 'local') {
       logger.info(`Exporting local Docker image ${image.name}:${image.tag} to tar`);
-      
-      // Use docker save for local images
       await execAsync(`docker save -o ${tarPath} ${image.name}:${image.tag}`);
       
       const stats = await fs.stat(tarPath);
       logger.info(`Exported tar file: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
     } else {
       // Download from registry using skopeo
-      logger.info(`Downloading image ${image.name}:${image.tag} from registry`);
-      
       const fullImageName = image.registry ? `${image.registry}/${image.name}` : image.name;
       const imageRef = `${fullImageName}:${image.tag}`;
       
@@ -271,106 +298,6 @@ export class PatchExecutorTar {
     return tarPath;
   }
 
-  private async importTarToBuildah(tarPath: string): Promise<string> {
-    logger.info(`Importing tar ${tarPath} into Buildah`);
-    
-    // Use buildah unshare to import in the proper namespace
-    const scriptPath = path.join(process.cwd(), 'scripts', 'buildah-patch.sh');
-    const { stdout } = await execAsync(`bash ${scriptPath} mount ${tarPath}`);
-    
-    // Parse container ID and mount path from output
-    const [containerId, mountPath] = stdout.trim().split('|');
-    
-    if (!containerId || !mountPath) {
-      throw new Error('Failed to import and mount container');
-    }
-    
-    logger.info(`Imported as container: ${containerId}`);
-    logger.info(`Mounted at: ${mountPath}`);
-    
-    // Store mount path for later use
-    this.currentMountPath = mountPath;
-    
-    return containerId;
-  }
-
-  private async mountContainer(containerId: string): Promise<string> {
-    // Mount is already done in importTarToBuildah when using unshare
-    if (this.currentMountPath) {
-      return this.currentMountPath;
-    }
-    
-    // Fallback to regular mount (shouldn't happen with new flow)
-    logger.info(`Mounting container ${containerId}`);
-    const { stdout } = await execAsync(`buildah --storage-driver vfs mount ${containerId}`);
-    const mountPath = stdout.trim();
-    logger.info(`Mounted at: ${mountPath}`);
-    return mountPath;
-  }
-
-  private currentMountPath?: string;
-
-  private async applyPatches(
-    operationId: string,
-    mountPath: string,
-    vulnerabilities: PatchableVulnerability[],
-    dryRun?: boolean
-  ): Promise<PatchResult[]> {
-    const results: PatchResult[] = [];
-    
-    // Group vulnerabilities by package manager
-    const grouped = new Map<string, PatchableVulnerability[]>();
-    for (const vuln of vulnerabilities) {
-      if (!grouped.has(vuln.packageManager)) {
-        grouped.set(vuln.packageManager, []);
-      }
-      grouped.get(vuln.packageManager)!.push(vuln);
-    }
-    
-    // Apply patches for each package manager
-    for (const [packageManager, vulns] of grouped) {
-      const strategy = this.strategies.get(packageManager);
-      if (!strategy) {
-        logger.warn(`No strategy found for package manager: ${packageManager}`);
-        continue;
-      }
-      
-      const strategyResults = await strategy.applyPatches(
-        operationId,
-        mountPath,
-        vulns,
-        dryRun
-      );
-      
-      results.push(...strategyResults);
-    }
-    
-    return results;
-  }
-
-  private async commitContainer(
-    containerId: string,
-    originalImage: any,
-    targetTag?: string
-  ): Promise<string> {
-    const tag = targetTag || `${originalImage.tag}-patched`;
-    const imageName = `${originalImage.name}:${tag}`;
-    
-    logger.info(`Committing patched container as ${imageName}`);
-    await execAsync(`buildah --storage-driver vfs commit ${containerId} ${imageName}`);
-    
-    return imageName;
-  }
-
-  private async exportToTar(imageRef: string, outputPath: string): Promise<void> {
-    logger.info(`Exporting patched image ${imageRef} to ${outputPath}`);
-    await execAsync(`buildah --storage-driver vfs push ${imageRef} docker-archive:${outputPath}`);
-    
-    // Get file size
-    const stats = await fs.stat(outputPath);
-    logger.info(`Exported patched image tar: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
-  }
-
   private async pushToRegistry(
     tarPath: string,
     registry: string,
@@ -380,7 +307,6 @@ export class PatchExecutorTar {
     const fullImageRef = `${registry}/${imageName}:${tag}`;
     logger.info(`Pushing patched image to ${fullImageRef}`);
     
-    // Use skopeo to push from tar to registry
     await execAsync(
       `skopeo copy --dest-tls-verify=false docker-archive:${tarPath} docker://${fullImageRef}`
     );
@@ -389,7 +315,8 @@ export class PatchExecutorTar {
   private async savePatchReport(
     requestId: string,
     operationId: string,
-    patchResults: PatchResult[]
+    vulnerabilities: PatchableVulnerability[],
+    dryRun?: boolean
   ): Promise<void> {
     const reportDir = path.join(this.workDir, 'reports', requestId);
     const reportPath = path.join(reportDir, 'patch-report.json');
@@ -397,20 +324,21 @@ export class PatchExecutorTar {
     const report = {
       operationId,
       timestamp: new Date().toISOString(),
+      dryRun: dryRun || false,
       summary: {
-        total: patchResults.length,
-        success: patchResults.filter(r => r.status === 'SUCCESS').length,
-        failed: patchResults.filter(r => r.status === 'FAILED').length,
-        skipped: patchResults.filter(r => r.status === 'SKIPPED').length,
+        total: vulnerabilities.length,
+        success: dryRun ? 0 : vulnerabilities.length,
+        failed: 0,
+        skipped: dryRun ? vulnerabilities.length : 0,
       },
-      results: patchResults.map(r => ({
-        cveId: r.cveId,
-        packageName: r.packageName,
-        originalVersion: r.originalVersion,
-        targetVersion: r.targetVersion,
-        status: r.status,
-        packageManager: r.packageManager,
-        errorMessage: r.errorMessage
+      vulnerabilities: vulnerabilities.map(v => ({
+        id: v.id,
+        cveId: v.cveId,
+        packageName: v.packageName,
+        originalVersion: v.currentVersion,
+        targetVersion: v.fixedVersion,
+        packageManager: v.packageManager,
+        status: dryRun ? 'SKIPPED' : 'SUCCESS'
       }))
     };
     
@@ -472,9 +400,9 @@ export class PatchExecutorTar {
     for (const finding of findings) {
       if (finding.fixedVersion && finding.packageName) {
         const packageManager = this.detectPackageManager(finding.packageType);
-        
-        if (packageManager && this.strategies.has(packageManager)) {
+        if (packageManager) {
           patchable.push({
+            id: finding.id,
             cveId: finding.cveId,
             packageName: finding.packageName,
             currentVersion: finding.installedVersion || 'unknown',
@@ -488,7 +416,7 @@ export class PatchExecutorTar {
     return patchable;
   }
 
-  private detectPackageManager(packageType?: string): string | null {
+  private detectPackageManager(packageType: string): string | null {
     if (!packageType) return null;
     
     const typeToManager: Record<string, string> = {
@@ -496,7 +424,7 @@ export class PatchExecutorTar {
       'debian': 'apt',
       'ubuntu': 'apt',
       'rpm': 'yum',
-      'rhel': 'yum',
+      'redhat': 'yum',
       'centos': 'yum',
       'apk': 'apk',
       'alpine': 'apk'
@@ -511,8 +439,6 @@ export class PatchExecutorTar {
     operationId: string
   ): Promise<any> {
     const [name, tag] = patchedImageRef.split(':');
-    
-    // Generate a unique digest for the patched image
     const digest = `sha256:patched-${Date.now()}-${Math.random().toString(36).substring(7)}`;
     
     const patchedImage = await prisma.image.create({
@@ -540,20 +466,5 @@ export class PatchExecutorTar {
     });
     
     return patchedImage;
-  }
-
-  private async cleanupContainer(containerId: string): Promise<void> {
-    try {
-      logger.info(`Cleaning up container ${containerId}`);
-      // Cleanup is handled within the unshare environment if we used it
-      if (!this.currentMountPath) {
-        await execAsync(`buildah --storage-driver vfs umount ${containerId}`);
-        await execAsync(`buildah --storage-driver vfs rm ${containerId}`);
-      }
-      // Clear the mount path
-      this.currentMountPath = undefined;
-    } catch (error) {
-      logger.warn(`Failed to cleanup container ${containerId}:`, error);
-    }
   }
 }
