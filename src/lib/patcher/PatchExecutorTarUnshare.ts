@@ -22,6 +22,7 @@ export interface PatchRequest {
   selectedVulnerabilityIds?: string[];
   newImageName?: string;
   newImageTag?: string;
+  skipDockerLoad?: boolean;  // Skip loading into Docker daemon
 }
 
 export interface PatchableVulnerability {
@@ -79,7 +80,7 @@ export class PatchExecutorTarUnshare {
         patchableVulns = patchableVulns.filter(vuln => 
           request.selectedVulnerabilityIds!.includes(vuln.id)
         );
-        logger.info(`Filtered to ${patchableVulns.length} selected vulnerabilities`);
+        logger.info(`Filtered to ${patchableVulns.length} selected vulnerabilities from ${request.selectedVulnerabilityIds.length} requested`);
       }
 
       if (patchableVulns.length === 0) {
@@ -105,8 +106,9 @@ export class PatchExecutorTarUnshare {
       const patchWorkDir = path.join(this.patchDir, patchOperation.id);
       await fs.mkdir(patchWorkDir, { recursive: true });
       
-      // Define output tar path
-      const patchedTarPath = path.join(patchWorkDir, 'patched-image.tar');
+      // Define output tar path with descriptive name
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+      const patchedTarPath = path.join(patchWorkDir, `patched-${image.name}-${timestamp}.tar`);
       
       // Update status to patching
       await this.updatePatchOperationStatus(patchOperation.id, 'PATCHING');
@@ -176,10 +178,60 @@ export class PatchExecutorTarUnshare {
         const finalImageName = request.newImageName || image.name;
         const finalImageTag = request.newImageTag || request.targetTag || `${image.tag}-patched`;
         
-        // Load patched image into Docker for scanning
-        logger.info(`Loading patched image as ${finalImageName}:${finalImageTag}`);
-        await execAsync(`docker load -i ${patchedTarPath}`);
-        await execAsync(`docker tag patched-image:latest ${finalImageName}:${finalImageTag}`);
+        if (!request.skipDockerLoad) {
+          // Load patched image into Docker for scanning
+          logger.info(`Loading patched image from ${patchedTarPath}`);
+          logger.info(`Will tag as ${finalImageName}:${finalImageTag}`);
+          const loadResult = await execAsync(`docker load -i ${patchedTarPath}`);
+          logger.info(`Docker load stdout: ${loadResult.stdout}`);
+          logger.info(`Docker load stderr: ${loadResult.stderr || 'no stderr'}`);
+          
+          // The loaded image will have the name from buildah (patched-image)
+          // We need to extract the actual loaded image ID and tag it
+          // Docker load output format: "Loaded image: localhost/patched-image:latest"
+          const imageIdMatch = loadResult.stdout.match(/Loaded image:\s*(.+)/);
+          if (imageIdMatch && imageIdMatch[1]) {
+            const loadedImage = imageIdMatch[1].trim();
+            logger.info(`Extracted loaded image name: '${loadedImage}'`);
+            logger.info(`Tagging ${loadedImage} as ${finalImageName}:${finalImageTag}`);
+            try {
+              const tagResult = await execAsync(`docker tag ${loadedImage} ${finalImageName}:${finalImageTag}`);
+              logger.info(`Tag command completed. stdout: ${tagResult.stdout || 'empty'}, stderr: ${tagResult.stderr || 'empty'}`);
+            } catch (tagError: any) {
+              logger.error(`Failed to tag ${loadedImage}: ${tagError.message}`);
+              throw tagError;
+            }
+          } else {
+            // Fallback: try multiple possible names
+            logger.warn(`Could not extract loaded image name from output: ${loadResult.stdout}`);
+            logger.warn('Trying known patterns...');
+            const possibleNames = [
+              'localhost/patched-image:latest',
+              'patched-image:latest',
+              'patched-image'
+            ];
+            
+            let tagged = false;
+            for (const name of possibleNames) {
+              try {
+                logger.info(`Attempting to tag ${name} as ${finalImageName}:${finalImageTag}`);
+                const tagResult = await execAsync(`docker tag ${name} ${finalImageName}:${finalImageTag}`);
+                logger.info(`Successfully tagged ${name} as ${finalImageName}:${finalImageTag}`);
+                tagged = true;
+                break;
+              } catch (e: any) {
+                logger.warn(`Failed to tag ${name}: ${e.message}`);
+              }
+            }
+            
+            if (!tagged) {
+              logger.error('Failed to tag patched image with any known pattern');
+              // Don't throw here - continue with the process
+            }
+          }
+        } else {
+          logger.info(`Skipping Docker load as requested. TAR file saved at: ${patchedTarPath}`);
+        }
         
         // If target registry specified, push to registry
         if (request.targetRegistry) {
@@ -201,12 +253,19 @@ export class PatchExecutorTarUnshare {
         patchedImageId = patchedImage.id;
         
         // Move patched tar to reports directory for download
+        // Use a unique filename that includes the patch operation ID and target image name
         const reportsDir = path.join(this.workDir, 'reports', scan.requestId);
-        await fs.copyFile(patchedTarPath, path.join(reportsDir, 'patched-image.tar'));
+        const tarFileName = `patched-${finalImageName}-${finalImageTag}-${patchOperation.id}.tar`;
+        await fs.copyFile(patchedTarPath, path.join(reportsDir, tarFileName));
+        logger.info(`Copied patched TAR to ${path.join(reportsDir, tarFileName)}`);
         
-        // Automatically trigger a scan of the patched image
-        logger.info(`Triggering automatic scan of patched image ${finalImageName}:${finalImageTag}`);
-        await this.triggerScan(finalImageName, finalImageTag, patchedImage.id);
+        // Automatically trigger a scan of the patched image (only if loaded into Docker)
+        if (!request.skipDockerLoad) {
+          logger.info(`Triggering automatic scan of patched image ${finalImageName}:${finalImageTag}`);
+          await this.triggerScan(finalImageName, finalImageTag, patchedImage.id);
+        } else {
+          logger.info('Skipping automatic scan since image was not loaded into Docker');
+        }
       }
 
       // Update final status
@@ -498,19 +557,13 @@ export class PatchExecutorTarUnshare {
       const scanRequest = {
         image: imageName,
         tag: imageTag,
-        scanners: {
-          trivy: true,
-          grype: true,
-          syft: true,
-          dockle: true,
-          osv: true,
-          dive: false
-        }
+        source: 'local'
       };
 
       logger.info(`Initiating scan for patched image ${imageName}:${imageTag}`);
       
-      const response = await fetch('http://localhost:3003/api/scans', {
+      const port = process.env.PORT || '3000';
+      const response = await fetch(`http://localhost:${port}/api/scans/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(scanRequest)

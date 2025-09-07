@@ -33,6 +33,7 @@ import {
   IconTrendingUp,
   IconRefresh,
   IconTrash,
+  IconUpload,
 } from "@tabler/icons-react"
 import {
   ColumnDef,
@@ -67,6 +68,7 @@ import {
   ContextMenuSubTrigger,
 } from "@/components/ui/context-menu"
 import { DeleteImageDialog } from "@/components/delete-image-dialog"
+import { ExportImageDialog } from "@/components/export-image-dialog"
 import { useScanning } from "@/providers/ScanningProvider"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -517,12 +519,14 @@ function DraggableRow({
   row, 
   onRowClick, 
   onRescan, 
-  onDelete 
+  onDelete,
+  onExport 
 }: { 
   row: Row<z.infer<typeof schema>>, 
   onRowClick: (imageName: string) => void,
   onRescan: (imageName: string, source?: string, tag?: string) => void,
-  onDelete: (imageName: string) => void
+  onDelete: (imageName: string) => void,
+  onExport: (imageName: string, tag: string, allTags: string[]) => void
 }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
@@ -538,7 +542,23 @@ function DraggableRow({
   }
 
   const handleRescan = (tag?: string) => {
-    onRescan(row.original.imageName, row.original.source, tag)
+    // If no tag is provided, extract it from the image field
+    let actualTag = tag;
+    if (!actualTag) {
+      // Handle both string and object formats for image field
+      const imageData = row.original.image;
+      if (typeof imageData === 'string') {
+        // Parse tag from string (e.g., "postgres:15" -> "15")
+        const imageParts = imageData.split(':');
+        actualTag = imageParts.length > 1 ? imageParts[imageParts.length - 1] : 'latest';
+      } else if (typeof imageData === 'object' && imageData) {
+        // If it's an object, get the tag property
+        actualTag = (imageData as any).tag || 'latest';
+      } else {
+        actualTag = 'latest';
+      }
+    }
+    onRescan(row.original.imageName, row.original.source, actualTag)
   }
 
   const handleRescanAll = async () => {
@@ -566,6 +586,13 @@ function DraggableRow({
 
   const handleDelete = () => {
     onDelete(row.original.imageName)
+  }
+  
+  const handleExport = () => {
+    const imageName = row.original.imageName
+    const currentTag = (row.original as any).tag || 'latest'
+    const allTags = (row.original as any)._allTags?.split(', ').filter(Boolean) || [currentTag]
+    onExport(imageName, currentTag, allTags)
   }
   
   // Get tag information
@@ -632,6 +659,11 @@ function DraggableRow({
           </ContextMenuItem>
         )}
         <ContextMenuSeparator />
+        <ContextMenuItem onSelect={handleExport} className="flex items-center">
+          <IconUpload className="mr-2 h-4 w-4" />
+          Export to Registry
+        </ContextMenuItem>
+        <ContextMenuSeparator />
         <ContextMenuItem onSelect={handleDelete} className="text-red-600 focus:text-red-600">
           <IconTrash className="mr-2 h-4 w-4" />
           Delete Image
@@ -654,6 +686,10 @@ export function DataTable({
   // State for delete dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
   const [imageToDelete, setImageToDelete] = React.useState<string>("")
+  
+  // State for export dialog
+  const [exportDialogOpen, setExportDialogOpen] = React.useState(false)
+  const [imageToExport, setImageToExport] = React.useState<{name: string, tag?: string, allTags?: string[]}>({name: ""})
   
   // Group data by image name (without tag)
   const groupedData = React.useMemo(() => {
@@ -890,6 +926,11 @@ export function DataTable({
     }
   }
 
+  const handleExport = (imageName: string, tag: string, allTags: string[]) => {
+    setImageToExport({ name: imageName, tag, allTags })
+    setExportDialogOpen(true)
+  }
+  
   const handleDeleteConfirm = async () => {
     const loadingToastId = toast.loading(`Deleting ${imageToDelete}...`)
     
@@ -1008,6 +1049,7 @@ export function DataTable({
                         onRowClick={handleRowClick}
                         onRescan={handleRescan}
                         onDelete={handleDeleteClick}
+                        onExport={handleExport}
                       />
                     ))}
                   </SortableContext>
@@ -1140,6 +1182,20 @@ export function DataTable({
         onOpenChange={setDeleteDialogOpen}
         imageName={imageToDelete}
         onConfirm={handleDeleteConfirm}
+      />
+      
+      {/* Export Image Dialog */}
+      <ExportImageDialog
+        open={exportDialogOpen}
+        onOpenChange={(open) => {
+          setExportDialogOpen(open)
+          if (!open) {
+            setImageToExport({name: ""})
+          }
+        }}
+        imageName={imageToExport.name}
+        imageTag={imageToExport.tag}
+        allTags={imageToExport.allTags}
       />
     </Tabs>
   )

@@ -16,7 +16,8 @@ export async function POST(request: NextRequest) {
       dryRun = false,
       selectedVulnerabilityIds,
       newImageName,
-      newImageTag 
+      newImageTag,
+      skipDockerLoad = false 
     } = body;
     
     if (!sourceImageId || !scanId) {
@@ -68,7 +69,8 @@ export async function POST(request: NextRequest) {
       dryRun,
       selectedVulnerabilityIds,
       newImageName,
-      newImageTag
+      newImageTag,
+      skipDockerLoad
     });
     
     return NextResponse.json({

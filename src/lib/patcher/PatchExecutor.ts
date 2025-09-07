@@ -37,7 +37,7 @@ export class PatchExecutor {
   private workDir = process.env.PATCH_WORKDIR || '/workspace/patches';
 
   constructor() {
-    this.strategies = new Map([
+    this.strategies = new Map<string, PatchStrategy>([
       ['apt', new AptPatchStrategy()],
       ['yum', new YumPatchStrategy()],
       ['apk', new ApkPatchStrategy()],

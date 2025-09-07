@@ -15,6 +15,7 @@ import {
   IconBrandDocker,
   IconServer,
   IconCloud,
+  IconUpload,
 } from "@tabler/icons-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -48,6 +49,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
+import { ExportImageDialog } from "@/components/export-image-dialog"
 
 // Component handles its own data formatting since historical scans are pre-formatted
 
@@ -88,6 +90,8 @@ export function HistoricalScansTable({ data, imageId, onScanDeleted }: Historica
   const router = useRouter()
   const [deletingScanId, setDeletingScanId] = React.useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false)
+  const [exportDialogOpen, setExportDialogOpen] = React.useState(false)
+  const [selectedScanForExport, setSelectedScanForExport] = React.useState<HistoricalScan | null>(null)
   
   // Data is already formatted for display
   const formattedScans = data
@@ -184,6 +188,11 @@ export function HistoricalScansTable({ data, imageId, onScanDeleted }: Historica
   const handleDeleteCancel = () => {
     setShowDeleteDialog(false)
     setDeletingScanId(null)
+  }
+
+  const handleExport = (scan: HistoricalScan) => {
+    setSelectedScanForExport(scan)
+    setExportDialogOpen(true)
   }
 
   return (
@@ -364,6 +373,13 @@ export function HistoricalScansTable({ data, imageId, onScanDeleted }: Historica
                 </ContextMenuTrigger>
                 <ContextMenuContent>
                   <ContextMenuItem 
+                    onClick={() => handleExport(scan)}
+                    className="flex items-center"
+                  >
+                    <IconUpload className="mr-2 h-4 w-4" />
+                    Export to Registry
+                  </ContextMenuItem>
+                  <ContextMenuItem 
                     className="text-red-600 focus:text-red-600 focus:bg-red-50"
                     onClick={() => handleDeleteClick(scan.scanId)}
                   >
@@ -399,6 +415,21 @@ export function HistoricalScansTable({ data, imageId, onScanDeleted }: Historica
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {selectedScanForExport && (
+        <ExportImageDialog
+          open={exportDialogOpen}
+          onOpenChange={(open) => {
+            setExportDialogOpen(open)
+            if (!open) {
+              setSelectedScanForExport(null)
+            }
+          }}
+          imageName={selectedScanForExport.version.split(':')[0]}
+          imageTag={selectedScanForExport.version.split(':')[1] || 'latest'}
+          allTags={data.map(s => s.version.split(':')[1] || 'latest').filter((v, i, a) => a.indexOf(v) === i)}
+        />
+      )}
     </div>
   )
 }

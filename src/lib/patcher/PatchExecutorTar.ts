@@ -40,7 +40,7 @@ export class PatchExecutorTar {
   private patchDir = path.join(this.workDir, 'patches');
 
   constructor() {
-    this.strategies = new Map([
+    this.strategies = new Map<string, PatchStrategy>([
       ['apt', new AptPatchStrategy()],
       ['yum', new YumPatchStrategy()],
       ['apk', new ApkPatchStrategy()],

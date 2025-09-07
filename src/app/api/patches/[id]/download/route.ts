@@ -5,12 +5,13 @@ import path from 'path';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     // Get patch operation details
     const patchOperation = await prisma.patchOperation.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         scan: true
       }
@@ -52,10 +53,10 @@ export async function GET(
     const tarBuffer = await fs.readFile(patchedTarPath);
 
     // Return as downloadable file
-    return new NextResponse(tarBuffer, {
+    return new NextResponse(tarBuffer as any, {
       headers: {
         'Content-Type': 'application/x-tar',
-        'Content-Disposition': `attachment; filename="patched-image-${params.id}.tar"`,
+        'Content-Disposition': `attachment; filename="patched-image-${id}.tar"`,
         'Content-Length': tarBuffer.length.toString()
       }
     });
