@@ -555,12 +555,12 @@ export class DatabaseAdapter implements IDatabaseAdapter {
 
   async calculateAggregatedData(scanId: string, reports: ScanReports, metadataId?: string): Promise<void> {
     const aggregates: AggregatedData = {};
-
+    const vulnCount: VulnerabilityCount = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+    let totalCvssScore = 0;
+    let cvssCount = 0;
+    
+    // Aggregate vulnerabilities from Trivy
     if (reports.trivy?.Results) {
-      const vulnCount: VulnerabilityCount = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-      let totalCvssScore = 0;
-      let cvssCount = 0;
-
       for (const result of reports.trivy.Results) {
         if (result.Vulnerabilities) {
           for (const vuln of result.Vulnerabilities) {
@@ -577,7 +577,68 @@ export class DatabaseAdapter implements IDatabaseAdapter {
           }
         }
       }
+    }
+    
+    // Aggregate vulnerabilities from Grype
+    if (reports.grype?.matches) {
+      for (const match of reports.grype.matches) {
+        // Grype uses capitalized severity levels
+        const severity = match.vulnerability?.severity?.toLowerCase();
+        if (severity && vulnCount.hasOwnProperty(severity)) {
+          vulnCount[severity as keyof VulnerabilityCount]++;
+        }
+        
+        // Get CVSS score from Grype
+        if (match.vulnerability?.cvss) {
+          for (const cvss of match.vulnerability.cvss) {
+            if (cvss.metrics?.baseScore) {
+              totalCvssScore += cvss.metrics.baseScore;
+              cvssCount++;
+              break; // Use first available score
+            }
+          }
+        }
+      }
+    }
+    
+    // Aggregate vulnerabilities from OSV
+    if (reports.osv?.results) {
+      for (const result of reports.osv.results) {
+        if (result.packages) {
+          for (const pkg of result.packages) {
+            if (pkg.vulnerabilities) {
+              for (const vuln of pkg.vulnerabilities) {
+                // OSV uses severity arrays with CVSS scores
+                if (vuln.severity) {
+                  for (const sev of vuln.severity) {
+                    if (sev.type === 'CVSS_V3' && sev.score) {
+                      const score = parseFloat(sev.score);
+                      totalCvssScore += score;
+                      cvssCount++;
+                      
+                      // Map CVSS score to severity
+                      if (score >= 9.0) vulnCount.critical++;
+                      else if (score >= 7.0) vulnCount.high++;
+                      else if (score >= 4.0) vulnCount.medium++;
+                      else if (score >= 0.1) vulnCount.low++;
+                      else vulnCount.info++;
+                      break;
+                    }
+                  }
+                } else {
+                  // If no severity score, count as info
+                  vulnCount.info++;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
 
+    // Only set vulnerability count if we found any vulnerabilities
+    if (vulnCount.critical > 0 || vulnCount.high > 0 || vulnCount.medium > 0 || 
+        vulnCount.low > 0 || vulnCount.info > 0) {
       aggregates.vulnerabilityCount = vulnCount;
       
       const avgCvss = cvssCount > 0 ? totalCvssScore / cvssCount : 0;
