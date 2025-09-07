@@ -276,36 +276,251 @@ export default function ScanResultsPage() {
       .catch(() => setShowRawOutput(false));
   }, []);
 
-  const trivyResults: TrivyReport | null =
-    scanData?.metadata?.trivyResults ||
-    scanData?.scannerReports?.trivy ||
-    scanData?.trivy ||
-    null;
-  const grypResults: GrypeReport | null =
-    scanData?.metadata?.grypeResults ||
-    scanData?.scannerReports?.grype ||
-    scanData?.grype ||
-    null;
-  const syftResults: SyftReport | null =
-    scanData?.metadata?.syftResults ||
-    scanData?.scannerReports?.syft ||
-    scanData?.syft ||
-    null;
-  const dockleResults: DockleReport | null =
-    scanData?.metadata?.dockleResults ||
-    scanData?.scannerReports?.dockle ||
-    scanData?.dockle ||
-    null;
-  const osvResults: OSVReport | null =
-    scanData?.metadata?.osvResults ||
-    scanData?.scannerReports?.osv ||
-    scanData?.osv ||
-    null;
-  const diveResults: DiveReport | null =
-    scanData?.metadata?.diveResults ||
-    scanData?.scannerReports?.dive ||
-    scanData?.dive ||
-    null;
+  // Use table data first for display, fall back to JSONB for downloads
+  const trivyResults: TrivyReport | null = React.useMemo(() => {
+    // If we have table data, transform it to the expected format
+    if (scanData?.metadata?.trivyResult) {
+      const tableData = scanData.metadata.trivyResult;
+      return {
+        SchemaVersion: tableData.schemaVersion,
+        ArtifactName: tableData.artifactName,
+        ArtifactType: tableData.artifactType,
+        Results: tableData.vulnerabilities?.reduce((acc: any[], vuln: any) => {
+          const existingTarget = acc.find((r: any) => r.Target === vuln.targetName);
+          if (existingTarget) {
+            existingTarget.Vulnerabilities.push({
+              VulnerabilityID: vuln.vulnerabilityId,
+              PkgName: vuln.pkgName,
+              InstalledVersion: vuln.installedVersion,
+              FixedVersion: vuln.fixedVersion,
+              Severity: vuln.severity,
+              Title: vuln.title,
+              Description: vuln.description,
+              PrimaryURL: vuln.primaryUrl,
+              CVSS: {
+                nvd: {
+                  V3Score: vuln.cvssScoreV3,
+                  V3Vector: vuln.cvssVectorV3,
+                  V2Score: vuln.cvssScore,
+                  V2Vector: vuln.cvssVector
+                }
+              }
+            });
+          } else {
+            acc.push({
+              Target: vuln.targetName,
+              Class: vuln.targetClass,
+              Type: vuln.targetType,
+              Vulnerabilities: [{
+                VulnerabilityID: vuln.vulnerabilityId,
+                PkgName: vuln.pkgName,
+                InstalledVersion: vuln.installedVersion,
+                FixedVersion: vuln.fixedVersion,
+                Severity: vuln.severity,
+                Title: vuln.title,
+                Description: vuln.description,
+                PrimaryURL: vuln.primaryUrl,
+                CVSS: {
+                  nvd: {
+                    V3Score: vuln.cvssScoreV3,
+                    V3Vector: vuln.cvssVectorV3,
+                    V2Score: vuln.cvssScore,
+                    V2Vector: vuln.cvssVector
+                  }
+                }
+              }]
+            });
+          }
+          return acc;
+        }, []) || []
+      };
+    }
+    // Fall back to JSONB data
+    return scanData?.metadata?.trivyResults ||
+      scanData?.scannerReports?.trivy ||
+      scanData?.trivy ||
+      null;
+  }, [scanData]);
+
+  const grypResults: GrypeReport | null = React.useMemo(() => {
+    // If we have table data, transform it to the expected format
+    if (scanData?.metadata?.grypeResult) {
+      const tableData = scanData.metadata.grypeResult;
+      return {
+        matches: tableData.vulnerabilities?.map((vuln: any) => ({
+          vulnerability: {
+            id: vuln.vulnerabilityId,
+            severity: vuln.severity,
+            namespace: vuln.namespace,
+            description: vuln.description,
+            fix: {
+              state: vuln.fixState,
+              versions: vuln.fixVersions
+            },
+            cvss: vuln.cvssV3Score ? [{
+              version: '3.0',
+              metrics: { baseScore: vuln.cvssV3Score },
+              vector: vuln.cvssV3Vector
+            }] : vuln.cvssV2Score ? [{
+              version: '2.0',
+              metrics: { baseScore: vuln.cvssV2Score },
+              vector: vuln.cvssV2Vector
+            }] : [],
+            urls: vuln.urls
+          },
+          artifact: {
+            name: vuln.packageName,
+            version: vuln.packageVersion,
+            type: vuln.packageType,
+            language: vuln.packageLanguage,
+            locations: vuln.packagePath ? [{ path: vuln.packagePath }] : []
+          }
+        })) || [],
+        db: tableData.dbStatus
+      };
+    }
+    // Fall back to JSONB data
+    return scanData?.metadata?.grypeResults ||
+      scanData?.scannerReports?.grype ||
+      scanData?.grype ||
+      null;
+  }, [scanData]);
+
+  const syftResults: SyftReport | null = React.useMemo(() => {
+    // If we have table data, transform it to the expected format
+    if (scanData?.metadata?.syftResult) {
+      const tableData = scanData.metadata.syftResult;
+      return {
+        artifacts: tableData.packages?.map((pkg: any) => ({
+          id: pkg.packageId,
+          name: pkg.name,
+          version: pkg.version,
+          type: pkg.type,
+          foundBy: pkg.foundBy,
+          purl: pkg.purl,
+          cpes: pkg.cpe ? [pkg.cpe] : [],
+          language: pkg.language,
+          licenses: pkg.licenses,
+          metadata: pkg.metadata,
+          locations: pkg.locations
+        })) || [],
+        source: tableData.source,
+        distro: tableData.distro,
+        descriptor: { name: tableData.bomFormat },
+        schema: { version: tableData.schemaVersion }
+      };
+    }
+    // Fall back to JSONB data
+    return scanData?.metadata?.syftResults ||
+      scanData?.scannerReports?.syft ||
+      scanData?.syft ||
+      null;
+  }, [scanData]);
+
+  const dockleResults: DockleReport | null = React.useMemo(() => {
+    // If we have table data, transform it to the expected format
+    if (scanData?.metadata?.dockleResult) {
+      const tableData = scanData.metadata.dockleResult;
+      return {
+        summary: tableData.summary,
+        details: tableData.violations?.map((violation: any) => ({
+          code: violation.code,
+          title: violation.title,
+          level: violation.level,
+          alerts: violation.alerts
+        })) || []
+      };
+    }
+    // Fall back to JSONB data
+    return scanData?.metadata?.dockleResults ||
+      scanData?.scannerReports?.dockle ||
+      scanData?.dockle ||
+      null;
+  }, [scanData]);
+
+  const osvResults: OSVReport | null = React.useMemo(() => {
+    // If we have table data, transform it to the expected format
+    if (scanData?.metadata?.osvResult) {
+      const tableData = scanData.metadata.osvResult;
+      const results: any[] = [];
+      
+      // Group vulnerabilities by package
+      const packageGroups: Record<string, any> = {};
+      tableData.vulnerabilities?.forEach((vuln: any) => {
+        const key = `${vuln.packageEcosystem}:${vuln.packageName}:${vuln.packageVersion}`;
+        if (!packageGroups[key]) {
+          packageGroups[key] = {
+            package: {
+              name: vuln.packageName,
+              ecosystem: vuln.packageEcosystem,
+              version: vuln.packageVersion,
+              purl: vuln.packagePurl
+            },
+            vulnerabilities: []
+          };
+        }
+        packageGroups[key].vulnerabilities.push({
+          id: vuln.osvId,
+          aliases: vuln.aliases,
+          summary: vuln.summary,
+          details: vuln.details,
+          severity: vuln.severity,
+          affected: vuln.affected,
+          references: vuln.references,
+          published: vuln.published,
+          modified: vuln.modified,
+          database_specific: vuln.databaseSpecific
+        });
+      });
+      
+      // Convert to results array
+      Object.values(packageGroups).forEach(group => {
+        results.push({
+          packages: [group]
+        });
+      });
+      
+      return { results };
+    }
+    // Fall back to JSONB data
+    return scanData?.metadata?.osvResults ||
+      scanData?.scannerReports?.osv ||
+      scanData?.osv ||
+      null;
+  }, [scanData]);
+
+  const diveResults: DiveReport | null = React.useMemo(() => {
+    // If we have table data, transform it to the expected format
+    if (scanData?.metadata?.diveResult) {
+      const tableData = scanData.metadata.diveResult;
+      return {
+        image: {
+          efficiencyScore: tableData.efficiencyScore,
+          sizeBytes: Number(tableData.sizeBytes),
+          inefficientBytes: Number(tableData.wastedBytes),
+          inefficientFiles: tableData.inefficientFiles,
+          duplicateFiles: tableData.duplicateFiles
+        },
+        layer: tableData.layers?.map((layer: any) => ({
+          id: layer.layerId,
+          index: layer.layerIndex,
+          digest: layer.digest,
+          sizeBytes: Number(layer.sizeBytes),
+          command: layer.command,
+          addedFiles: layer.addedFiles,
+          modifiedFiles: layer.modifiedFiles,
+          removedFiles: layer.removedFiles,
+          wastedBytes: Number(layer.wastedBytes),
+          fileDetails: layer.fileDetails
+        })) || []
+      };
+    }
+    // Fall back to JSONB data
+    return scanData?.metadata?.diveResults ||
+      scanData?.scannerReports?.dive ||
+      scanData?.dive ||
+      null;
+  }, [scanData]);
 
   // Debug: Log scanner results to console
   console.log("🔍 Debug Scan Data Structure:", {

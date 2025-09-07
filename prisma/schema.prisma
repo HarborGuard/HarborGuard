@@ -91,7 +91,7 @@ model ScanMetadata {
   dockerLabels           Json?    // Label key-value pairs
   dockerEnv              Json?    // Environment variables array
   
-  // Scan Results from each scanner
+  // Scan Results from each scanner (kept for downloads)
   trivyResults           Json?
   grypeResults           Json?
   syftResults            Json?
@@ -121,9 +121,423 @@ model ScanMetadata {
   
   scan                   Scan?
   
+  // Relations to new scan result tables
+  grypeResult            GrypeResults?
+  trivyResult            TrivyResults?
+  diveResult             DiveResults?
+  syftResult             SyftResults?
+  dockleResult           DockleResults?
+  osvResult              OsvResults?
+  
   @@index([dockerDigest])
   @@index([aggregatedRiskScore])
   @@map("scan_metadata")
+}
+
+// ============================================
+// Individual Scanner Result Tables
+// ============================================
+
+model GrypeResults {
+  id                String        @id @default(cuid())
+  scanMetadataId    String        @unique
+  
+  // Summary data
+  matchesCount      Int           @default(0)
+  dbStatus          Json?         // DB status info
+  
+  // Vulnerability details (normalized from matches)
+  vulnerabilities   GrypeVulnerability[]
+  
+  createdAt         DateTime      @default(now())
+  scanMetadata      ScanMetadata  @relation(fields: [scanMetadataId], references: [id], onDelete: Cascade)
+  
+  @@index([scanMetadataId])
+  @@map("grype_results")
+}
+
+model GrypeVulnerability {
+  id                String        @id @default(cuid())
+  grypeResultsId    String
+  
+  // Core vulnerability info
+  vulnerabilityId   String        // CVE ID or GHSA ID
+  severity          String
+  namespace         String?       // e.g., "nvd", "github"
+  
+  // Package info
+  packageName       String
+  packageVersion    String
+  packageType       String        // e.g., "npm", "python", "go-module"
+  packagePath       String?
+  packageLanguage   String?
+  
+  // Fix info
+  fixState          String?       // "fixed", "not-fixed", "unknown"
+  fixVersions       Json?         // Array of fix versions
+  
+  // CVSS scores
+  cvssV2Score       Float?
+  cvssV2Vector      String?
+  cvssV3Score       Float?
+  cvssV3Vector      String?
+  
+  // URLs and references
+  urls              Json?         // Array of reference URLs
+  description       String?       @db.Text
+  
+  grypeResult       GrypeResults  @relation(fields: [grypeResultsId], references: [id], onDelete: Cascade)
+  
+  @@index([grypeResultsId])
+  @@index([vulnerabilityId])
+  @@index([severity])
+  @@index([packageName])
+  @@map("grype_vulnerabilities")
+}
+
+model TrivyResults {
+  id                String        @id @default(cuid())
+  scanMetadataId    String        @unique
+  
+  // Summary data
+  schemaVersion     Int?
+  artifactName      String?
+  artifactType      String?
+  
+  // Vulnerability and misconfiguration results
+  vulnerabilities   TrivyVulnerability[]
+  misconfigurations TrivyMisconfiguration[]
+  secrets           TrivySecret[]
+  
+  createdAt         DateTime      @default(now())
+  scanMetadata      ScanMetadata  @relation(fields: [scanMetadataId], references: [id], onDelete: Cascade)
+  
+  @@index([scanMetadataId])
+  @@map("trivy_results")
+}
+
+model TrivyVulnerability {
+  id                String        @id @default(cuid())
+  trivyResultsId    String
+  
+  // Target info (layer/file)
+  targetName        String        // e.g., "node_modules/.../package.json"
+  targetClass       String?       // e.g., "lang-pkgs", "os-pkgs"
+  targetType        String?       // e.g., "npm", "debian"
+  
+  // Vulnerability info
+  vulnerabilityId   String        // CVE ID
+  pkgId             String?
+  pkgName           String
+  pkgPath           String?
+  installedVersion  String?
+  fixedVersion      String?
+  status            String?       // e.g., "affected", "fixed"
+  
+  // Severity and scoring
+  severity          String
+  severitySource    String?       // e.g., "nvd", "redhat"
+  primaryUrl        String?
+  
+  // CVSS data
+  cvssScore         Float?
+  cvssVector        String?
+  cvssScoreV3       Float?
+  cvssVectorV3      String?
+  
+  // Additional info
+  title             String?       @db.Text
+  description       String?       @db.Text
+  publishedDate     DateTime?
+  lastModifiedDate  DateTime?
+  
+  // References
+  references        Json?         // Array of reference URLs
+  
+  trivyResult       TrivyResults  @relation(fields: [trivyResultsId], references: [id], onDelete: Cascade)
+  
+  @@index([trivyResultsId])
+  @@index([vulnerabilityId])
+  @@index([severity])
+  @@index([pkgName])
+  @@index([targetName])
+  @@map("trivy_vulnerabilities")
+}
+
+model TrivyMisconfiguration {
+  id                String        @id @default(cuid())
+  trivyResultsId    String
+  
+  // Target info
+  targetName        String
+  targetClass       String?
+  targetType        String?
+  
+  // Misconfiguration details
+  checkId           String
+  avdId             String?
+  title             String
+  description       String        @db.Text
+  message           String        @db.Text
+  namespace         String?
+  query             String?       @db.Text
+  
+  // Severity and resolution
+  severity          String
+  resolution        String?       @db.Text
+  status            String        // e.g., "PASS", "FAIL"
+  
+  // Location
+  startLine         Int?
+  endLine           Int?
+  code              Json?         // Code lines array
+  
+  // References
+  primaryUrl        String?
+  references        Json?         // Array of URLs
+  
+  trivyResult       TrivyResults  @relation(fields: [trivyResultsId], references: [id], onDelete: Cascade)
+  
+  @@index([trivyResultsId])
+  @@index([checkId])
+  @@index([severity])
+  @@index([status])
+  @@map("trivy_misconfigurations")
+}
+
+model TrivySecret {
+  id                String        @id @default(cuid())
+  trivyResultsId    String
+  
+  // Target info
+  targetName        String
+  
+  // Secret details
+  ruleId            String
+  category          String
+  severity          String
+  title             String
+  
+  // Location
+  startLine         Int
+  endLine           Int
+  code              Json?         // Code lines array
+  match             String?       // The actual match (redacted)
+  
+  // Layer info
+  layer             String?
+  
+  trivyResult       TrivyResults  @relation(fields: [trivyResultsId], references: [id], onDelete: Cascade)
+  
+  @@index([trivyResultsId])
+  @@index([ruleId])
+  @@index([severity])
+  @@map("trivy_secrets")
+}
+
+model DiveResults {
+  id                String        @id @default(cuid())
+  scanMetadataId    String        @unique
+  
+  // Efficiency metrics
+  efficiencyScore   Float         // 0-100
+  sizeBytes         BigInt
+  wastedBytes       BigInt
+  wastedPercent     Float
+  
+  // Layer analysis
+  layers            DiveLayer[]
+  
+  // File tree analysis
+  inefficientFiles  Json?         // Array of inefficient files
+  duplicateFiles    Json?         // Array of duplicate file paths
+  
+  createdAt         DateTime      @default(now())
+  scanMetadata      ScanMetadata  @relation(fields: [scanMetadataId], references: [id], onDelete: Cascade)
+  
+  @@index([scanMetadataId])
+  @@index([efficiencyScore])
+  @@map("dive_results")
+}
+
+model DiveLayer {
+  id                String        @id @default(cuid())
+  diveResultsId     String
+  
+  // Layer identification
+  layerId           String
+  layerIndex        Int
+  digest            String
+  
+  // Size metrics
+  sizeBytes         BigInt
+  command           String?       @db.Text
+  
+  // Analysis results
+  addedFiles        Int           @default(0)
+  modifiedFiles     Int           @default(0)
+  removedFiles      Int           @default(0)
+  wastedBytes       BigInt        @default(0)
+  
+  // File details (optional, for detailed analysis)
+  fileDetails       Json?         // Array of file changes
+  
+  diveResult        DiveResults   @relation(fields: [diveResultsId], references: [id], onDelete: Cascade)
+  
+  @@index([diveResultsId])
+  @@index([layerIndex])
+  @@map("dive_layers")
+}
+
+model SyftResults {
+  id                String        @id @default(cuid())
+  scanMetadataId    String        @unique
+  
+  // SBOM metadata
+  schemaVersion     String?
+  bomFormat         String?       // e.g., "CycloneDX", "SPDX"
+  specVersion       String?
+  serialNumber      String?
+  
+  // Summary counts
+  packagesCount     Int           @default(0)
+  filesAnalyzed     Int           @default(0)
+  
+  // Package details
+  packages          SyftPackage[]
+  
+  // Source info
+  source            Json?         // Source metadata
+  distro            Json?         // OS distribution info
+  
+  createdAt         DateTime      @default(now())
+  scanMetadata      ScanMetadata  @relation(fields: [scanMetadataId], references: [id], onDelete: Cascade)
+  
+  @@index([scanMetadataId])
+  @@map("syft_results")
+}
+
+model SyftPackage {
+  id                String        @id @default(cuid())
+  syftResultsId     String
+  
+  // Package identification
+  packageId         String        // Syft's internal ID
+  name              String
+  version           String
+  type              String        // e.g., "npm", "python", "go-module"
+  foundBy           String?       // Cataloger that found it
+  purl              String?       // Package URL
+  cpe               String?       // CPE string
+  
+  // Package metadata
+  language          String?
+  licenses          Json?         // Array of licenses
+  size              BigInt?
+  
+  // Location info
+  locations         Json?         // Array of file locations
+  layerId           String?
+  
+  // Additional metadata
+  metadata          Json?         // Type-specific metadata
+  
+  syftResult        SyftResults   @relation(fields: [syftResultsId], references: [id], onDelete: Cascade)
+  
+  @@index([syftResultsId])
+  @@index([name])
+  @@index([type])
+  @@index([purl])
+  @@map("syft_packages")
+}
+
+model DockleResults {
+  id                String        @id @default(cuid())
+  scanMetadataId    String        @unique
+  
+  // Summary
+  summary           Json?         // Summary object with counts
+  
+  // Compliance details
+  violations        DockleViolation[]
+  
+  createdAt         DateTime      @default(now())
+  scanMetadata      ScanMetadata  @relation(fields: [scanMetadataId], references: [id], onDelete: Cascade)
+  
+  @@index([scanMetadataId])
+  @@map("dockle_results")
+}
+
+model DockleViolation {
+  id                String        @id @default(cuid())
+  dockleResultsId   String
+  
+  // Violation details
+  code              String        // e.g., "CIS-DI-0001"
+  title             String
+  level             String        // e.g., "FATAL", "WARN", "INFO", "PASS"
+  alerts            Json?         // Array of alert messages
+  
+  dockleResult      DockleResults @relation(fields: [dockleResultsId], references: [id], onDelete: Cascade)
+  
+  @@index([dockleResultsId])
+  @@index([code])
+  @@index([level])
+  @@map("dockle_violations")
+}
+
+model OsvResults {
+  id                String        @id @default(cuid())
+  scanMetadataId    String        @unique
+  
+  // OSV scanner results
+  vulnerabilities   OsvVulnerability[]
+  
+  createdAt         DateTime      @default(now())
+  scanMetadata      ScanMetadata  @relation(fields: [scanMetadataId], references: [id], onDelete: Cascade)
+  
+  @@index([scanMetadataId])
+  @@map("osv_results")
+}
+
+model OsvVulnerability {
+  id                String        @id @default(cuid())
+  osvResultsId      String
+  
+  // Vulnerability identification
+  osvId             String        // OSV ID
+  aliases           Json?         // Array of aliases (CVE IDs, etc.)
+  
+  // Package info
+  packageName       String
+  packageEcosystem  String        // e.g., "npm", "PyPI"
+  packageVersion    String
+  packagePurl       String?
+  
+  // Vulnerability details
+  summary           String?       @db.Text
+  details           String?       @db.Text
+  severity          Json?         // Array of severity assessments
+  
+  // Fix info
+  fixed             String?       // Fixed version
+  affected          Json?         // Affected version ranges
+  
+  // Dates
+  published         DateTime?
+  modified          DateTime?
+  withdrawn         DateTime?
+  
+  // References
+  references        Json?         // Array of reference URLs
+  databaseSpecific  Json?         // Database-specific fields
+  
+  osvResult         OsvResults    @relation(fields: [osvResultsId], references: [id], onDelete: Cascade)
+  
+  @@index([osvResultsId])
+  @@index([osvId])
+  @@index([packageName])
+  @@map("osv_vulnerabilities")
 }
 
 model ScanResult {

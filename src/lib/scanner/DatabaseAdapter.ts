@@ -153,8 +153,11 @@ export class DatabaseAdapter implements IDatabaseAdapter {
 
     await this.updateScanRecord(scanId, updateData);
     
-    // Create or update ScanMetadata record (for backward compatibility)
+    // Create or update ScanMetadata record (keeps JSONB for downloads)
     const metadataId = await this.createOrUpdateScanMetadata(scanId, reports);
+    
+    // Save to individual scanner result tables for fast queries
+    await this.saveScannerResultTables(metadataId, reports);
     
     // Populate normalized finding tables
     await this.populateNormalizedFindings(scanId, reports);
@@ -231,14 +234,333 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     return metadataId;
   }
 
+  /**
+   * Save scan results to individual scanner tables for optimized queries
+   */
+  async saveScannerResultTables(metadataId: string, reports: ScanReports): Promise<void> {
+    try {
+      // Save each scanner's results to its dedicated table
+      if (reports.grype) {
+        await this.saveGrypeResults(metadataId, reports.grype);
+      }
+      
+      if (reports.trivy) {
+        await this.saveTrivyResults(metadataId, reports.trivy);
+      }
+      
+      if (reports.dive) {
+        await this.saveDiveResults(metadataId, reports.dive);
+      }
+      
+      if (reports.syft) {
+        await this.saveSyftResults(metadataId, reports.syft);
+      }
+      
+      if (reports.dockle) {
+        await this.saveDockleResults(metadataId, reports.dockle);
+      }
+      
+      if (reports.osv) {
+        await this.saveOsvResults(metadataId, reports.osv);
+      }
+    } catch (error) {
+      console.error('Error saving to scanner result tables:', error);
+      // Continue even if table save fails - we still have the JSONB data
+    }
+  }
+
+  private async saveGrypeResults(metadataId: string, grypeData: any): Promise<void> {
+    const grypeResult = await prisma.grypeResults.create({
+      data: {
+        scanMetadataId: metadataId,
+        matchesCount: grypeData.matches?.length || 0,
+        dbStatus: grypeData.db || null,
+      }
+    });
+
+    if (grypeData.matches && grypeData.matches.length > 0) {
+      const vulnerabilities = grypeData.matches.map((match: any) => ({
+        grypeResultsId: grypeResult.id,
+        vulnerabilityId: match.vulnerability?.id || 'UNKNOWN',
+        severity: match.vulnerability?.severity || 'INFO',
+        namespace: match.vulnerability?.namespace || null,
+        packageName: match.artifact?.name || 'unknown',
+        packageVersion: match.artifact?.version || '',
+        packageType: match.artifact?.type || 'unknown',
+        packagePath: match.artifact?.locations?.[0]?.path || null,
+        packageLanguage: match.artifact?.language || null,
+        fixState: match.vulnerability?.fix?.state || null,
+        fixVersions: match.vulnerability?.fix?.versions || null,
+        cvssV2Score: match.vulnerability?.cvss?.[0]?.version === '2.0' ? 
+          match.vulnerability.cvss[0].metrics?.baseScore : null,
+        cvssV2Vector: match.vulnerability?.cvss?.[0]?.version === '2.0' ? 
+          match.vulnerability.cvss[0].vector : null,
+        cvssV3Score: match.vulnerability?.cvss?.find((c: any) => c.version?.startsWith('3'))?.metrics?.baseScore || null,
+        cvssV3Vector: match.vulnerability?.cvss?.find((c: any) => c.version?.startsWith('3'))?.vector || null,
+        urls: match.vulnerability?.urls || null,
+        description: match.vulnerability?.description || null,
+      }));
+
+      await prisma.grypeVulnerability.createMany({ data: vulnerabilities });
+    }
+  }
+
+  private async saveTrivyResults(metadataId: string, trivyData: any): Promise<void> {
+    const trivyResult = await prisma.trivyResults.create({
+      data: {
+        scanMetadataId: metadataId,
+        schemaVersion: trivyData.SchemaVersion || null,
+        artifactName: trivyData.ArtifactName || null,
+        artifactType: trivyData.ArtifactType || null,
+      }
+    });
+
+    if (trivyData.Results && trivyData.Results.length > 0) {
+      for (const result of trivyData.Results) {
+        // Save vulnerabilities
+        if (result.Vulnerabilities && result.Vulnerabilities.length > 0) {
+          const vulnerabilities = result.Vulnerabilities.map((vuln: any) => ({
+            trivyResultsId: trivyResult.id,
+            targetName: result.Target || '',
+            targetClass: result.Class || null,
+            targetType: result.Type || null,
+            vulnerabilityId: vuln.VulnerabilityID || 'UNKNOWN',
+            pkgId: vuln.PkgID || null,
+            pkgName: vuln.PkgName || 'unknown',
+            pkgPath: vuln.PkgPath || null,
+            installedVersion: vuln.InstalledVersion || null,
+            fixedVersion: vuln.FixedVersion || null,
+            status: vuln.Status || null,
+            severity: vuln.Severity || 'INFO',
+            severitySource: vuln.SeveritySource || null,
+            primaryUrl: vuln.PrimaryURL || null,
+            cvssScore: vuln.CVSS?.nvd?.V2Score || null,
+            cvssVector: vuln.CVSS?.nvd?.V2Vector || null,
+            cvssScoreV3: vuln.CVSS?.nvd?.V3Score || vuln.CVSS?.redhat?.V3Score || null,
+            cvssVectorV3: vuln.CVSS?.nvd?.V3Vector || vuln.CVSS?.redhat?.V3Vector || null,
+            title: vuln.Title || null,
+            description: vuln.Description || null,
+            publishedDate: vuln.PublishedDate ? new Date(vuln.PublishedDate) : null,
+            lastModifiedDate: vuln.LastModifiedDate ? new Date(vuln.LastModifiedDate) : null,
+            references: vuln.References || null,
+          }));
+
+          await prisma.trivyVulnerability.createMany({ data: vulnerabilities });
+        }
+
+        // Save misconfigurations
+        if (result.Misconfigurations && result.Misconfigurations.length > 0) {
+          const misconfigs = result.Misconfigurations.map((misconf: any) => ({
+            trivyResultsId: trivyResult.id,
+            targetName: result.Target || '',
+            targetClass: result.Class || null,
+            targetType: result.Type || null,
+            checkId: misconf.ID || '',
+            avdId: misconf.AVDID || null,
+            title: misconf.Title || '',
+            description: misconf.Description || '',
+            message: misconf.Message || '',
+            namespace: misconf.Namespace || null,
+            query: misconf.Query || null,
+            severity: misconf.Severity || 'INFO',
+            resolution: misconf.Resolution || null,
+            status: misconf.Status || 'FAIL',
+            startLine: misconf.CauseMetadata?.StartLine || null,
+            endLine: misconf.CauseMetadata?.EndLine || null,
+            code: misconf.CauseMetadata?.Code || null,
+            primaryUrl: misconf.PrimaryURL || null,
+            references: misconf.References || null,
+          }));
+
+          await prisma.trivyMisconfiguration.createMany({ data: misconfigs });
+        }
+
+        // Save secrets
+        if (result.Secrets && result.Secrets.length > 0) {
+          const secrets = result.Secrets.map((secret: any) => ({
+            trivyResultsId: trivyResult.id,
+            targetName: result.Target || '',
+            ruleId: secret.RuleID || '',
+            category: secret.Category || '',
+            severity: secret.Severity || 'INFO',
+            title: secret.Title || '',
+            startLine: secret.StartLine || 0,
+            endLine: secret.EndLine || 0,
+            code: secret.Code || null,
+            match: secret.Match || null,
+            layer: secret.Layer || null,
+          }));
+
+          await prisma.trivySecret.createMany({ data: secrets });
+        }
+      }
+    }
+  }
+
+  private async saveDiveResults(metadataId: string, diveData: any): Promise<void> {
+    const efficiencyScore = diveData.image?.efficiencyScore || 0;
+    const sizeBytes = BigInt(diveData.image?.sizeBytes || 0);
+    const wastedBytes = BigInt(diveData.image?.inefficientBytes || 0);
+    const wastedPercent = sizeBytes > 0 ? Number(wastedBytes) / Number(sizeBytes) * 100 : 0;
+
+    const diveResult = await prisma.diveResults.create({
+      data: {
+        scanMetadataId: metadataId,
+        efficiencyScore,
+        sizeBytes,
+        wastedBytes,
+        wastedPercent,
+        inefficientFiles: diveData.image?.inefficientFiles || null,
+        duplicateFiles: diveData.image?.duplicateFiles || null,
+      }
+    });
+
+    if (diveData.layer && diveData.layer.length > 0) {
+      const layers = diveData.layer.map((layer: any, index: number) => ({
+        diveResultsId: diveResult.id,
+        layerId: layer.id || '',
+        layerIndex: index,
+        digest: layer.digest || '',
+        sizeBytes: BigInt(layer.sizeBytes || 0),
+        command: layer.command || null,
+        addedFiles: layer.addedFiles || 0,
+        modifiedFiles: layer.modifiedFiles || 0,
+        removedFiles: layer.removedFiles || 0,
+        wastedBytes: BigInt(layer.wastedBytes || 0),
+        fileDetails: layer.fileDetails || null,
+      }));
+
+      await prisma.diveLayer.createMany({ data: layers });
+    }
+  }
+
+  private async saveSyftResults(metadataId: string, syftData: any): Promise<void> {
+    const syftResult = await prisma.syftResults.create({
+      data: {
+        scanMetadataId: metadataId,
+        schemaVersion: syftData.schema?.version || null,
+        bomFormat: syftData.descriptor?.name || null,
+        specVersion: syftData.specVersion || null,
+        serialNumber: syftData.serialNumber || null,
+        packagesCount: syftData.artifacts?.length || 0,
+        filesAnalyzed: syftData.source?.target?.imageSize || 0,
+        source: syftData.source || null,
+        distro: syftData.distro || null,
+      }
+    });
+
+    if (syftData.artifacts && syftData.artifacts.length > 0) {
+      const packages = syftData.artifacts.map((artifact: any) => {
+        // Extract CPE string - handle various formats
+        let cpeString: string | null = null;
+        if (artifact.cpes && artifact.cpes.length > 0) {
+          const firstCpe = artifact.cpes[0];
+          if (typeof firstCpe === 'string') {
+            cpeString = firstCpe;
+          } else if (typeof firstCpe === 'object' && firstCpe.cpe) {
+            cpeString = firstCpe.cpe;
+          } else if (typeof firstCpe === 'object' && firstCpe.value) {
+            cpeString = firstCpe.value;
+          }
+        }
+        
+        return {
+          syftResultsId: syftResult.id,
+          packageId: artifact.id || '',
+          name: artifact.name || 'unknown',
+          version: artifact.version || '',
+          type: artifact.type || 'unknown',
+          foundBy: artifact.foundBy || null,
+          purl: artifact.purl || null,
+          cpe: cpeString,
+          language: artifact.language || null,
+          licenses: artifact.licenses || null,
+          size: artifact.metadata?.installedSize ? BigInt(artifact.metadata.installedSize) : null,
+          locations: artifact.locations || null,
+          layerId: artifact.locations?.[0]?.layerID || null,
+          metadata: artifact.metadata || null,
+        };
+      });
+
+      await prisma.syftPackage.createMany({ data: packages });
+    }
+  }
+
+  private async saveDockleResults(metadataId: string, dockleData: any): Promise<void> {
+    const dockleResult = await prisma.dockleResults.create({
+      data: {
+        scanMetadataId: metadataId,
+        summary: dockleData.summary || null,
+      }
+    });
+
+    if (dockleData.details && dockleData.details.length > 0) {
+      const violations = dockleData.details.map((detail: any) => ({
+        dockleResultsId: dockleResult.id,
+        code: detail.code || '',
+        title: detail.title || '',
+        level: detail.level || 'INFO',
+        alerts: detail.alerts || null,
+      }));
+
+      await prisma.dockleViolation.createMany({ data: violations });
+    }
+  }
+
+  private async saveOsvResults(metadataId: string, osvData: any): Promise<void> {
+    const osvResult = await prisma.osvResults.create({
+      data: {
+        scanMetadataId: metadataId,
+      }
+    });
+
+    const vulnerabilities: any[] = [];
+    
+    if (osvData.results && osvData.results.length > 0) {
+      for (const result of osvData.results) {
+        if (result.packages) {
+          for (const pkg of result.packages) {
+            if (pkg.vulnerabilities) {
+              for (const vuln of pkg.vulnerabilities) {
+                vulnerabilities.push({
+                  osvResultsId: osvResult.id,
+                  osvId: vuln.id || 'UNKNOWN',
+                  aliases: vuln.aliases || null,
+                  packageName: pkg.package?.name || 'unknown',
+                  packageEcosystem: pkg.package?.ecosystem || 'unknown',
+                  packageVersion: pkg.package?.version || '',
+                  packagePurl: pkg.package?.purl || null,
+                  summary: vuln.summary || null,
+                  details: vuln.details || null,
+                  severity: vuln.severity || null,
+                  fixed: vuln.affected?.[0]?.ranges?.[0]?.events?.find((e: any) => e.fixed)?.fixed || null,
+                  affected: vuln.affected || null,
+                  published: vuln.published ? new Date(vuln.published) : null,
+                  modified: vuln.modified ? new Date(vuln.modified) : null,
+                  withdrawn: vuln.withdrawn ? new Date(vuln.withdrawn) : null,
+                  references: vuln.references || null,
+                  databaseSpecific: vuln.database_specific || null,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (vulnerabilities.length > 0) {
+      await prisma.osvVulnerability.createMany({ data: vulnerabilities });
+    }
+  }
+
   async calculateAggregatedData(scanId: string, reports: ScanReports, metadataId?: string): Promise<void> {
     const aggregates: AggregatedData = {};
-
+    const vulnCount: VulnerabilityCount = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+    let totalCvssScore = 0;
+    let cvssCount = 0;
+    
+    // Aggregate vulnerabilities from Trivy
     if (reports.trivy?.Results) {
-      const vulnCount: VulnerabilityCount = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-      let totalCvssScore = 0;
-      let cvssCount = 0;
-
       for (const result of reports.trivy.Results) {
         if (result.Vulnerabilities) {
           for (const vuln of result.Vulnerabilities) {
@@ -255,7 +577,68 @@ export class DatabaseAdapter implements IDatabaseAdapter {
           }
         }
       }
+    }
+    
+    // Aggregate vulnerabilities from Grype
+    if (reports.grype?.matches) {
+      for (const match of reports.grype.matches) {
+        // Grype uses capitalized severity levels
+        const severity = match.vulnerability?.severity?.toLowerCase();
+        if (severity && vulnCount.hasOwnProperty(severity)) {
+          vulnCount[severity as keyof VulnerabilityCount]++;
+        }
+        
+        // Get CVSS score from Grype
+        if (match.vulnerability?.cvss) {
+          for (const cvss of match.vulnerability.cvss) {
+            if (cvss.metrics?.baseScore) {
+              totalCvssScore += cvss.metrics.baseScore;
+              cvssCount++;
+              break; // Use first available score
+            }
+          }
+        }
+      }
+    }
+    
+    // Aggregate vulnerabilities from OSV
+    if (reports.osv?.results) {
+      for (const result of reports.osv.results) {
+        if (result.packages) {
+          for (const pkg of result.packages) {
+            if (pkg.vulnerabilities) {
+              for (const vuln of pkg.vulnerabilities) {
+                // OSV uses severity arrays with CVSS scores
+                if (vuln.severity) {
+                  for (const sev of vuln.severity) {
+                    if (sev.type === 'CVSS_V3' && sev.score) {
+                      const score = parseFloat(sev.score);
+                      totalCvssScore += score;
+                      cvssCount++;
+                      
+                      // Map CVSS score to severity
+                      if (score >= 9.0) vulnCount.critical++;
+                      else if (score >= 7.0) vulnCount.high++;
+                      else if (score >= 4.0) vulnCount.medium++;
+                      else if (score >= 0.1) vulnCount.low++;
+                      else vulnCount.info++;
+                      break;
+                    }
+                  }
+                } else {
+                  // If no severity score, count as info
+                  vulnCount.info++;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
 
+    // Only set vulnerability count if we found any vulnerabilities
+    if (vulnCount.critical > 0 || vulnCount.high > 0 || vulnCount.medium > 0 || 
+        vulnCount.low > 0 || vulnCount.info > 0) {
       aggregates.vulnerabilityCount = vulnCount;
       
       const avgCvss = cvssCount > 0 ? totalCvssScore / cvssCount : 0;
