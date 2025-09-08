@@ -1321,54 +1321,6 @@
         ]
       }
     },
-    "/api/scans/{id}/findings/compliance": {
-      "get": {
-        "summary": "GET /api/scans/{id}/findings/compliance",
-        "tags": [
-          "Scans"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "id parameter"
-          }
-        ]
-      }
-    },
-    "/api/scans/{id}/findings/packages": {
-      "get": {
-        "summary": "GET /api/scans/{id}/findings/packages",
-        "tags": [
-          "Scans"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "id parameter"
-          }
-        ]
-      }
-    },
     "/api/scans/{id}/findings": {
       "get": {
         "summary": "GET /api/scans/{id}/findings",
@@ -1396,54 +1348,6 @@
     "/api/scans/{id}/findings/vulnerabilities": {
       "get": {
         "summary": "GET /api/scans/{id}/findings/vulnerabilities",
-        "tags": [
-          "Scans"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "id parameter"
-          }
-        ]
-      }
-    },
-    "/api/scans/{id}/optimized": {
-      "get": {
-        "summary": "GET /api/scans/{id}/optimized",
-        "tags": [
-          "Scans"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "id parameter"
-          }
-        ]
-      }
-    },
-    "/api/scans/{id}/packages": {
-      "get": {
-        "summary": "GET /api/scans/{id}/packages",
         "tags": [
           "Scans"
         ],
