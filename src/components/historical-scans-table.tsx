@@ -373,7 +373,12 @@ export function HistoricalScansTable({ data, imageId, onScanDeleted }: Historica
                 </ContextMenuTrigger>
                 <ContextMenuContent>
                   <ContextMenuItem 
-                    onClick={() => handleExport(scan)}
+                    onClick={() => {
+                      // Delay to ensure context menu closes before modal opens
+                      setTimeout(() => {
+                        handleExport(scan)
+                      }, 150)
+                    }}
                     className="flex items-center"
                   >
                     <IconUpload className="mr-2 h-4 w-4" />
@@ -381,7 +386,12 @@ export function HistoricalScansTable({ data, imageId, onScanDeleted }: Historica
                   </ContextMenuItem>
                   <ContextMenuItem 
                     className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                    onClick={() => handleDeleteClick(scan.scanId)}
+                    onClick={() => {
+                      // Delay to ensure context menu closes before modal opens
+                      setTimeout(() => {
+                        handleDeleteClick(scan.scanId)
+                      }, 150)
+                    }}
                   >
                     <IconTrash className="mr-2 h-4 w-4" />
                     Delete Scan
