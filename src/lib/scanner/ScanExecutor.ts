@@ -19,6 +19,53 @@ export class ScanExecutor implements IScanExecutor {
     private progressTracker: { updateProgress: (requestId: string, progress: number, step?: string) => void }
   ) {}
 
+  async executeTarScan(requestId: string, request: ScanRequest, scanId: string, imageId: string): Promise<void> {
+    const reportDir = path.join(this.workDir, 'reports', requestId);
+    const cacheDir = path.join(this.workDir, 'cache');
+
+    await this.setupDirectories(reportDir, cacheDir);
+    this.progressTracker.updateProgress(requestId, 10, 'Setting up scan environment');
+
+    const tarPath = request.tarPath!;
+    const env = this.setupEnvironmentVariables(cacheDir);
+
+    logger.scanner(`Scanning tar file: ${tarPath}`);
+
+    // Check if tar file exists
+    try {
+      const stats = await fs.stat(tarPath);
+      logger.scanner(`Tar file found: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+    } catch (error) {
+      throw new Error(`Tar file not found: ${tarPath}`);
+    }
+
+    this.progressTracker.updateProgress(requestId, 20, 'Reading tar metadata');
+
+    // Extract metadata from tar
+    try {
+      const { stdout: metadataOutput } = await execAsync(
+        `skopeo inspect docker-archive:${tarPath}`,
+        { env }
+      );
+      await fs.writeFile(path.join(reportDir, 'metadata.json'), metadataOutput);
+    } catch (error) {
+      logger.warn('Failed to extract tar metadata:', error);
+      // Write minimal metadata
+      await fs.writeFile(path.join(reportDir, 'metadata.json'), JSON.stringify({
+        Architecture: 'unknown',
+        Os: 'linux',
+        RepoTags: [`${request.image}:${request.tag}`]
+      }, null, 2));
+    }
+
+    this.progressTracker.updateProgress(requestId, 30, 'Starting security scans');
+
+    await this.runScannersOnTar(requestId, tarPath, reportDir, env, request.scanners);
+
+    // Don't delete the tar file since it's the patched image we want to keep
+    logger.scanner('Scan completed, tar file preserved at:', tarPath);
+  }
+
   async executeLocalDockerScan(requestId: string, request: ScanRequest, scanId: string, imageId: string): Promise<void> {
     const reportDir = path.join(this.workDir, 'reports', requestId);
     const imageDir = path.join(this.workDir, 'images');
@@ -46,12 +93,8 @@ export class ScanExecutor implements IScanExecutor {
 
     await this.runScannersOnTar(requestId, tarPath, reportDir, env, request.scanners);
 
-    try {
-      await fs.unlink(tarPath);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.warn('Failed to cleanup tar file:', errorMessage);
-    }
+    // Keep tar file for potential patching operations
+    logger.scanner('Scan completed, tar file preserved for patching at:', tarPath);
   }
 
   async executeRegistryScan(requestId: string, request: ScanRequest, scanId: string, imageId: string): Promise<void> {
@@ -110,12 +153,8 @@ export class ScanExecutor implements IScanExecutor {
 
     await this.runScannersOnTar(requestId, tarPath, reportDir, env, request.scanners);
 
-    try {
-      await fs.unlink(tarPath);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.warn('Failed to cleanup tar file:', errorMessage);
-    }
+    // Keep tar file for potential patching operations
+    logger.scanner('Scan completed, tar file preserved for patching at:', tarPath);
   }
 
 

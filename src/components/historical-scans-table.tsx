@@ -49,7 +49,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
-import { ExportImageDialog } from "@/components/export-image-dialog"
+import { ExportImageDialogEnhanced } from "@/components/export-image-dialog-enhanced"
 
 // Component handles its own data formatting since historical scans are pre-formatted
 
@@ -417,7 +417,7 @@ export function HistoricalScansTable({ data, imageId, onScanDeleted }: Historica
       </AlertDialog>
       
       {selectedScanForExport && (
-        <ExportImageDialog
+        <ExportImageDialogEnhanced
           open={exportDialogOpen}
           onOpenChange={(open) => {
             setExportDialogOpen(open)
@@ -427,7 +427,8 @@ export function HistoricalScansTable({ data, imageId, onScanDeleted }: Historica
           }}
           imageName={selectedScanForExport.version.split(':')[0]}
           imageTag={selectedScanForExport.version.split(':')[1] || 'latest'}
-          allTags={data.map(s => s.version.split(':')[1] || 'latest').filter((v, i, a) => a.indexOf(v) === i)}
+          patchedTarPath=""
+          patchOperationId=""
         />
       )}
     </div>

@@ -1107,9 +1107,11 @@ enum PatchStatus {
 enum PatchOperationStatus {
   PENDING
   ANALYZING
+  PULLING
   BUILDING
   PATCHING
   PUSHING
+  VERIFYING
   COMPLETED
   FAILED
   CANCELLED

@@ -2,6 +2,7 @@ import { promisify } from 'util';
 import { exec } from 'child_process';
 import path from 'path';
 import fs from 'fs/promises';
+import { existsSync } from 'fs';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import type { 
@@ -22,7 +23,6 @@ export interface PatchRequest {
   selectedVulnerabilityIds?: string[];
   newImageName?: string;
   newImageTag?: string;
-  skipDockerLoad?: boolean;  // Skip loading into Docker daemon
 }
 
 export interface PatchableVulnerability {
@@ -99,6 +99,9 @@ export class PatchExecutorTarUnshare {
         data: { vulnerabilitiesCount: patchableVulns.length }
       });
 
+      // Update status to pulling
+      await this.updatePatchOperationStatus(patchOperation.id, 'PULLING');
+      
       // Get or download the original tar file
       const originalTarPath = await this.getImageTar(image, scan.requestId);
       
@@ -116,8 +119,12 @@ export class PatchExecutorTarUnshare {
       // Generate patch commands
       const patchCommands = this.generatePatchCommands(patchableVulns);
       
-      // Execute patch using buildah unshare script
-      const scriptPath = path.join(process.cwd(), 'scripts', 'buildah-patch-full.sh');
+      // Choose script based on environment
+      // In development: NODE_ENV is 'development' OR we're not in a Docker container
+      const isDevelopment = process.env.NODE_ENV === 'development' || 
+                           (!process.env.NODE_ENV && !existsSync('/.dockerenv'));
+      const scriptName = isDevelopment ? 'buildah-patch-dev.sh' : 'buildah-patch-container.sh';
+      const scriptPath = path.join(process.cwd(), 'scripts', scriptName);
       const dryRunFlag = request.dryRun ? 'true' : 'false';
       
       logger.info(`Executing patch script with ${patchableVulns.length} vulnerabilities`);
@@ -125,7 +132,9 @@ export class PatchExecutorTarUnshare {
       try {
         const { stdout, stderr } = await execAsync(
           `bash ${scriptPath} "${originalTarPath}" '${patchCommands}' "${patchedTarPath}" ${dryRunFlag}`,
-          { maxBuffer: 10 * 1024 * 1024 } // 10MB buffer for large outputs
+          { 
+            maxBuffer: 10 * 1024 * 1024 // 10MB buffer for large outputs
+          }
         );
         
         if (stderr && !stderr.includes('warning')) {
@@ -151,7 +160,8 @@ export class PatchExecutorTarUnshare {
       const successCount = request.dryRun ? 0 : patchableVulns.length;
       const failedCount = 0;
 
-      // Save patch results to database
+      // Save patch results to database and update progress
+      let patchedCount = 0;
       for (const vuln of patchableVulns) {
         await prisma.patchResult.create({
           data: {
@@ -166,6 +176,15 @@ export class PatchExecutorTarUnshare {
             packageManager: vuln.packageManager
           }
         });
+        
+        // Update patched count periodically
+        patchedCount++;
+        if (patchedCount % 5 === 0 || patchedCount === patchableVulns.length) {
+          await prisma.patchOperation.update({
+            where: { id: patchOperation.id },
+            data: { patchedCount }
+          });
+        }
       }
 
       // Handle patched image
@@ -178,60 +197,7 @@ export class PatchExecutorTarUnshare {
         const finalImageName = request.newImageName || image.name;
         const finalImageTag = request.newImageTag || request.targetTag || `${image.tag}-patched`;
         
-        if (!request.skipDockerLoad) {
-          // Load patched image into Docker for scanning
-          logger.info(`Loading patched image from ${patchedTarPath}`);
-          logger.info(`Will tag as ${finalImageName}:${finalImageTag}`);
-          const loadResult = await execAsync(`docker load -i ${patchedTarPath}`);
-          logger.info(`Docker load stdout: ${loadResult.stdout}`);
-          logger.info(`Docker load stderr: ${loadResult.stderr || 'no stderr'}`);
-          
-          // The loaded image will have the name from buildah (patched-image)
-          // We need to extract the actual loaded image ID and tag it
-          // Docker load output format: "Loaded image: localhost/patched-image:latest"
-          const imageIdMatch = loadResult.stdout.match(/Loaded image:\s*(.+)/);
-          if (imageIdMatch && imageIdMatch[1]) {
-            const loadedImage = imageIdMatch[1].trim();
-            logger.info(`Extracted loaded image name: '${loadedImage}'`);
-            logger.info(`Tagging ${loadedImage} as ${finalImageName}:${finalImageTag}`);
-            try {
-              const tagResult = await execAsync(`docker tag ${loadedImage} ${finalImageName}:${finalImageTag}`);
-              logger.info(`Tag command completed. stdout: ${tagResult.stdout || 'empty'}, stderr: ${tagResult.stderr || 'empty'}`);
-            } catch (tagError: any) {
-              logger.error(`Failed to tag ${loadedImage}: ${tagError.message}`);
-              throw tagError;
-            }
-          } else {
-            // Fallback: try multiple possible names
-            logger.warn(`Could not extract loaded image name from output: ${loadResult.stdout}`);
-            logger.warn('Trying known patterns...');
-            const possibleNames = [
-              'localhost/patched-image:latest',
-              'patched-image:latest',
-              'patched-image'
-            ];
-            
-            let tagged = false;
-            for (const name of possibleNames) {
-              try {
-                logger.info(`Attempting to tag ${name} as ${finalImageName}:${finalImageTag}`);
-                const tagResult = await execAsync(`docker tag ${name} ${finalImageName}:${finalImageTag}`);
-                logger.info(`Successfully tagged ${name} as ${finalImageName}:${finalImageTag}`);
-                tagged = true;
-                break;
-              } catch (e: any) {
-                logger.warn(`Failed to tag ${name}: ${e.message}`);
-              }
-            }
-            
-            if (!tagged) {
-              logger.error('Failed to tag patched image with any known pattern');
-              // Don't throw here - continue with the process
-            }
-          }
-        } else {
-          logger.info(`Skipping Docker load as requested. TAR file saved at: ${patchedTarPath}`);
-        }
+        logger.info(`Patched TAR file created at: ${patchedTarPath}`);
         
         // If target registry specified, push to registry
         if (request.targetRegistry) {
@@ -259,15 +225,17 @@ export class PatchExecutorTarUnshare {
         await fs.copyFile(patchedTarPath, path.join(reportsDir, tarFileName));
         logger.info(`Copied patched TAR to ${path.join(reportsDir, tarFileName)}`);
         
-        // Automatically trigger a scan of the patched image (only if loaded into Docker)
-        if (!request.skipDockerLoad) {
-          logger.info(`Triggering automatic scan of patched image ${finalImageName}:${finalImageTag}`);
-          await this.triggerScan(finalImageName, finalImageTag, patchedImage.id);
-        } else {
-          logger.info('Skipping automatic scan since image was not loaded into Docker');
-        }
+        // Trigger scan of the patched tar file directly
+        logger.info(`Triggering automatic scan of patched tar file: ${patchedTarPath}`);
+        await this.triggerTarScan(patchedTarPath, finalImageName, finalImageTag, patchedImage.id);
       }
 
+      // Verify patches (status update for UI feedback)
+      await this.updatePatchOperationStatus(patchOperation.id, 'VERIFYING');
+      
+      // Brief verification delay for UI feedback
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
       // Update final status
       await this.updatePatchOperationStatus(patchOperation.id, 'COMPLETED', {
         patchedCount: successCount,
@@ -349,18 +317,65 @@ export class PatchExecutorTarUnshare {
 
   private async getImageTar(image: any, requestId: string): Promise<string> {
     const safeImageName = image.name.replace(/[/:]/g, '_');
-    const tarPath = path.join(this.workDir, 'images', `${safeImageName}-${requestId}.tar`);
+    // First try to find tar file with image digest hash (from scanning)
+    const imageHash = image.digest ? image.digest.replace('sha256:', '') : '';
+    const scanTarPath = imageHash ? path.join(this.workDir, 'images', `${safeImageName}-${imageHash}.tar`) : '';
+    
+    // Check if tar file from scan exists
+    if (scanTarPath) {
+      try {
+        const stats = await fs.stat(scanTarPath);
+        if (stats.size > 0) {
+          logger.info(`Using existing scan tar file: ${scanTarPath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
+          return scanTarPath;
+        }
+      } catch {
+        logger.info(`Scan tar file not found at ${scanTarPath}`);
+      }
+    }
+    
+    // Fallback to requestId-based path
+    const requestTarPath = path.join(this.workDir, 'images', `${safeImageName}-${requestId}.tar`);
     
     // Check if tar file already exists
     try {
-      const stats = await fs.stat(tarPath);
+      const stats = await fs.stat(requestTarPath);
       if (stats.size > 0) {
-        logger.info(`Using existing tar file: ${tarPath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
-        return tarPath;
+        logger.info(`Using existing tar file: ${requestTarPath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
+        return requestTarPath;
       }
     } catch {
-      logger.info(`Tar file not found at ${tarPath}`);
+      logger.info(`Tar file not found at ${requestTarPath}`);
     }
+    
+    // Try to find any matching tar file with wildcard pattern
+    const imagesDir = path.join(this.workDir, 'images');
+    try {
+      const files = await fs.readdir(imagesDir);
+      const matchingFiles = files.filter(f => f.startsWith(safeImageName) && f.endsWith('.tar'));
+      
+      if (matchingFiles.length > 0) {
+        // Sort by modification time and use the most recent
+        const fileStats = await Promise.all(
+          matchingFiles.map(async f => ({
+            name: f,
+            path: path.join(imagesDir, f),
+            mtime: (await fs.stat(path.join(imagesDir, f))).mtime
+          }))
+        );
+        
+        fileStats.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+        const mostRecent = fileStats[0];
+        
+        logger.info(`Found existing tar file by pattern: ${mostRecent.path}`);
+        return mostRecent.path;
+      }
+    } catch (error) {
+      logger.warn('Failed to search for tar files:', error);
+    }
+    
+    // If no tar file found, we'll need to download/export it
+    const tarPath = requestTarPath;
 
     // Export from Docker if local source
     if (image.source === 'LOCAL_DOCKER' || image.registry === 'local') {
@@ -552,15 +567,16 @@ export class PatchExecutorTarUnshare {
     return patchedImage;
   }
 
-  private async triggerScan(imageName: string, imageTag: string, imageId: string): Promise<void> {
+  private async triggerTarScan(tarPath: string, imageName: string, imageTag: string, imageId: string): Promise<void> {
     try {
       const scanRequest = {
         image: imageName,
         tag: imageTag,
-        source: 'local'
+        source: 'tar',
+        tarPath: tarPath
       };
 
-      logger.info(`Initiating scan for patched image ${imageName}:${imageTag}`);
+      logger.info(`Initiating scan for patched tar file: ${tarPath}`);
       
       const port = process.env.PORT || '3000';
       const response = await fetch(`http://localhost:${port}/api/scans/start`, {

@@ -1,24 +1,22 @@
-import { NextRequest, NextResponse } from "next/server"
-import { exec } from "child_process"
-import { promisify } from "util"
+import { NextResponse } from 'next/server';
+import { promisify } from 'util';
+import { exec } from 'child_process';
 
-const execAsync = promisify(exec)
+const execAsync = promisify(exec);
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const { stdout } = await execAsync("docker version --format '{{.Server.Version}}'", {
-      timeout: 5000
-    })
+    // Try to ping Docker daemon
+    await execAsync('docker info', { timeout: 5000 });
     
     return NextResponse.json({
       available: true,
-      version: stdout.trim()
-    })
+      message: 'Docker daemon is available'
+    });
   } catch (error) {
-    console.log("Docker not available:", error)
     return NextResponse.json({
       available: false,
-      error: "Docker is not available on this system"
-    })
+      message: 'Docker daemon is not available'
+    });
   }
 }

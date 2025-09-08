@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { VulnerabilitySelectionModal } from '@/components/vulnerability-selection-modal';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   Shield, 
   AlertTriangle, 
@@ -14,7 +15,9 @@ import {
   XCircle,
   Loader2,
   Package,
-  Wrench
+  Wrench,
+  Clock,
+  CheckCircle2
 } from 'lucide-react';
 
 interface PatchAnalysisProps {
@@ -25,12 +28,22 @@ interface PatchAnalysisProps {
   onPatchExecute?: (analysis: any) => void;
 }
 
+interface PatchProgress {
+  stage: 'initializing' | 'analyzing' | 'pulling' | 'patching' | 'pushing' | 'verifying' | 'completed' | 'failed';
+  message: string;
+  progress: number;
+  patchedCount?: number;
+  totalCount?: number;
+}
+
 export function PatchAnalysis({ scanId, imageId, imageName = 'image', imageTag = 'latest', onPatchExecute }: PatchAnalysisProps) {
   const [analysis, setAnalysis] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [patching, setPatching] = useState(false);
   const [showVulnModal, setShowVulnModal] = useState(false);
+  const [patchProgress, setPatchProgress] = useState<PatchProgress | null>(null);
+  const [patchOperationId, setPatchOperationId] = useState<string | null>(null);
 
   useEffect(() => {
     analyzeScan();
@@ -63,8 +76,19 @@ export function PatchAnalysis({ scanId, imageId, imageName = 'image', imageTag =
   const executePatch = async (dryRun = false, selectedVulnerabilityIds?: string[], newImageName?: string, newImageTag?: string) => {
     setPatching(true);
     setError(null);
+    
+    // Initialize progress
+    setPatchProgress({
+      stage: 'initializing',
+      message: 'Starting patch operation...',
+      progress: 5,
+      totalCount: selectedVulnerabilityIds?.length || analysis?.patchableVulnerabilities || 0
+    });
 
     try {
+      // Start patch operation
+      setPatchProgress(prev => ({ ...prev!, stage: 'analyzing', message: 'Analyzing vulnerabilities...', progress: 10 }));
+      
       const response = await fetch('/api/patches/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -83,15 +107,122 @@ export function PatchAnalysis({ scanId, imageId, imageName = 'image', imageTag =
       }
 
       const data = await response.json();
+      const operationId = data.patchOperation?.id;
+      
+      if (operationId && !dryRun) {
+        setPatchOperationId(operationId);
+        // Start polling for status
+        await pollPatchStatus(operationId);
+      } else {
+        // For dry run, just show completed
+        setPatchProgress({
+          stage: 'completed',
+          message: dryRun ? 'Dry run completed successfully' : 'Patch completed successfully',
+          progress: 100
+        });
+        setTimeout(() => setPatchProgress(null), 3000);
+      }
       
       if (onPatchExecute) {
         onPatchExecute(data.patchOperation);
       }
     } catch (err) {
+      setPatchProgress({
+        stage: 'failed',
+        message: err instanceof Error ? err.message : 'Patch execution failed',
+        progress: 0
+      });
       setError(err instanceof Error ? err.message : 'Patch execution failed');
+      setTimeout(() => setPatchProgress(null), 5000);
     } finally {
       setPatching(false);
     }
+  };
+
+  const pollPatchStatus = async (operationId: string) => {
+    const pollInterval = 2000; // Poll every 2 seconds
+    let attempts = 0;
+    const maxAttempts = 150; // Max 5 minutes
+    
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/patches/${operationId}/status`);
+        if (!response.ok) return;
+        
+        const data = await response.json();
+        const operation = data.patchOperation;
+        
+        // Update progress based on status
+        if (operation.status === 'ANALYZING') {
+          setPatchProgress({
+            stage: 'analyzing',
+            message: 'Analyzing vulnerabilities and preparing patches...',
+            progress: 20,
+            patchedCount: 0,
+            totalCount: operation.vulnerabilitiesCount
+          });
+        } else if (operation.status === 'PULLING') {
+          setPatchProgress({
+            stage: 'pulling',
+            message: 'Pulling container image...',
+            progress: 30
+          });
+        } else if (operation.status === 'PATCHING') {
+          const patchedCount = operation.patchedCount || 0;
+          const totalCount = operation.vulnerabilitiesCount || 1;
+          const patchProgress = 40 + (patchedCount / totalCount) * 40; // 40-80% range
+          
+          setPatchProgress({
+            stage: 'patching',
+            message: `Applying patches... (${patchedCount}/${totalCount})`,
+            progress: patchProgress,
+            patchedCount,
+            totalCount
+          });
+        } else if (operation.status === 'PUSHING') {
+          setPatchProgress({
+            stage: 'pushing',
+            message: 'Saving patched image...',
+            progress: 85
+          });
+        } else if (operation.status === 'VERIFYING') {
+          setPatchProgress({
+            stage: 'verifying',
+            message: 'Verifying patches...',
+            progress: 95
+          });
+        } else if (operation.status === 'COMPLETED') {
+          setPatchProgress({
+            stage: 'completed',
+            message: `Successfully patched ${operation.patchedCount} vulnerabilities!`,
+            progress: 100,
+            patchedCount: operation.patchedCount,
+            totalCount: operation.vulnerabilitiesCount
+          });
+          setTimeout(() => setPatchProgress(null), 5000);
+          return; // Stop polling
+        } else if (operation.status === 'FAILED') {
+          setPatchProgress({
+            stage: 'failed',
+            message: operation.error || 'Patch operation failed',
+            progress: 0
+          });
+          setTimeout(() => setPatchProgress(null), 5000);
+          return; // Stop polling
+        }
+        
+        // Continue polling if not completed
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(poll, pollInterval);
+        }
+      } catch (err) {
+        console.error('Failed to poll patch status:', err);
+      }
+    };
+    
+    // Start polling
+    poll();
   };
 
   const handlePatchWithSelection = (selectedVulnerabilityIds: string[], newImageName: string, newImageTag: string) => {
@@ -142,19 +273,6 @@ export function PatchAnalysis({ scanId, imageId, imageName = 'image', imageTag =
             </CardDescription>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => executePatch(true)}
-              disabled={patching || analysis.patchableVulnerabilities === 0}
-            >
-              {patching ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Wrench className="h-4 w-4 mr-2" />
-              )}
-              Dry Run
-            </Button>
             <Button
               size="sm"
               onClick={() => setShowVulnModal(true)}
@@ -274,6 +392,88 @@ export function PatchAnalysis({ scanId, imageId, imageName = 'image', imageTag =
       imageTag={imageTag}
       onConfirm={handlePatchWithSelection}
     />
+    
+    {/* Patch Progress Dialog */}
+    <Dialog open={!!patchProgress} onOpenChange={() => {}}>
+      <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {patchProgress?.stage === 'failed' ? (
+              <XCircle className="h-5 w-5 text-red-500" />
+            ) : patchProgress?.stage === 'completed' ? (
+              <CheckCircle2 className="h-5 w-5 text-green-500" />
+            ) : (
+              <Shield className="h-5 w-5 text-blue-500" />
+            )}
+            Patching {imageName}:{imageTag}
+          </DialogTitle>
+          <DialogDescription>
+            {patchProgress?.message}
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          {/* Progress Bar */}
+          <div className="space-y-2">
+            <Progress value={patchProgress?.progress || 0} className="h-3" />
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>{patchProgress?.progress}%</span>
+              {patchProgress?.patchedCount !== undefined && patchProgress?.totalCount && (
+                <span>{patchProgress.patchedCount} / {patchProgress.totalCount} patches</span>
+              )}
+            </div>
+          </div>
+          
+          {/* Stage indicators */}
+          <div className="space-y-2">
+            {['initializing', 'analyzing', 'pulling', 'patching', 'pushing', 'verifying', 'completed'].map((stage) => {
+              const currentStage = patchProgress?.stage || '';
+              const stageIndex = ['initializing', 'analyzing', 'pulling', 'patching', 'pushing', 'verifying', 'completed'].indexOf(stage);
+              const currentIndex = ['initializing', 'analyzing', 'pulling', 'patching', 'pushing', 'verifying', 'completed'].indexOf(currentStage);
+              const isActive = stage === currentStage;
+              const isDone = currentIndex > stageIndex;
+              const isFailed = currentStage === 'failed';
+              
+              return (
+                <div key={stage} className="flex items-center gap-2">
+                  {isDone ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  ) : isActive && !isFailed ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                  ) : isFailed && isActive ? (
+                    <XCircle className="h-4 w-4 text-red-500" />
+                  ) : (
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <span className={`text-sm capitalize ${isActive ? 'font-medium' : 'text-muted-foreground'}`}>
+                    {stage.replace('_', ' ')}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          
+          {/* Error or success message */}
+          {patchProgress?.stage === 'failed' && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Patch Failed</AlertTitle>
+              <AlertDescription>{patchProgress.message}</AlertDescription>
+            </Alert>
+          )}
+          
+          {patchProgress?.stage === 'completed' && (
+            <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertTitle>Patch Successful</AlertTitle>
+              <AlertDescription>
+                Successfully patched {patchProgress.patchedCount} out of {patchProgress.totalCount} vulnerabilities.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
     </>
   );
 }

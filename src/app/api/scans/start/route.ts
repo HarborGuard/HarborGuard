@@ -64,15 +64,16 @@ const ScanStartSchema = z.object({
   // New format
   image: z.string().min(1).optional(),
   tag: z.string().min(1).optional(),
-  source: z.enum(['registry', 'local']).optional(),
+  source: z.enum(['registry', 'local', 'tar']).optional(),
   dockerImageId: z.string().optional(),
   repositoryId: z.string().optional(), // For private repositories
+  tarPath: z.string().optional(), // Path to tar file for direct tar scanning
 }).refine(
   (data) => 
-    // Either legacy format or new format must be provided
-    (data.imageName && data.imageTag) || (data.image && data.tag),
+    // Either legacy format, new format, or tar path must be provided
+    (data.imageName && data.imageTag) || (data.image && data.tag) || data.tarPath,
   {
-    message: "Either (imageName & imageTag) or (image & tag) must be provided"
+    message: "Either (imageName & imageTag), (image & tag), or tarPath must be provided"
   }
 )
 
@@ -82,6 +83,51 @@ export async function POST(request: NextRequest) {
     
     // Validate request data
     const validatedData = ScanStartSchema.parse(body)
+    
+    // Handle tar file scanning if tarPath is provided
+    if (validatedData.tarPath) {
+      console.log(`Starting scan for tar file: ${validatedData.tarPath}`)
+      
+      // Extract image name from tar path if possible
+      const pathParts = validatedData.tarPath.split('/')
+      const filename = pathParts[pathParts.length - 1]
+      const imageName = validatedData.image || filename.replace('.tar', '').replace('.gz', '')
+      const imageTag = validatedData.tag || 'latest'
+      
+      // Convert to ScanRequest format for tar file
+      const scanRequest: ScanRequest = {
+        image: imageName,
+        tag: imageTag,
+        source: 'tar',
+        tarPath: validatedData.tarPath,
+      }
+      
+      // Start scan with tar file
+      const result = await scannerService.startScan(scanRequest, 0)
+      
+      // Log the scan start action
+      await auditLogger.scanStart(
+        request, 
+        `tar:${filename}`, 
+        'tar'
+      );
+      
+      // Include queue information in response
+      const response: any = {
+        success: true,
+        requestId: result.requestId,
+        scanId: result.scanId,
+        message: result.queued ? 'Scan queued successfully' : 'Scan started successfully'
+      }
+      
+      if (result.queued) {
+        response.queued = true;
+        response.queuePosition = result.queuePosition;
+        response.estimatedWaitTime = scannerService.getEstimatedWaitTime(result.requestId);
+      }
+      
+      return NextResponse.json(response, { status: 201 })
+    }
     
     // Handle both legacy and new format
     const imageName = validatedData.image || validatedData.imageName!

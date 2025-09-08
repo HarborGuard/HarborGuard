@@ -68,7 +68,7 @@ import {
   ContextMenuSubTrigger,
 } from "@/components/ui/context-menu"
 import { DeleteImageDialog } from "@/components/delete-image-dialog"
-import { ExportImageDialog } from "@/components/export-image-dialog"
+import { ExportImageDialogEnhanced } from "@/components/export-image-dialog-enhanced"
 import { useScanning } from "@/providers/ScanningProvider"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -659,11 +659,6 @@ function DraggableRow({
           </ContextMenuItem>
         )}
         <ContextMenuSeparator />
-        <ContextMenuItem onSelect={handleExport} className="flex items-center">
-          <IconUpload className="mr-2 h-4 w-4" />
-          Export to Registry
-        </ContextMenuItem>
-        <ContextMenuSeparator />
         <ContextMenuItem onSelect={handleDelete} className="text-red-600 focus:text-red-600">
           <IconTrash className="mr-2 h-4 w-4" />
           Delete Image
@@ -1185,7 +1180,7 @@ export function DataTable({
       />
       
       {/* Export Image Dialog */}
-      <ExportImageDialog
+      <ExportImageDialogEnhanced
         open={exportDialogOpen}
         onOpenChange={(open) => {
           setExportDialogOpen(open)
@@ -1194,8 +1189,9 @@ export function DataTable({
           }
         }}
         imageName={imageToExport.name}
-        imageTag={imageToExport.tag}
-        allTags={imageToExport.allTags}
+        imageTag={imageToExport.tag || ''}
+        patchedTarPath=""
+        patchOperationId=""
       />
     </Tabs>
   )

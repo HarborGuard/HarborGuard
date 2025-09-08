@@ -115,7 +115,11 @@ export class ScannerService {
 
   private async executeScan(requestId: string, request: ScanRequest, scanId: string, imageId: string) {
     try {
-      if (this.isLocalDockerScan(request)) {
+      if (request.source === 'tar' && request.tarPath) {
+        // Direct tar file scanning
+        await this.scanExecutor.executeTarScan(requestId, request, scanId, imageId);
+        await this.finalizeScan(requestId, scanId, request);
+      } else if (this.isLocalDockerScan(request)) {
         await this.scanExecutor.executeLocalDockerScan(requestId, request, scanId, imageId);
         await this.finalizeScan(requestId, scanId, request);
       } else {
@@ -182,7 +186,7 @@ export class ScannerService {
   }
 
   private shouldSimulateDownload(request: ScanRequest): boolean {
-    return !this.isLocalDockerScan(request);
+    return request.source !== 'local' && request.source !== 'tar';
   }
 
   private updateJobStatus(requestId: string, status: ScanJob['status'], progress?: number, error?: string, step?: string) {

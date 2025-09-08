@@ -3,7 +3,7 @@
   "version": "0.2b",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "NODE_ENV=development next dev --turbopack",
     "build": "npx prisma generate && npm run generate:openapi && next build",
     "build:docker": "npx prisma generate && next build",
     "generate:openapi": "npx tsx scripts/generate-openapi.ts",
