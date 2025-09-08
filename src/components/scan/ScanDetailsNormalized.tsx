@@ -68,7 +68,11 @@ export function ScanDetailsNormalized({
 }: ScanDetailsNormalizedProps) {
   const [findings, setFindings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  // Individual search states for each tab
+  const [vulnerabilitySearch, setVulnerabilitySearch] = useState("");
+  const [packageSearch, setPackageSearch] = useState("");
+  const [complianceSearch, setComplianceSearch] = useState("");
+  const [efficiencySearch, setEfficiencySearch] = useState("");
   const [severityFilter, setSeverityFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [sortField, setSortField] = useState("severity");
@@ -84,14 +88,13 @@ export function ScanDetailsNormalized({
   // Fetch normalized findings
   useEffect(() => {
     fetchFindings();
-  }, [scanId, search, severityFilter, sourceFilter]);
+  }, [scanId, severityFilter, sourceFilter]);
 
   const fetchFindings = async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
         type: 'all',
-        ...(search && { search }),
         ...(severityFilter !== 'all' && { severity: severityFilter }),
         ...(sourceFilter !== 'all' && { source: sourceFilter })
       });
@@ -123,6 +126,68 @@ export function ScanDetailsNormalized({
   const getComment = (cveId: string) => {
     const classification = getClassification(cveId);
     return classification?.comment || undefined;
+  };
+
+  // Filter functions for each tab
+  const filterVulnerabilities = (items: any[]) => {
+    if (!items) return [];
+    if (!vulnerabilitySearch) return items;
+    
+    const searchLower = vulnerabilitySearch.toLowerCase();
+    return items.filter(item => {
+      return (
+        item.cveId?.toLowerCase().includes(searchLower) ||
+        item.packageName?.toLowerCase().includes(searchLower) ||
+        item.description?.toLowerCase().includes(searchLower) ||
+        item.severity?.toLowerCase().includes(searchLower) ||
+        item.fixedVersion?.toLowerCase().includes(searchLower)
+      );
+    });
+  };
+
+  const filterPackages = (items: any[]) => {
+    if (!items) return [];
+    if (!packageSearch) return items;
+    
+    const searchLower = packageSearch.toLowerCase();
+    return items.filter(item => {
+      return (
+        item.packageName?.toLowerCase().includes(searchLower) ||
+        item.version?.toLowerCase().includes(searchLower) ||
+        item.type?.toLowerCase().includes(searchLower) ||
+        item.ecosystem?.toLowerCase().includes(searchLower) ||
+        item.license?.toLowerCase().includes(searchLower)
+      );
+    });
+  };
+
+  const filterCompliance = (items: any[]) => {
+    if (!items) return [];
+    if (!complianceSearch) return items;
+    
+    const searchLower = complianceSearch.toLowerCase();
+    return items.filter(item => {
+      return (
+        item.ruleName?.toLowerCase().includes(searchLower) ||
+        item.category?.toLowerCase().includes(searchLower) ||
+        item.message?.toLowerCase().includes(searchLower) ||
+        item.severity?.toLowerCase().includes(searchLower)
+      );
+    });
+  };
+
+  const filterEfficiency = (items: any[]) => {
+    if (!items) return [];
+    if (!efficiencySearch) return items;
+    
+    const searchLower = efficiencySearch.toLowerCase();
+    return items.filter(item => {
+      return (
+        item.findingType?.toLowerCase().includes(searchLower) ||
+        item.description?.toLowerCase().includes(searchLower) ||
+        item.layerIndex?.toString().includes(searchLower)
+      );
+    });
   };
 
   // Sort findings
@@ -281,19 +346,8 @@ export function ScanDetailsNormalized({
         </Card>
       </div>
 
-      {/* Search and Filters */}
-      <div className="flex gap-4">
-        <div className="flex-1">
-          <div className="relative max-w-sm">
-            <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search findings..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8"
-            />
-          </div>
-        </div>
+      {/* Global Filters */}
+      <div className="flex justify-end gap-4">
         <Select value={severityFilter} onValueChange={setSeverityFilter}>
           <SelectTrigger className="w-[150px]">
             <SelectValue placeholder="Severity" />
@@ -348,10 +402,23 @@ export function ScanDetailsNormalized({
         <TabsContent value="vulnerabilities">
           <Card>
             <CardHeader>
-              <CardTitle>Vulnerability Findings</CardTitle>
-              <CardDescription>
-                Security vulnerabilities detected by scanners
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Vulnerability Findings</CardTitle>
+                  <CardDescription>
+                    Security vulnerabilities detected by scanners
+                  </CardDescription>
+                </div>
+                <div className="relative w-64">
+                  <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search vulnerabilities..."
+                    value={vulnerabilitySearch}
+                    onChange={(e) => setVulnerabilitySearch(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <Table>
@@ -400,7 +467,7 @@ export function ScanDetailsNormalized({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortFindings(filterFalsePositives(findings.vulnerabilities?.findings || []), sortField).map((vuln: any) => {
+                  {sortFindings(filterVulnerabilities(filterFalsePositives(findings.vulnerabilities?.findings || [])), sortField).map((vuln: any) => {
                     const comment = getComment(vuln.cveId);
                     return (
                     <TableRow 
@@ -471,10 +538,23 @@ export function ScanDetailsNormalized({
         <TabsContent value="packages">
           <Card>
             <CardHeader>
-              <CardTitle>Package Inventory</CardTitle>
-              <CardDescription>
-                All packages and dependencies detected in the image
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Package Inventory</CardTitle>
+                  <CardDescription>
+                    All packages and dependencies detected in the image
+                  </CardDescription>
+                </div>
+                <div className="relative w-64">
+                  <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search packages..."
+                    value={packageSearch}
+                    onChange={(e) => setPackageSearch(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <Table>
@@ -489,7 +569,7 @@ export function ScanDetailsNormalized({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(findings.packages?.findings || []).map((pkg: any) => (
+                  {filterPackages(findings.packages?.findings || []).map((pkg: any) => (
                     <TableRow 
                       key={`${pkg.id}-${pkg.source}`}
                       className="cursor-pointer hover:bg-muted/50"
@@ -516,10 +596,23 @@ export function ScanDetailsNormalized({
         <TabsContent value="compliance">
           <Card>
             <CardHeader>
-              <CardTitle>Compliance Findings</CardTitle>
-              <CardDescription>
-                Container best practices and security compliance issues
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Compliance Findings</CardTitle>
+                  <CardDescription>
+                    Container best practices and security compliance issues
+                  </CardDescription>
+                </div>
+                <div className="relative w-64">
+                  <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search compliance issues..."
+                    value={complianceSearch}
+                    onChange={(e) => setComplianceSearch(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <Table>
@@ -533,7 +626,7 @@ export function ScanDetailsNormalized({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortFindings(findings.compliance?.findings || [], 'severity').map((comp: any) => (
+                  {sortFindings(filterCompliance(findings.compliance?.findings || []), 'severity').map((comp: any) => (
                     <TableRow key={`${comp.id}-${comp.source}`}>
                       <TableCell className="font-mono text-sm">{comp.ruleName}</TableCell>
                       <TableCell>{comp.category}</TableCell>
@@ -552,10 +645,23 @@ export function ScanDetailsNormalized({
         <TabsContent value="efficiency">
           <Card>
             <CardHeader>
-              <CardTitle>Efficiency Analysis</CardTitle>
-              <CardDescription>
-                Image size optimization and layer efficiency findings
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Efficiency Analysis</CardTitle>
+                  <CardDescription>
+                    Image size optimization and layer efficiency findings
+                  </CardDescription>
+                </div>
+                <div className="relative w-64">
+                  <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search efficiency issues..."
+                    value={efficiencySearch}
+                    onChange={(e) => setEfficiencySearch(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -589,7 +695,7 @@ export function ScanDetailsNormalized({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(findings.efficiency?.findings || []).map((eff: any) => (
+                    {filterEfficiency(findings.efficiency?.findings || []).map((eff: any) => (
                       <TableRow key={eff.id}>
                         <TableCell>{eff.findingType}</TableCell>
                         <TableCell>{eff.layerIndex !== null ? `#${eff.layerIndex}` : '-'}</TableCell>
