@@ -84,14 +84,13 @@ export function ScanDetailsNormalized({
   // Fetch normalized findings
   useEffect(() => {
     fetchFindings();
-  }, [scanId, search, severityFilter, sourceFilter]);
+  }, [scanId, severityFilter, sourceFilter]);
 
   const fetchFindings = async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
         type: 'all',
-        ...(search && { search }),
         ...(severityFilter !== 'all' && { severity: severityFilter }),
         ...(sourceFilter !== 'all' && { source: sourceFilter })
       });
@@ -123,6 +122,34 @@ export function ScanDetailsNormalized({
   const getComment = (cveId: string) => {
     const classification = getClassification(cveId);
     return classification?.comment || undefined;
+  };
+
+  // Filter findings based on search term
+  const filterFindings = (items: any[]) => {
+    if (!items) return [];
+    if (!search) return items;
+    
+    const searchLower = search.toLowerCase();
+    return items.filter(item => {
+      // Search in CVE ID
+      if (item.cveId?.toLowerCase().includes(searchLower)) return true;
+      // Search in package name
+      if (item.packageName?.toLowerCase().includes(searchLower)) return true;
+      // Search in description
+      if (item.description?.toLowerCase().includes(searchLower)) return true;
+      // Search in rule name (for compliance)
+      if (item.ruleName?.toLowerCase().includes(searchLower)) return true;
+      // Search in message
+      if (item.message?.toLowerCase().includes(searchLower)) return true;
+      // Search in category
+      if (item.category?.toLowerCase().includes(searchLower)) return true;
+      // Search in type
+      if (item.type?.toLowerCase().includes(searchLower)) return true;
+      // Search in version
+      if (item.version?.toLowerCase().includes(searchLower)) return true;
+      
+      return false;
+    });
   };
 
   // Sort findings
@@ -400,7 +427,7 @@ export function ScanDetailsNormalized({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortFindings(filterFalsePositives(findings.vulnerabilities?.findings || []), sortField).map((vuln: any) => {
+                  {sortFindings(filterFindings(filterFalsePositives(findings.vulnerabilities?.findings || [])), sortField).map((vuln: any) => {
                     const comment = getComment(vuln.cveId);
                     return (
                     <TableRow 
@@ -489,7 +516,7 @@ export function ScanDetailsNormalized({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(findings.packages?.findings || []).map((pkg: any) => (
+                  {filterFindings(findings.packages?.findings || []).map((pkg: any) => (
                     <TableRow 
                       key={`${pkg.id}-${pkg.source}`}
                       className="cursor-pointer hover:bg-muted/50"
@@ -533,7 +560,7 @@ export function ScanDetailsNormalized({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortFindings(findings.compliance?.findings || [], 'severity').map((comp: any) => (
+                  {sortFindings(filterFindings(findings.compliance?.findings || []), 'severity').map((comp: any) => (
                     <TableRow key={`${comp.id}-${comp.source}`}>
                       <TableCell className="font-mono text-sm">{comp.ruleName}</TableCell>
                       <TableCell>{comp.category}</TableCell>
@@ -589,7 +616,7 @@ export function ScanDetailsNormalized({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(findings.efficiency?.findings || []).map((eff: any) => (
+                    {filterFindings(findings.efficiency?.findings || []).map((eff: any) => (
                       <TableRow key={eff.id}>
                         <TableCell>{eff.findingType}</TableCell>
                         <TableCell>{eff.layerIndex !== null ? `#${eff.layerIndex}` : '-'}</TableCell>
