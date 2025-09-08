@@ -24,6 +24,12 @@ model Image {
   cveClassifications   CveClassification[]
   imageVulnerabilities ImageVulnerability[]
   scans                Scan[]
+  
+  // Patch relations
+  patchOperationsAsSource   PatchOperation[]     @relation("PatchSourceImage")
+  patchOperationsAsPatched  PatchOperation[]     @relation("PatchedImage")
+  patchedImagesAsOriginal   PatchedImage[]       @relation("PatchedImageOriginal")
+  patchedImagesAsResult     PatchedImage[]       @relation("PatchedImageResult")
 
   @@index([name, tag])
   @@index([registry, name, tag])
@@ -56,6 +62,7 @@ model Scan {
   complianceFindings         ScanComplianceFinding[]
   efficiencyFindings         ScanEfficiencyFinding[]
   findingCorrelations        ScanFindingCorrelation[]
+  patchOperations            PatchOperation[]
 
   @@index([requestId])
   @@index([status])
@@ -632,16 +639,19 @@ model ImageVulnerability {
   installedVersion   String?
   fixedVersion       String?
   status             VulnerabilityStatus @default(DETECTED)
+  patchStatus        PatchStatus         @default(NOT_ATTEMPTED)
   detectedAt         DateTime            @default(now())
   cveClassifications CveClassification[]
   image              Image               @relation(fields: [imageId], references: [id], onDelete: Cascade)
   vulnerability      Vulnerability       @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
+  patchOperations    PatchOperation[]
 
   @@unique([imageId, vulnerabilityId, packageName])
   @@index([imageId])
   @@index([vulnerabilityId])
   @@index([status])
   @@index([packageName])
+  @@index([patchStatus])
   @@map("image_vulnerabilities")
 }
 
@@ -885,6 +895,103 @@ model ScanFindingCorrelation {
   @@map("scan_finding_correlations")
 }
 
+// ============================================
+// Patch Management Tables
+// ============================================
+
+model PatchOperation {
+  id                   String                @id @default(cuid())
+  sourceImageId        String
+  patchedImageId       String?
+  scanId               String
+  status               PatchOperationStatus  @default(PENDING)
+  strategy             PatchStrategy
+  startedAt            DateTime              @default(now())
+  completedAt          DateTime?
+  errorMessage         String?               @db.Text
+  
+  // Patch details
+  vulnerabilitiesCount Int                   @default(0)
+  patchedCount         Int                   @default(0)
+  failedCount          Int                   @default(0)
+  
+  // Buildah operation details
+  buildahContainerId   String?
+  buildahMountPath     String?
+  
+  // Registry details for patched image
+  patchedImageRegistry String?
+  patchedImageName     String?
+  patchedImageTag      String?
+  patchedImageDigest   String?
+  
+  // Relations
+  sourceImage          Image                 @relation("PatchSourceImage", fields: [sourceImageId], references: [id], onDelete: Cascade)
+  patchedImage         Image?                @relation("PatchedImage", fields: [patchedImageId], references: [id], onDelete: SetNull)
+  scan                 Scan                  @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  patchResults         PatchResult[]
+  vulnerabilities      ImageVulnerability[]
+  
+  @@index([sourceImageId])
+  @@index([patchedImageId])
+  @@index([scanId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("patch_operations")
+}
+
+model PatchResult {
+  id                String              @id @default(cuid())
+  patchOperationId  String
+  vulnerabilityId   String
+  cveId             String
+  packageName       String
+  originalVersion   String?
+  targetVersion     String?
+  patchCommand      String              @db.Text
+  status            PatchResultStatus   @default(PENDING)
+  errorMessage      String?             @db.Text
+  executedAt        DateTime?
+  
+  // Package manager details
+  packageManager    String              // apt, yum, apk, npm, pip, etc.
+  
+  patchOperation    PatchOperation      @relation(fields: [patchOperationId], references: [id], onDelete: Cascade)
+  
+  @@index([patchOperationId])
+  @@index([vulnerabilityId])
+  @@index([status])
+  @@map("patch_results")
+}
+
+model PatchedImage {
+  id                String              @id @default(cuid())
+  originalImageId   String
+  patchedImageId    String              @unique
+  patchOperationId  String              @unique
+  
+  // Comparison metrics
+  originalCveCount  Int
+  remainingCveCount Int
+  patchedCveCount   Int
+  patchEfficiency   Float               // Percentage of CVEs patched
+  
+  // Size comparison
+  originalSize      BigInt?
+  patchedSize       BigInt?
+  sizeDelta         BigInt?
+  
+  createdAt         DateTime            @default(now())
+  
+  originalImage     Image               @relation("PatchedImageOriginal", fields: [originalImageId], references: [id], onDelete: Cascade)
+  patchedImage      Image               @relation("PatchedImageResult", fields: [patchedImageId], references: [id], onDelete: Cascade)
+  
+  @@index([originalImageId])
+  @@index([patchedImageId])
+  @@index([createdAt])
+  @@map("patched_images")
+}
+
 enum RepositoryType {
   DOCKERHUB
   GHCR
@@ -985,4 +1092,43 @@ enum LogAction {
   DOWNLOAD
   LOGIN
   LOGOUT
+}
+
+enum PatchStatus {
+  NOT_ATTEMPTED
+  ANALYZING
+  PATCHABLE
+  NOT_PATCHABLE
+  PATCHING
+  PATCHED
+  PATCH_FAILED
+}
+
+enum PatchOperationStatus {
+  PENDING
+  ANALYZING
+  PULLING
+  BUILDING
+  PATCHING
+  PUSHING
+  VERIFYING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum PatchResultStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  SKIPPED
+}
+
+enum PatchStrategy {
+  APT
+  YUM
+  APK
+  NPM
+  PIP
+  MULTI
 }

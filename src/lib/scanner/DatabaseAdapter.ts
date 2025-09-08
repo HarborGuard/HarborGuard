@@ -13,6 +13,10 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     if (this.isLocalDockerScan(request)) {
       return this.initializeLocalDockerScanRecord(requestId, request);
     }
+    
+    if (request.source === 'tar' && request.tarPath) {
+      return this.initializeTarScanRecord(requestId, request);
+    }
 
     return this.initializeRegistryScanRecord(requestId, request);
   }
@@ -70,6 +74,42 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       const errorMessage = error instanceof Error ? error.message : String(error);
       const imageRef = request.dockerImageId || `${request.image}:${request.tag}`;
       throw new Error(`Failed to inspect local Docker image ${imageRef}: ${errorMessage}`);
+    }
+  }
+
+  private async initializeTarScanRecord(requestId: string, request: ScanRequest) {
+    try {
+      // For tar files, we don't need to inspect from registry
+      // Create a unique digest based on the tar path and timestamp
+      const digest = `sha256:tar-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      
+      const image = await prisma.image.create({
+        data: {
+          name: request.image,
+          tag: request.tag,
+          registry: 'local',
+          source: 'FILE_UPLOAD',
+          digest,
+          platform: 'linux/amd64',
+          sizeBytes: 0
+        }
+      });
+
+      const scan = await prisma.scan.create({
+        data: {
+          requestId,
+          imageId: image.id,
+          startedAt: new Date(),
+          status: 'RUNNING',
+          source: 'tar'
+        }
+      });
+
+      return { scanId: scan.id, imageId: image.id };
+    } catch (error) {
+      console.error('Failed to initialize tar scan record:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to initialize tar scan: ${errorMessage}`);
     }
   }
 
@@ -388,7 +428,10 @@ export class DatabaseAdapter implements IDatabaseAdapter {
             endLine: secret.EndLine || 0,
             code: secret.Code || null,
             match: secret.Match || null,
-            layer: secret.Layer || null,
+            // Handle Layer being an object with DiffID
+            layer: typeof secret.Layer === 'object' && secret.Layer ? 
+                   (secret.Layer.DiffID || secret.Layer.Digest || JSON.stringify(secret.Layer)) : 
+                   secret.Layer || null,
           }));
 
           await prisma.trivySecret.createMany({ data: secrets });
@@ -836,8 +879,6 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     if (Array.isArray(license)) {
       const formatted = license.map(l => this.formatLicense(l)).filter(Boolean);
       if (formatted.length > 0) {
-        // Debug log
-        console.log('Formatted licenses array:', formatted);
         return formatted.join(', ');
       }
       return null;
@@ -845,7 +886,6 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     if (typeof license === 'object') {
       // Handle common license object structures - prioritize actual license value
       if (license.value) {
-        console.log('Found license.value:', license.value);
         return license.value;  // Syft format: {type: "declared", value: "MIT"}
       }
       if (license.spdxExpression) return license.spdxExpression;  // SPDX expression
@@ -866,12 +906,9 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     
     // Process Syft results
     if (reports.syft?.artifacts) {
-      console.log(`Processing ${reports.syft.artifacts.length} Syft artifacts...`);
       for (const artifact of reports.syft.artifacts) {
         const formattedLicense = this.formatLicense(artifact.licenses);
-        if (artifact.licenses && artifact.licenses.length > 0) {
-          console.log(`Package ${artifact.name}: licenses = ${JSON.stringify(artifact.licenses)}, formatted = ${formattedLicense}`);
-        }
+
         findings.push({
           scanId,
           source: 'syft',

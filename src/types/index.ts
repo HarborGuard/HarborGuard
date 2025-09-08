@@ -400,7 +400,7 @@ export interface ComplianceScore {
 }
 
 // Scan Source Types
-export type ScanSource = 'registry' | 'local';
+export type ScanSource = 'registry' | 'local' | 'tar';
 
 export interface DockerImage {
   id: string;
@@ -470,10 +470,11 @@ export interface ScanRequest {
   image: string;
   tag: string;
   registry?: string;
-  source?: ScanSource; // 'registry' or 'local'
+  source?: ScanSource; // 'registry', 'local', or 'tar'
   dockerImageId?: string; // For local Docker images
   repositoryId?: string; // For private repositories
   scanners?: ScannerConfig; // Optional scanner configuration
+  tarPath?: string; // Path to tar file for direct tar scanning
 }
 
 export interface CreateScanRequest extends ScanRequest {

@@ -49,6 +49,10 @@
       "description": "Openapi.json operations"
     },
     {
+      "name": "Patches",
+      "description": "Patches operations"
+    },
+    {
       "name": "Ready",
       "description": "Readiness probe endpoints"
     },
@@ -157,6 +161,19 @@
         "summary": "GET /api/config/raw-output",
         "tags": [
           "Config"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/docker/check": {
+      "get": {
+        "summary": "GET /api/docker/check",
+        "tags": [
+          "Docker"
         ],
         "responses": {
           "200": {
@@ -566,6 +583,96 @@
         ]
       }
     },
+    "/api/images/export": {
+      "post": {
+        "summary": "POST /api/images/export",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tarPath": {
+                    "type": "string",
+                    "description": "tarPath parameter"
+                  },
+                  "imageName": {
+                    "type": "string",
+                    "description": "imageName parameter"
+                  },
+                  "imageTag": {
+                    "type": "string",
+                    "description": "imageTag parameter"
+                  },
+                  "sourceImage": {
+                    "type": "string",
+                    "description": "sourceImage parameter"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/images/export-to-registry": {
+      "post": {
+        "summary": "POST /api/images/export-to-registry",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sourceImage": {
+                    "type": "string",
+                    "description": "sourceImage parameter"
+                  },
+                  "targetRegistry": {
+                    "type": "string",
+                    "description": "targetRegistry parameter"
+                  },
+                  "targetImageName": {
+                    "type": "string",
+                    "description": "targetImageName parameter"
+                  },
+                  "targetImageTag": {
+                    "type": "string",
+                    "description": "targetImageTag parameter"
+                  },
+                  "repositoryId": {
+                    "type": "string",
+                    "description": "repositoryId parameter"
+                  },
+                  "patchedTarPath": {
+                    "type": "string",
+                    "description": "patchedTarPath parameter"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/images/name/{name}/cve-classifications": {
       "get": {
         "summary": "GET /api/images/name/{name}/cve-classifications",
@@ -786,6 +893,148 @@
         }
       }
     },
+    "/api/patches/{id}/download": {
+      "get": {
+        "summary": "GET /api/patches/{id}/download",
+        "tags": [
+          "Patches"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ]
+      }
+    },
+    "/api/patches/{id}/status": {
+      "get": {
+        "summary": "GET /api/patches/{id}/status",
+        "tags": [
+          "Patches"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ]
+      }
+    },
+    "/api/patches/analyze": {
+      "get": {
+        "summary": "GET /api/patches/analyze",
+        "tags": [
+          "Patches"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/patches/analyze",
+        "tags": [
+          "Patches"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/patches/execute": {
+      "post": {
+        "summary": "POST /api/patches/execute",
+        "tags": [
+          "Patches"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sourceImageId": {
+                    "type": "string",
+                    "description": "sourceImageId parameter"
+                  },
+                  "scanId": {
+                    "type": "string",
+                    "description": "scanId parameter"
+                  },
+                  "targetRegistry": {
+                    "type": "string",
+                    "description": "targetRegistry parameter"
+                  },
+                  "targetTag": {
+                    "type": "string",
+                    "description": "targetTag parameter"
+                  },
+                  "dryRun = false": {
+                    "type": "string",
+                    "description": "dryRun = false parameter"
+                  },
+                  "selectedVulnerabilityIds": {
+                    "type": "string",
+                    "description": "selectedVulnerabilityIds parameter"
+                  },
+                  "newImageName": {
+                    "type": "string",
+                    "description": "newImageName parameter"
+                  },
+                  "newImageTag": {
+                    "type": "string",
+                    "description": "newImageTag parameter"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/patches/history": {
+      "get": {
+        "summary": "GET /api/patches/history",
+        "tags": [
+          "Patches"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
     "/api/ready": {
       "get": {
         "summary": "GET /api/ready",
@@ -891,30 +1140,6 @@
         ]
       }
     },
-    "/api/repositories/{id}/test": {
-      "post": {
-        "summary": "POST /api/repositories/{id}/test",
-        "tags": [
-          "Repositories"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "id parameter"
-          }
-        ]
-      }
-    },
     "/api/repositories": {
       "get": {
         "summary": "GET /api/repositories",
@@ -971,51 +1196,6 @@
                   "testResult": {
                     "type": "string",
                     "description": "testResult parameter"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/repositories/test": {
-      "post": {
-        "summary": "POST /api/repositories/test",
-        "tags": [
-          "Repositories"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "type": {
-                    "type": "string",
-                    "description": "type parameter"
-                  },
-                  "registryUrl": {
-                    "type": "string",
-                    "description": "registryUrl parameter"
-                  },
-                  "username": {
-                    "type": "string",
-                    "description": "username parameter"
-                  },
-                  "password": {
-                    "type": "string",
-                    "description": "password parameter"
-                  },
-                  "organization": {
-                    "type": "string",
-                    "description": "organization parameter"
                   }
                 }
               }
@@ -1216,6 +1396,54 @@
     "/api/scans/{id}/findings/vulnerabilities": {
       "get": {
         "summary": "GET /api/scans/{id}/findings/vulnerabilities",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ]
+      }
+    },
+    "/api/scans/{id}/optimized": {
+      "get": {
+        "summary": "GET /api/scans/{id}/optimized",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ]
+      }
+    },
+    "/api/scans/{id}/packages": {
+      "get": {
+        "summary": "GET /api/scans/{id}/packages",
         "tags": [
           "Scans"
         ],
