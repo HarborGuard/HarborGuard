@@ -48,6 +48,41 @@ echo "Mounting container filesystem..."
 mountpoint=$(buildah $STORAGE_FLAG mount $container 2>&1 | tee /tmp/buildah-mount.log | grep -v 'chown' | head -1 || echo "/var/tmp/buildah$RANDOM/mnt")
 echo "Mounted at: $mountpoint"
 
+# Setup chroot environment with proper mounts
+echo "Setting up chroot environment..."
+
+# Create device nodes if they don't exist
+if [ ! -e "$mountpoint/dev/null" ]; then
+  echo "Mounting /dev into chroot..."
+  mount --bind /dev "$mountpoint/dev" || {
+    echo "Creating minimal device nodes..."
+    mkdir -p "$mountpoint/dev"
+    mknod -m 666 "$mountpoint/dev/null" c 1 3 2>/dev/null || true
+    mknod -m 666 "$mountpoint/dev/zero" c 1 5 2>/dev/null || true
+    mknod -m 666 "$mountpoint/dev/random" c 1 8 2>/dev/null || true
+    mknod -m 666 "$mountpoint/dev/urandom" c 1 9 2>/dev/null || true
+    mknod -m 666 "$mountpoint/dev/tty" c 5 0 2>/dev/null || true
+  }
+fi
+
+# Mount /dev/pts for terminal allocation
+echo "Mounting /dev/pts for terminal support..."
+mkdir -p "$mountpoint/dev/pts" 2>/dev/null || true
+mount -t devpts devpts "$mountpoint/dev/pts" 2>/dev/null || true
+
+# Mount proc and sys
+echo "Mounting /proc and /sys..."
+mount -t proc proc "$mountpoint/proc" 2>/dev/null || true
+mount -t sysfs sys "$mountpoint/sys" 2>/dev/null || true
+
+# Mount a tmpfs on /run to avoid permission issues
+mount -t tmpfs tmpfs "$mountpoint/run" 2>/dev/null || true
+
+# Ensure DNS resolution works
+if [ -f /etc/resolv.conf ] && [ ! -f "$mountpoint/etc/resolv.conf" ]; then
+  cp /etc/resolv.conf "$mountpoint/etc/resolv.conf" 2>/dev/null || true
+fi
+
 # Execute patches
 if [ "$DRY_RUN" = "false" ]; then
   echo "Executing patch commands..."
@@ -68,6 +103,14 @@ else
   echo "$PATCH_COMMANDS" | sed "s|\$mountpoint|$mountpoint|g"
   echo "PATCH_STATUS:DRY_RUN"
 fi
+
+# Cleanup mounts
+echo "Cleaning up mounts..."
+umount "$mountpoint/dev/pts" 2>/dev/null || true
+umount "$mountpoint/run" 2>/dev/null || true
+umount "$mountpoint/sys" 2>/dev/null || true
+umount "$mountpoint/proc" 2>/dev/null || true
+umount "$mountpoint/dev" 2>/dev/null || true
 
 # Unmount
 echo "Unmounting container..."

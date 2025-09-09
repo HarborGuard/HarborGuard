@@ -1140,6 +1140,30 @@
         ]
       }
     },
+    "/api/repositories/{id}/test": {
+      "post": {
+        "summary": "POST /api/repositories/{id}/test",
+        "tags": [
+          "Repositories"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ]
+      }
+    },
     "/api/repositories": {
       "get": {
         "summary": "GET /api/repositories",
@@ -1196,6 +1220,51 @@
                   "testResult": {
                     "type": "string",
                     "description": "testResult parameter"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repositories/test": {
+      "post": {
+        "summary": "POST /api/repositories/test",
+        "tags": [
+          "Repositories"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "description": "type parameter"
+                  },
+                  "registryUrl": {
+                    "type": "string",
+                    "description": "registryUrl parameter"
+                  },
+                  "username": {
+                    "type": "string",
+                    "description": "username parameter"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "password parameter"
+                  },
+                  "organization": {
+                    "type": "string",
+                    "description": "organization parameter"
                   }
                 }
               }
