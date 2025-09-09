@@ -133,6 +133,8 @@ interface AppState {
     limit: number
     offset: number
     hasMore: boolean
+    currentPage: number
+    totalPages: number
   }
 }
 
@@ -144,6 +146,7 @@ type AppAction =
   | { type: 'UPDATE_SCAN'; payload: Scan }
   | { type: 'ADD_SCAN'; payload: Scan }
   | { type: 'DELETE_SCAN'; payload: number }
+  | { type: 'SET_PAGE'; payload: number }
 
 const initialState: AppState = {
   scans: [],
@@ -153,9 +156,11 @@ const initialState: AppState = {
   error: null,
   pagination: {
     total: 0,
-    limit: 100,
+    limit: 25,
     offset: 0,
-    hasMore: false
+    hasMore: false,
+    currentPage: 1,
+    totalPages: 1
   }
 }
 
@@ -199,6 +204,15 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         scans: state.scans.filter(scan => scan.id !== action.payload)
       }
+    case 'SET_PAGE':
+      return {
+        ...state,
+        pagination: {
+          ...state.pagination,
+          currentPage: action.payload,
+          offset: (action.payload - 1) * state.pagination.limit
+        }
+      }
     default:
       return state
   }
@@ -210,6 +224,7 @@ interface AppContextType {
   refreshData: () => Promise<void>
   loadMore: () => Promise<void>
   handleScanComplete: (job: any) => Promise<void>
+  setPage: (page: number) => Promise<void>
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -219,17 +234,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const refreshPromiseRef = useRef<Promise<void> | null>(null)
   const router = useRouter()
 
-  const loadData = async (loadMore: boolean = false) => {
+  const loadData = async (loadMore: boolean = false, pageNumber?: number) => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true })
       dispatch({ type: 'SET_ERROR', payload: null })
 
-      const offset = loadMore ? state.scans.length : 0
+      // Calculate offset based on page number or loadMore flag
+      const offset = pageNumber !== undefined 
+        ? (pageNumber - 1) * state.pagination.limit 
+        : loadMore ? state.scans.length : state.pagination.offset
       
       // Use optimized aggregated endpoint for better performance
-      // Fetch more items initially for better pagination experience
-      const fetchLimit = state.pagination.limit || 100
-      const scansRes = await fetch(`/api/scans/aggregated?limit=${fetchLimit}&offset=${offset}`)
+      const scansRes = await fetch(`/api/scans/aggregated?limit=${state.pagination.limit}&offset=${offset}`)
 
       if (!scansRes.ok) {
         throw new Error(`Failed to fetch scans: ${scansRes.status}`)
@@ -281,11 +297,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }) || []
 
       const actionType = loadMore ? 'APPEND_SCANS' : 'SET_SCANS'
+      const totalPages = Math.ceil(scansData.pagination.total / scansData.pagination.limit)
+      const currentPage = pageNumber !== undefined ? pageNumber : Math.floor(offset / scansData.pagination.limit) + 1
+      
       dispatch({ 
         type: actionType, 
         payload: { 
           scans: transformedScans, 
-          pagination: scansData.pagination 
+          pagination: {
+            ...scansData.pagination,
+            currentPage,
+            totalPages
+          }
         } 
       })
       
@@ -314,6 +337,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
     await loadData(true);
+  }
+
+  const setPage = async (page: number) => {
+    dispatch({ type: 'SET_PAGE', payload: page })
+    await loadData(false, page)
   }
 
   const handleScanComplete = async (job: any) => {
@@ -361,7 +389,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AppContext.Provider value={{ state, dispatch, refreshData, loadMore, handleScanComplete }}>
+    <AppContext.Provider value={{ state, dispatch, refreshData, loadMore, handleScanComplete, setPage }}>
       {children}
     </AppContext.Provider>
   )

@@ -8,12 +8,10 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useScans } from "@/hooks/useScans";
 import { useApp } from "@/contexts/AppContext";
 import { FullPageLoading } from "@/components/ui/loading";
-import { Button } from "@/components/ui/button";
-import { IconRefresh } from "@tabler/icons-react";
 
 export default function ImageRepositoryPage() {
   const { scans, loading } = useScans();
-  const { state, loadMore } = useApp();
+  const { state, setPage } = useApp();
   const breadcrumbs = [{ label: "Dashboard", href: "/" }, { label: "Images" }];
 
   if (loading) {
@@ -30,20 +28,14 @@ export default function ImageRepositoryPage() {
       <div className="@container/main flex flex-1 flex-col gap-2 overflow-auto">
         <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
           <ScanJobsMonitor />
-          <DataTable data={scans} isFullPage={true} />
-          {state.pagination.hasMore && (
-            <div className="flex justify-center mt-4">
-              <Button
-                onClick={loadMore}
-                disabled={state.loading}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <IconRefresh className="h-4 w-4" />
-                Load More Images
-              </Button>
-            </div>
-          )}
+          <DataTable 
+            data={scans} 
+            isFullPage={true}
+            serverSidePagination={true}
+            currentPage={state.pagination.currentPage}
+            totalPages={state.pagination.totalPages}
+            onPageChange={setPage}
+          />
         </div>
       </div>
     </div>
