@@ -153,7 +153,7 @@ const initialState: AppState = {
   error: null,
   pagination: {
     total: 0,
-    limit: 25,
+    limit: 100,
     offset: 0,
     hasMore: false
   }
@@ -227,7 +227,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const offset = loadMore ? state.scans.length : 0
       
       // Use optimized aggregated endpoint for better performance
-      const scansRes = await fetch(`/api/scans/aggregated?limit=${state.pagination.limit}&offset=${offset}`)
+      // Fetch more items initially for better pagination experience
+      const fetchLimit = state.pagination.limit || 100
+      const scansRes = await fetch(`/api/scans/aggregated?limit=${fetchLimit}&offset=${offset}`)
 
       if (!scansRes.ok) {
         throw new Error(`Failed to fetch scans: ${scansRes.status}`)
