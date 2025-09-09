@@ -272,7 +272,10 @@ export class PatchExecutorTarUnshare {
     
     for (const [packageManager, vulns] of grouped) {
       if (packageManager === 'apt') {
-        // Update package lists first
+        // First ensure gpg and apt-utils are available
+        commands.push('chroot $mountpoint sh -c "which gpgv || (apt-get update && apt-get install -y --no-install-recommends gnupg apt-utils)"');
+        
+        // Update package lists
         commands.push('chroot $mountpoint apt-get update');
         
         // Install fixed versions
