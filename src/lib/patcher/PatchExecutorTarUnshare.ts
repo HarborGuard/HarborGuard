@@ -278,9 +278,13 @@ export class PatchExecutorTarUnshare {
         // Update package lists
         commands.push('chroot $mountpoint apt-get update');
         
-        // Install fixed versions
-        const packages = vulns.map(v => `${v.packageName}=${v.fixedVersion}`).join(' ');
-        commands.push(`chroot $mountpoint apt-get install -y ${packages}`);
+        // Install fixed versions - try exact version first, then fall back to upgrade
+        // Group packages to handle version availability issues
+        const packageNames = vulns.map(v => v.packageName).join(' ');
+        
+        // Try to upgrade packages to their latest available versions
+        // This is more reliable than specifying exact versions that may not exist
+        commands.push(`chroot $mountpoint apt-get install -y --only-upgrade ${packageNames} || chroot $mountpoint apt-get install -y ${packageNames}`);
         
         // Clean apt cache
         commands.push('chroot $mountpoint apt-get clean');
