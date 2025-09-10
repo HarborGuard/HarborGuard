@@ -1,4 +1,4 @@
-# <img src="public/icons.svg" alt="Harbor Guard Logo" width="44" height="44" style="vertical-align: middle; filter: brightness(0) invert(1);"> Harbor Guard
+# <img src="public/icon.svg" alt="Harbor Guard Logo" width="44" height="44" style="vertical-align: middle; filter: brightness(0) invert(1);"> Harbor Guard
 
 [![Next.js](https://img.shields.io/badge/Next.js-15.4.6-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.1.0-blue?style=flat-square&logo=react)](https://reactjs.org/)
