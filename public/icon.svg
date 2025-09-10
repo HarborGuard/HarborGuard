@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-anchor !size-5.5 rounded-xl" aria-hidden="true">
+
+  <!-- circular border (same visual stroke as content) -->
+  <circle cx="12" cy="12" r="11" fill="none"></circle>
+
+  <!-- scaled-down content to create spacing; stroke compensated -->
+  <!-- rule of thumb: group stroke-width = 2 / scale -->
+  <g transform="translate(12 12) scale(0.8) translate(-12 -12)" stroke-width="2.5">
+    <path d="M12 22V8"></path>
+    <path d="M5 12H2a10 10 0 0 0 20 0h-3"></path>
+    <circle cx="12" cy="5" r="3"></circle>
+  </g>
+</svg>

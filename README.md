@@ -1,4 +1,4 @@
-# Harbor Guard
+# <img src="public/icons.svg" alt="Harbor Guard Logo" width="44" height="44" style="vertical-align: middle; filter: brightness(0) invert(1);"> Harbor Guard
 
 [![Next.js](https://img.shields.io/badge/Next.js-15.4.6-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.1.0-blue?style=flat-square&logo=react)](https://reactjs.org/)
@@ -13,7 +13,7 @@ A comprehensive container security scanning platform that provides an intuitive 
 
 ### Docker (Recommended)
 
-Run Harbor Guard using Docker with a single command:
+Run Harbor Guard with minimal features:
 
 ```bash
 docker run -p 3000:3000 ghcr.io/harborguard/harborguard:latest
@@ -22,7 +22,18 @@ docker run -p 3000:3000 ghcr.io/harborguard/harborguard:latest
 To give Harbor Guard access to your local images:
 
 ```bash
-docker run -p 3000:3000 -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/harborguard/harborguard:latest
+docker run -p 3000:3000 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  ghcr.io/harborguard/harborguard:latest
+```
+
+To automatically patch images with Harbor Guard (filesystem permission require privileged access):
+
+```bash
+docker run --privileged \
+  -p 3000:3000 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  ghcr.io/harborguard/harborguard:latest
 ```
 
 To use with an external PostgreSQL database:
@@ -74,9 +85,14 @@ These variables are typically used for internal configuration or advanced deploy
 | Variable | Description | Default | Example |
 |----------|-------------|---------|---------|
 | `SCANNER_WORKDIR` | Working directory for scanner operations | `/workspace` | `SCANNER_WORKDIR=/tmp/scanners` |
+| `PATCH_WORKDIR` | Working directory for patch operations | `/workspace/patches` | `PATCH_WORKDIR=/tmp/patches` |
+| `ENABLE_RAW_OUTPUT` | Enable raw scanner output in API responses | `false` | `ENABLE_RAW_OUTPUT=true` |
 | `NEXT_PUBLIC_DEMO_MODE` | Enable demo mode with limited functionality | `false` | `NEXT_PUBLIC_DEMO_MODE=true` |
 | `NEXT_PUBLIC_APP_URL` | Public application URL (for OpenAPI spec) | `http://localhost:3000` | `NEXT_PUBLIC_APP_URL=https://harborguard.example.com` |
 | `NEXT_PUBLIC_API_URL` | Public API URL (for OpenAPI spec) | *auto-detected* | `NEXT_PUBLIC_API_URL=https://api.harborguard.example.com` |
+| `NEXT_PUBLIC_APP_VERSION` | Override application version display | *auto-detected* | `NEXT_PUBLIC_APP_VERSION=1.0.0` |
+| `NODE_ENV` | Node.js environment mode | `production` | `NODE_ENV=development` |
+| `NEXT_RUNTIME` | Next.js runtime environment | *auto-detected* | `NEXT_RUNTIME=nodejs` |
 | `PGDATA` | PostgreSQL data directory (bundled PostgreSQL only) | `/var/lib/postgresql/data` | `PGDATA=/data/postgres` |
 | `POSTGRES_USER` | PostgreSQL username (bundled PostgreSQL only) | `harborguard` | `POSTGRES_USER=admin` |
 | `POSTGRES_PASSWORD` | PostgreSQL password (bundled PostgreSQL only) | `harborguard` | `POSTGRES_PASSWORD=secure_password` |
@@ -144,34 +160,6 @@ docker run -p 8080:8080 \
   ghcr.io/harborguard/harborguard:latest
 ```
 
-### Health Check Endpoints
-
-When `HEALTH_CHECK_ENABLED=true` (default), Harbor Guard provides monitoring endpoints:
-
-- **`GET /api/health`** - Comprehensive health status including database connectivity, scanner configuration, and cleanup statistics
-- **`GET /api/ready`** - Kubernetes-style readiness probe for load balancers
-- **`HEAD /api/health`** - Lightweight health check (returns HTTP status only)
-- **`HEAD /api/ready`** - Lightweight readiness check (returns HTTP status only)
-
-#### Docker Health Check
-
-The Harbor Guard Docker image includes a built-in HEALTHCHECK instruction that automatically monitors container health:
-
-- **Interval**: 30 seconds between health checks
-- **Timeout**: 10 seconds for each health check request
-- **Start Period**: 40 seconds grace period during container startup
-- **Retries**: 3 consecutive failures before marking container as unhealthy
-
-The health check uses the `/api/health` endpoint to verify:
-- Application is responding to HTTP requests
-- Database connectivity is working
-- Critical services are operational
-
-Docker and orchestration platforms (like Docker Compose, Kubernetes, etc.) will automatically use this health check to:
-- Monitor container health status
-- Restart unhealthy containers (if configured)
-- Route traffic only to healthy instances in load-balanced setups
-
 ## Screenshots
 
 <div align="center">
@@ -224,24 +212,12 @@ Harbor Guard integrates and orchestrates multiple industry-standard security sca
 - **[OSV Scanner](https://github.com/google/osv-scanner)** - Open Source Vulnerability database scanner
 - **[Dive](https://github.com/wagoodman/dive)** - Docker image layer analysis and optimization tool
 
-### Quality of Life Improvements
-
-Harbor Guard addresses common pain points in container security workflows:
-
-- **Unified Dashboard** - Single interface for all scanning tools instead of managing multiple CLI outputs
-- **Historical Tracking** - Persistent storage and comparison of scan results over time
-- **Report Export** - Download individual tool reports or complete ZIP packages for compliance
-- **Real-time Monitoring** - Live scan progress tracking with WebSocket integration
-- **Smart Filtering** - Dynamic filtering and sorting of vulnerabilities by severity, package, or CVE
-- **Interactive Charts** - Click-to-navigate scatter plots for vulnerability analysis
-
 ### Optimized Visualization Strategy
 
 <div align="center">
   <img src="assets/libraries.png" alt="Harbor Guard Library" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);" width="800">
   <p><em>Harbor Guard Dashboard - Container security scanning made simple</em></p>
 </div>
-
 
 The platform employs several innovative approaches to vulnerability data visualization:
 
@@ -263,79 +239,13 @@ The platform employs several innovative approaches to vulnerability data visuali
 - **Export flexibility** - Individual JSON reports or complete ZIP archives
 - **API accessibility** - Public REST endpoints for programmatic access to scan data
 
-## Features
-
-### 🔍 Comprehensive Scanning
-- Support for 6 major container security tools
-- Automatic vulnerability detection and classification
-- Software Bill of Materials (SBOM) generation
-- Container best practices validation
-- Layer-by-layer image analysis
-
-### 📊 Advanced Visualization
-- Interactive vulnerability scatter plots
-- Historical scan comparison charts
-- Real-time progress monitoring
-- Severity-based filtering and grouping
-- Responsive design for all screen sizes
-
-### 🚀 Developer Experience
-- Modern React 19 + Next.js 15 architecture
-- TypeScript for type safety
-- Prisma ORM with PostgreSQL
-- Automatic database fallback for reliability
-- Tailwind CSS for styling
-- shadcn/ui component library
-
-### 📈 Enterprise Ready
-- RESTful API for programmatic access
-- Bulk report export capabilities
-- Persistent scan history
-- Scalable database design
-- Docker-first deployment
-
-## API Endpoints
-
-Harbor Guard provides REST API endpoints for programmatic access:
-
-### Scan Reports
-- `GET /api/image/[name]/scan/[scanId]/[reportType]` - Download individual tool reports
-- `GET /api/image/[name]/scan/[scanId]/download` - Download complete scan package
-- `GET /api/scans` - List all scans
-- `POST /api/scans/start` - Initiate new scan
-
-### Docker Integration
-- `GET /api/docker/images` - List local Docker images
-- `GET /api/docker/search` - Search Docker Hub
-- `GET /api/docker/info` - Docker daemon information
-
-## Architecture
-
-Harbor Guard is built with modern web technologies:
-
-- **Frontend**: React 19 + Next.js 15 with App Router
-- **Styling**: Tailwind CSS + shadcn/ui components
-- **Database**: PostgreSQL with Prisma ORM
-- **Charts**: Recharts for data visualization
-- **Icons**: Tabler Icons + Lucide React
-- **State Management**: React Context + Custom hooks
-
 ## Contributing
 
 We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
 
-### Development Workflow
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Run the test suite: `npm test`
-6. Submit a pull request
-
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the AGPL-3.0 License - see the [LICENSE](LICENSE) file for details.
 
 ## Support
 
@@ -351,6 +261,7 @@ Special thanks to the maintainers of the integrated security tools:
 - goodwithtech (Dockle)
 - Google (OSV Scanner)
 - wagoodman (Dive)
+- containers (Skopeo, Buildah)
 
 ---
 
