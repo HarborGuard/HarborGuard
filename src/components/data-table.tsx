@@ -671,9 +671,17 @@ function DraggableRow({
 export function DataTable({
   data: initialData,
   isFullPage = false,
+  serverSidePagination = false,
+  currentPage,
+  totalPages,
+  onPageChange,
 }: {
   data: z.infer<typeof schema>[]
   isFullPage?: boolean
+  serverSidePagination?: boolean
+  currentPage?: number
+  totalPages?: number
+  onPageChange?: (page: number) => void
 }) {
   const router = useRouter()
   const { addScanJob } = useScanning()
@@ -804,7 +812,6 @@ export function DataTable({
     pageIndex: 0,
     pageSize: isFullPage ? 25 : 10,
   })
-  const [showExpanded, setShowExpanded] = React.useState(false)
   const sortableId = React.useId()
   const sensors = useSensors(
     useSensor(MouseSensor, {}),
@@ -1067,21 +1074,6 @@ export function DataTable({
             {table.getFilteredSelectedRowModel().rows.length} of{" "}
             {table.getFilteredRowModel().rows.length} row(s) selected.
           </div>
-          {!isFullPage && table.getFilteredRowModel().rows.length > 10 && (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const newSize = showExpanded ? 10 : Math.min(25, table.getFilteredRowModel().rows.length)
-                  setShowExpanded(!showExpanded)
-                  table.setPageSize(newSize)
-                }}
-              >
-                {showExpanded ? "Show Less" : `Show All (${table.getFilteredRowModel().rows.length})`}
-              </Button>
-            </div>
-          )}
           <div className="flex w-full items-center gap-8 lg:w-fit">
             <div className="hidden items-center gap-2 lg:flex">
               <Label htmlFor="rows-per-page" className="text-sm font-medium">
@@ -1108,15 +1100,21 @@ export function DataTable({
               </Select>
             </div>
             <div className="flex w-fit items-center justify-center text-sm font-medium">
-              Page {table.getState().pagination.pageIndex + 1} of{" "}
-              {table.getPageCount()}
+              Page {serverSidePagination ? (currentPage || 1) : (table.getState().pagination.pageIndex + 1)} of{" "}
+              {serverSidePagination ? (totalPages || 1) : table.getPageCount()}
             </div>
             <div className="ml-auto flex items-center gap-2 lg:ml-0">
               <Button
                 variant="outline"
                 className="hidden h-8 w-8 p-0 lg:flex"
-                onClick={() => table.setPageIndex(0)}
-                disabled={!table.getCanPreviousPage()}
+                onClick={() => {
+                  if (serverSidePagination && onPageChange) {
+                    onPageChange(1)
+                  } else {
+                    table.setPageIndex(0)
+                  }
+                }}
+                disabled={serverSidePagination ? currentPage === 1 : !table.getCanPreviousPage()}
               >
                 <span className="sr-only">Go to first page</span>
                 <IconChevronsLeft />
@@ -1125,8 +1123,14 @@ export function DataTable({
                 variant="outline"
                 className="size-8"
                 size="icon"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
+                onClick={() => {
+                  if (serverSidePagination && onPageChange && currentPage) {
+                    onPageChange(currentPage - 1)
+                  } else {
+                    table.previousPage()
+                  }
+                }}
+                disabled={serverSidePagination ? currentPage === 1 : !table.getCanPreviousPage()}
               >
                 <span className="sr-only">Go to previous page</span>
                 <IconChevronLeft />
@@ -1135,8 +1139,14 @@ export function DataTable({
                 variant="outline"
                 className="size-8"
                 size="icon"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
+                onClick={() => {
+                  if (serverSidePagination && onPageChange && currentPage) {
+                    onPageChange(currentPage + 1)
+                  } else {
+                    table.nextPage()
+                  }
+                }}
+                disabled={serverSidePagination ? currentPage === totalPages : !table.getCanNextPage()}
               >
                 <span className="sr-only">Go to next page</span>
                 <IconChevronRight />
@@ -1145,8 +1155,14 @@ export function DataTable({
                 variant="outline"
                 className="hidden size-8 lg:flex"
                 size="icon"
-                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                disabled={!table.getCanNextPage()}
+                onClick={() => {
+                  if (serverSidePagination && onPageChange && totalPages) {
+                    onPageChange(totalPages)
+                  } else {
+                    table.setPageIndex(table.getPageCount() - 1)
+                  }
+                }}
+                disabled={serverSidePagination ? currentPage === totalPages : !table.getCanNextPage()}
               >
                 <span className="sr-only">Go to last page</span>
                 <IconChevronsRight />
