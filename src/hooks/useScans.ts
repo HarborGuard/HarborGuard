@@ -11,6 +11,7 @@ export function useScans() {
   const dataReady = state.dataReady
   const error = state.error
   const totalFromDatabase = state.pagination.total // Get total from database
+  const completedFromDatabase = state.pagination.completedCount // Get completed count from database
 
   const stats = useMemo(() => {
     const totalScans = scans.length
@@ -54,7 +55,8 @@ export function useScans() {
       : 0
 
     const blockedScans = scans.filter(scan => scan.policy === 'Blocked').length
-    const completeScans = scans.filter(scan => scan.status === 'Complete').length
+    // Use database completedCount if available, otherwise count from current page
+    const completeScans = completedFromDatabase !== undefined ? completedFromDatabase : scans.filter(scan => scan.status === 'Complete').length
 
     return {
       totalScans: totalFromDatabase || totalScans, // Use database total if available
@@ -72,7 +74,7 @@ export function useScans() {
       completeScans,
       completionRate: totalScans > 0 ? Math.round((completeScans / totalScans) * 100) : 0
     }
-  }, [scans, totalFromDatabase])
+  }, [scans, totalFromDatabase, completedFromDatabase])
 
   const getScansByRiskLevel = (level: 'low' | 'medium' | 'high' | 'critical') => {
     const thresholds = {

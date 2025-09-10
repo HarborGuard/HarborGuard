@@ -135,6 +135,7 @@ interface AppState {
     hasMore: boolean
     currentPage: number
     totalPages: number
+    completedCount?: number
   }
 }
 

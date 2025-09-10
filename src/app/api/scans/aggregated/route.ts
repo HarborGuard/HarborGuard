@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     }
     
     // Use regular Prisma queries for better reliability
-    const [scans, total] = await Promise.all([
+    const [scans, total, completedCount] = await Promise.all([
       prisma.scan.findMany({
         where,
         select: {
@@ -65,7 +65,8 @@ export async function GET(request: NextRequest) {
         take: limit,
         skip: offset
       }),
-      prisma.scan.count({ where })
+      prisma.scan.count({ where }),
+      prisma.scan.count({ where: { ...where, status: 'SUCCESS' } })
     ])
     
     // Process and serialize the data with actual vulnerability counting
@@ -269,7 +270,8 @@ export async function GET(request: NextRequest) {
         total,
         limit,
         offset,
-        hasMore: offset + limit < total
+        hasMore: offset + limit < total,
+        completedCount
       }
     })
   } catch (error) {
