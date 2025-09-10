@@ -16,7 +16,7 @@ RUN npm run build:docker
 FROM node:20-alpine AS runtime
 WORKDIR /app
 
-ARG TARGETARCH=amd64
+ARG TARGETARCH
 ARG TRIVY_VERSION=v0.65.0
 ARG DOCKLE_VERSION=0.4.15
 ARG OSV_SCANNER_VERSION=v2.2.2
@@ -35,6 +35,10 @@ RUN apk add --no-cache \
     buildah podman fuse-overlayfs shadow-uidmap slirp4netns \
     crun iptables ip6tables \
   && set -eux \
+  # Debug: Show target architecture
+  && echo "Building for architecture: ${TARGETARCH:-not set}" \
+  # Set default if TARGETARCH is not provided
+  && TARGETARCH="${TARGETARCH:-amd64}" \
   # Install Trivy
   && curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin "${TRIVY_VERSION}" \
   # Install Grype
@@ -48,12 +52,16 @@ RUN apk add --no-cache \
   && curl -L "https://github.com/wagoodman/dive/releases/download/v${DIVE_VERSION}/dive_${DIVE_VERSION}_linux_${TARGETARCH}.tar.gz" -o /tmp/dive.tgz \
   && tar -xzf /tmp/dive.tgz -C /usr/local/bin dive \
   && rm /tmp/dive.tgz \
+  && chmod +x /usr/local/bin/dive \
   # Install dockle
   && if [ "$TARGETARCH" = "amd64" ]; then \
         DOCKLE_ARCH=64bit; \
-     else \
+     elif [ "$TARGETARCH" = "arm64" ]; then \
         DOCKLE_ARCH=ARM64; \
+     else \
+        echo "Unsupported architecture: $TARGETARCH" && exit 1; \
      fi \
+  && echo "Downloading dockle for ${DOCKLE_ARCH}" \
   && curl -L "https://github.com/goodwithtech/dockle/releases/download/v${DOCKLE_VERSION}/dockle_${DOCKLE_VERSION}_Linux-${DOCKLE_ARCH}.tar.gz" \
        -o /tmp/dockle.tgz \
   && tar -xzf /tmp/dockle.tgz -C /usr/local/bin dockle \
