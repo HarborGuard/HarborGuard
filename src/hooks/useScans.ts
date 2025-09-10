@@ -10,6 +10,7 @@ export function useScans() {
   const dataReceived = state.dataReceived
   const dataReady = state.dataReady
   const error = state.error
+  const totalFromDatabase = state.pagination.total // Get total from database
 
   const stats = useMemo(() => {
     const totalScans = scans.length
@@ -56,7 +57,7 @@ export function useScans() {
     const completeScans = scans.filter(scan => scan.status === 'Complete').length
 
     return {
-      totalScans,
+      totalScans: totalFromDatabase || totalScans, // Use database total if available
       uniqueImageTags,
       uniqueImages: imageGroups.size,
       vulnerabilities: {
@@ -71,7 +72,7 @@ export function useScans() {
       completeScans,
       completionRate: totalScans > 0 ? Math.round((completeScans / totalScans) * 100) : 0
     }
-  }, [scans])
+  }, [scans, totalFromDatabase])
 
   const getScansByRiskLevel = (level: 'low' | 'medium' | 'high' | 'critical') => {
     const thresholds = {

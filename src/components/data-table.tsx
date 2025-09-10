@@ -812,7 +812,6 @@ export function DataTable({
     pageIndex: 0,
     pageSize: isFullPage ? 25 : 10,
   })
-  const [showExpanded, setShowExpanded] = React.useState(false)
   const sortableId = React.useId()
   const sensors = useSensors(
     useSensor(MouseSensor, {}),
@@ -1075,21 +1074,6 @@ export function DataTable({
             {table.getFilteredSelectedRowModel().rows.length} of{" "}
             {table.getFilteredRowModel().rows.length} row(s) selected.
           </div>
-          {!isFullPage && table.getFilteredRowModel().rows.length > 10 && (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const newSize = showExpanded ? 10 : Math.min(25, table.getFilteredRowModel().rows.length)
-                  setShowExpanded(!showExpanded)
-                  table.setPageSize(newSize)
-                }}
-              >
-                {showExpanded ? "Show Less" : `Show All (${table.getFilteredRowModel().rows.length})`}
-              </Button>
-            </div>
-          )}
           <div className="flex w-full items-center gap-8 lg:w-fit">
             <div className="hidden items-center gap-2 lg:flex">
               <Label htmlFor="rows-per-page" className="text-sm font-medium">
