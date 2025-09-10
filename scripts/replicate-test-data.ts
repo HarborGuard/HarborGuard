@@ -24,7 +24,7 @@ async function replicateData() {
           digest: 'sha256:' + Math.random().toString(36).substring(2, 15),
           registry: 'docker.io',
           platform: 'linux/amd64',
-          sizeBytes: BigInt(150000000)
+          sizeBytes: 150000000
         }
       })
       
@@ -41,10 +41,13 @@ async function replicateData() {
         }
       })
       
-      existingImages.push(await prisma.image.findUnique({
+      const imageWithScans = await prisma.image.findUnique({
         where: { id: baseImage.id },
         include: { scans: true }
-      })!)
+      })
+      if (imageWithScans) {
+        existingImages.push(imageWithScans)
+      }
     }
     
     console.log(`Found ${existingImages.length} existing images`)
@@ -62,7 +65,7 @@ async function replicateData() {
             digest: `sha256:${Math.random().toString(36).substring(2, 15)}${i}`,
             registry: originalImage.registry || 'docker.io',
             platform: originalImage.platform || 'linux/amd64',
-            sizeBytes: originalImage.sizeBytes || BigInt(100000000)
+            sizeBytes: originalImage.sizeBytes || 100000000
           }
         })
         
