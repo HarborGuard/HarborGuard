@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
       id: true,
       requestId: true,
       imageId: true,
+      tag: true,
       startedAt: true,
       finishedAt: true,
       status: true,
