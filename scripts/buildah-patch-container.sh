@@ -122,6 +122,7 @@ buildah $STORAGE_FLAG commit --format docker $container patched-image
 
 # Export to tar
 echo "Exporting to tar: $OUTPUT_TAR"
+mkdir -p "$(dirname "$OUTPUT_TAR")"
 buildah $STORAGE_FLAG push patched-image docker-archive:$OUTPUT_TAR
 
 # Cleanup
