@@ -43,6 +43,7 @@ model Scan {
   id               String            @id @default(cuid())
   requestId        String            @unique
   imageId          String
+  tag              String            @default("latest")
   startedAt        DateTime
   finishedAt       DateTime?
   status           ScanStatus        @default(RUNNING)
@@ -72,6 +73,8 @@ model Scan {
   @@index([imageId, startedAt])
   @@index([status, startedAt])
   @@index([metadataId])
+  @@index([tag])
+  @@index([imageId, tag])
   @@map("scans")
 }
 

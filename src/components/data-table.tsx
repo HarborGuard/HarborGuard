@@ -229,10 +229,10 @@ function createColumns(handleDeleteClick: (imageName: string) => void): ColumnDe
     },
     cell: ({ row }) => {
       const imageData = row.original.image;
-      // Handle both string and object formats
+      // Handle both string and object formats - show only image name
       const imageName = typeof imageData === 'string' 
-        ? imageData 
-        : `${(imageData as any)?.name}:${(imageData as any)?.tag}`;
+        ? imageData.split(':')[0] // Extract just the image name
+        : (imageData as any)?.name; // Use the name property directly
       const tagCount = (row.original as any)._tagCount || 1;
       const allTags = (row.original as any)._allTags || '';
       
