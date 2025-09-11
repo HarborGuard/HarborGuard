@@ -62,6 +62,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         data: {
           requestId,
           imageId: image.id,
+          tag: request.tag,
           startedAt: new Date(),
           status: 'RUNNING',
           source: 'local'
@@ -99,6 +100,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         data: {
           requestId,
           imageId: image.id,
+          tag: request.tag,
           startedAt: new Date(),
           status: 'RUNNING',
           source: 'tar'
@@ -163,6 +165,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         data: {
           requestId,
           imageId: image.id,
+          tag: request.tag,
           startedAt: new Date(),
           status: 'RUNNING',
           source: request.source || 'registry'

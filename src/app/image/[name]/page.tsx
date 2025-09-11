@@ -73,7 +73,7 @@ export default function ImageDetailsPage() {
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )[0];
 
-    const tags = [...new Set(imagesByName.map((img) => img.tag))];
+    const tags = [...new Set(scansForImages.map((scan) => scan.tag).filter(Boolean))];
     const registries = [
       ...new Set(imagesByName.map((img) => img.registry).filter(Boolean)),
     ];
@@ -312,7 +312,7 @@ export default function ImageDetailsPage() {
           ),
           scanId: scan.id, // Real scan ID for navigation
           scanDate: scan.startedAt,
-          version: `${scan.image.name}:${scan.image.tag}`, // Show specific tag for each scan
+          version: `${scan.image.name}:${scan.tag || 'latest'}`, // Show specific tag for each scan
           registry: scan.image.registry || 'docker.io', // Include registry information
           source: scan.source || 'registry', // Include scan source
           riskScore: scan.riskScore || 0,
@@ -384,8 +384,8 @@ export default function ImageDetailsPage() {
                     Available Tags
                   </p>
                   <div className="flex flex-wrap gap-1 mt-1">
-                    {imageData.tags?.map((tag: string) => (
-                      <Badge key={tag} variant="outline" className="text-xs">
+                    {imageData.tags?.map((tag: string, index: number) => (
+                      <Badge key={`${tag}-${index}`} variant="outline" className="text-xs">
                         {tag}
                       </Badge>
                     ))}
