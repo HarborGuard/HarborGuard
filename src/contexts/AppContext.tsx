@@ -32,7 +32,7 @@ function transformScansForUI(scans: ScanWithImage[]): LegacyScan[] {
       imageId: scan.image.id, // Add imageId for navigation
       imageName: scan.image.name, // Add image name for new navigation
       uid: scan.requestId,
-      image: `${scan.image.name}:${scan.image.tag}`, // Full image name with tag
+      image: `${scan.image.name}:${scan.tag}`, // Full image name with scan tag
       source: scan.source || undefined, // Add source information
       digestShort: scan.image.digest?.slice(7, 19) || '',
       platform: scan.image.platform || 'unknown',
@@ -265,7 +265,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           imageId: scan.imageId,
           imageName: scan.image.name,
           uid: scan.requestId,
-          image: scan.image, // Keep the full image object to preserve registry info
+          image: { ...scan.image, tag: scan.tag }, // Keep the full image object but use scan.tag
           source: scan.source,
           digestShort: scan.image.digest?.slice(7, 19) || '',
           platform: 'unknown',
