@@ -367,18 +367,11 @@ export class RegistryMetadataCache {
     }
     
     // Clear L2 cache
-    if (operation) {
-      await this.prisma.repositoryImageMetadata.deleteMany({
-        where: {
-          repositoryId,
-          cacheKey: { contains: `:${operation}:` }
-        }
-      });
-    } else {
-      await this.prisma.repositoryImageMetadata.deleteMany({
-        where: { repositoryId }
-      });
-    }
+    // Note: We don't have a cacheKey field to selectively invalidate by operation,
+    // so we always clear all cache for the repository
+    await this.prisma.repositoryImageMetadata.deleteMany({
+      where: { repositoryId }
+    });
   }
   
   async warmupCache(repository: Repository): Promise<void> {
