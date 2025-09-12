@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { RegistryService } from '@/lib/registry/RegistryService'
+
+const registryService = new RegistryService(prisma)
 
 export async function DELETE(
   request: NextRequest,
@@ -7,11 +10,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-
-    await prisma.repository.delete({
-      where: { id },
-    })
-
+    await registryService.deleteRepository(id)
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Failed to delete repository:', error)

@@ -412,11 +412,13 @@ function createColumns(handleDeleteClick: (imageName: string) => void): ColumnDe
       if (allRegistries && allRegistries.length > 0) {
         // Sort registries for consistent display
         const sortedRegistries = allRegistries.sort((a: string, b: string) => {
-          // Put Docker Hub first, then local, then others alphabetically
+          // Put Docker Hub first, then local, then generic, then others alphabetically
           if (a === "docker.io") return -1;
           if (b === "docker.io") return 1;
           if (a === "local") return -1;
           if (b === "local") return 1;
+          if (a === "generic") return -1;
+          if (b === "generic") return 1;
           return a.localeCompare(b);
         });
         
@@ -434,6 +436,12 @@ function createColumns(handleDeleteClick: (imageName: string) => void): ColumnDe
                 Docker Hub
               </Badge>
             );
+          } else if (reg === "generic") {
+            return (
+              <Badge key="generic" variant="default" className="text-xs">
+                Generic Registry
+              </Badge>
+            );
           } else {
             return (
               <Badge key={reg} variant="outline" className="text-xs">
@@ -448,12 +456,15 @@ function createColumns(handleDeleteClick: (imageName: string) => void): ColumnDe
       
       // Fallback to single registry from current row
       const imageData = row.original.image;
+      const imageSource = typeof imageData === 'object' ? (imageData as any)?.source : null;
       const currentRegistry = typeof imageData === 'object' ? (imageData as any)?.registry : null;
       const source = row.original.source;
       
       let registry = "docker.io";
       if (source === "local") {
         registry = "local";
+      } else if (imageSource === "REGISTRY_PRIVATE" || source === "REGISTRY_PRIVATE") {
+        registry = "generic";
       } else if (currentRegistry) {
         registry = currentRegistry;
       }
@@ -462,13 +473,15 @@ function createColumns(handleDeleteClick: (imageName: string) => void): ColumnDe
         <Badge 
           variant={
             registry === "docker.io" ? "default" : 
-            registry === "local" ? "secondary" : 
+            registry === "local" ? "secondary" :
+            registry === "generic" ? "default" :
             "outline"
           }
           className="text-xs"
         >
           {registry === "docker.io" ? "Docker Hub" : 
-           registry === "local" ? "Local Docker" : 
+           registry === "local" ? "Local Docker" :
+           registry === "generic" ? "Generic Registry" : 
            registry}
         </Badge>
       );
@@ -735,11 +748,14 @@ export function DataTable({
       // Collect all registries from grouped items
       const allRegistries = new Set<string>();
       items.forEach(item => {
+        const imageSource = typeof item.image === 'object' ? (item.image as any)?.source : null;
         const reg = typeof item.image === 'object' ? (item.image as any)?.registry : null;
         const src = item.source;
         
         if (src === "local") {
           allRegistries.add("local");
+        } else if (imageSource === "REGISTRY_PRIVATE" || src === "REGISTRY_PRIVATE") {
+          allRegistries.add("generic");
         } else if (!reg || reg === null) {
           allRegistries.add("docker.io");
         } else {
