@@ -1,7 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Repository, type RepositoryImageMetadata, type SyncStatus } from '@/generated/prisma';
 import type { RegistryImage, ImageTag, ImageMetadata, RegistryCapability } from '../types';
 import { RegistryProviderFactory } from '../providers/RegistryProviderFactory';
-import type { Repository, RepositoryImageMetadata, SyncStatus } from '@/generated/prisma';
 
 interface CacheConfig {
   memoryTTL: number; // milliseconds
