@@ -1,0 +1,8 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Check if schema.prisma was changed
+if git diff HEAD~1 HEAD --name-only | grep -q "prisma/schema.prisma"; then
+  echo "📦 Prisma schema changed, regenerating client..."
+  npx prisma generate
+fi
