@@ -130,7 +130,7 @@ END $$;
 DO $$ 
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'SyncStatus') THEN
-    CREATE TYPE "public"."SyncStatus" AS ENUM ('PENDING', 'SYNCING', 'SYNCED', 'FAILED');
+    CREATE TYPE "public"."SyncStatus" AS ENUM ('PENDING', 'SYNCING', 'COMPLETED', 'FAILED', 'STALE');
   END IF;
 END $$;
 
