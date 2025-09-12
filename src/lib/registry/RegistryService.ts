@@ -1,5 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-import type { Repository } from '@/generated/prisma';
+import { PrismaClient, type Repository } from '@/generated/prisma';
 import { RegistryProviderFactory } from './providers/RegistryProviderFactory';
 import { RegistryMetadataCache } from './cache/RegistryMetadataCache';
 import type { 
