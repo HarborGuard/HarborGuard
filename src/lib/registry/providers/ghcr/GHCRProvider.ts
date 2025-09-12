@@ -39,14 +39,20 @@ export class GHCRProvider extends EnhancedRegistryProvider {
   
   protected parseConfig(repository: Repository): GHCRConfig {
     return {
-      username: repository.username,
-      token: repository.encryptedPassword, // TODO: decrypt in production
+      username: repository.username || '',
+      token: repository.encryptedPassword || '', // TODO: decrypt in production
       organization: repository.organization || undefined,
       apiBaseUrl: 'https://api.github.com'
     };
   }
   
   async getAuthHeaders(): Promise<Record<string, string>> {
+    // Public repos don't require auth for read operations
+    if (!this.config.token) {
+      return {
+        'Accept': 'application/vnd.github.v3+json'
+      };
+    }
     return {
       'Authorization': `Bearer ${this.config.token}`,
       'Accept': 'application/vnd.github.v3+json'
@@ -55,6 +61,10 @@ export class GHCRProvider extends EnhancedRegistryProvider {
   
   async getSkopeoAuthArgs(): Promise<string> {
     // GitHub Container Registry uses PAT for authentication
+    // Public repos don't require auth
+    if (!this.config.username || !this.config.token) {
+      return '';
+    }
     const escapedUsername = this.config.username.replace(/"/g, '\\"');
     const escapedToken = this.config.token.replace(/"/g, '\\"');
     return `--creds "${escapedUsername}:${escapedToken}"`;

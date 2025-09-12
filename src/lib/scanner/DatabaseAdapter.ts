@@ -181,13 +181,62 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       }
       
       if (!repository) {
-        // Create a temporary generic repository for public images
+        // Create a temporary repository based on the registry URL and type hint
+        let repoType: 'DOCKERHUB' | 'GHCR' | 'GENERIC' | 'ECR' | 'GCR' = 'DOCKERHUB';
+        let repoName = 'Docker Hub';
+        let repoUrl = registryUrl || 'docker.io';
+        
+        // Use registryType hint if provided
+        if (request.registryType) {
+          if (request.registryType === 'GITLAB') {
+            // GitLab uses GENERIC type with special handling
+            repoType = 'GENERIC';
+            repoName = 'GitLab Container Registry';
+          } else {
+            repoType = request.registryType as any;
+            switch (request.registryType) {
+              case 'GHCR':
+                repoName = 'GitHub Container Registry';
+                break;
+              case 'ECR':
+                repoName = 'AWS Elastic Container Registry';
+                break;
+              case 'GCR':
+                repoName = 'Google Container Registry';
+                break;
+              case 'DOCKERHUB':
+                repoName = 'Docker Hub';
+                break;
+              default:
+                repoName = 'Generic Registry';
+            }
+          }
+        } else {
+          // Auto-detect repository type based on registry URL
+          if (repoUrl.includes('ghcr.io')) {
+            repoType = 'GHCR';
+            repoName = 'GitHub Container Registry';
+          } else if (repoUrl.includes('gitlab')) {
+            repoType = 'GENERIC';
+            repoName = 'GitLab Container Registry';
+          } else if (repoUrl.includes('ecr')) {
+            repoType = 'ECR';
+            repoName = 'AWS Elastic Container Registry';
+          } else if (repoUrl.includes('gcr.io') || repoUrl.includes('pkg.dev')) {
+            repoType = 'GCR';
+            repoName = 'Google Container Registry';
+          } else if (repoUrl !== 'docker.io' && repoUrl !== 'registry-1.docker.io') {
+            repoType = 'GENERIC';
+            repoName = 'Generic Registry';
+          }
+        }
+        
         repository = {
           id: 'temp',
-          name: 'Docker Hub',
-          type: 'DOCKERHUB',
+          name: repoName,
+          type: repoType,
           protocol: 'https',
-          registryUrl: 'docker.io',
+          registryUrl: repoUrl,
           username: '',
           encryptedPassword: '',
           organization: null,

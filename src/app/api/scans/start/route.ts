@@ -86,6 +86,7 @@ const SingleScanSchema = z.object({
   dockerImageId: z.string().optional(),
   repositoryId: z.string().optional(), // For private repositories
   tarPath: z.string().optional(), // Path to tar file for direct tar scanning
+  registryType: z.enum(['DOCKERHUB', 'GHCR', 'GENERIC', 'ECR', 'GCR', 'GITLAB']).optional(), // Hint for registry type
 }).refine(
   (data) => 
     // Either legacy format, new format, or tar path must be provided
@@ -168,6 +169,7 @@ async function processSingleScan(validatedData: any, request: NextRequest, prior
     source: validatedData.source,
     dockerImageId: validatedData.dockerImageId,
     repositoryId: validatedData.repositoryId,
+    registryType: validatedData.registryType,
   }
   
   // Start scan with specified priority

@@ -236,12 +236,13 @@ export function NewScanModal({ children }: NewScanModalProps) {
   })
 
 
-  const parseImageString = (imageString: string): { imageName: string; imageTag: string; registry?: string } => {
+  const parseImageString = (imageString: string): { imageName: string; imageTag: string; registry?: string; registryType?: string } => {
     // Handle different image formats
     let fullImage = imageString.trim()
     
     // Extract registry, image name, and tag
     let registry: string | undefined
+    let registryType: string | undefined
     let imageName: string
     let imageTag = 'latest'
     
@@ -251,6 +252,21 @@ export function NewScanModal({ children }: NewScanModalProps) {
       if (parts[0].includes('.') || parts[0].includes(':')) {
         registry = parts[0]
         fullImage = parts.slice(1).join('/')
+        
+        // Detect registry type based on URL
+        if (registry.includes('ghcr.io')) {
+          registryType = 'GHCR'
+        } else if (registry.includes('gitlab')) {
+          registryType = 'GITLAB'
+        } else if (registry.includes('ecr')) {
+          registryType = 'ECR'
+        } else if (registry.includes('gcr.io') || registry.includes('pkg.dev')) {
+          registryType = 'GCR'
+        } else if (registry === 'docker.io' || registry === 'registry-1.docker.io') {
+          registryType = 'DOCKERHUB'
+        } else {
+          registryType = 'GENERIC'
+        }
       }
     }
     
@@ -263,7 +279,7 @@ export function NewScanModal({ children }: NewScanModalProps) {
       imageName = fullImage
     }
     
-    return { imageName, imageTag, registry }
+    return { imageName, imageTag, registry, registryType }
   }
 
   const getCurrentImageString = (): string => {
@@ -361,6 +377,14 @@ export function NewScanModal({ children }: NewScanModalProps) {
         image: imageName,
         tag: imageTag,
         registry,
+      }
+      
+      // Add registry type hint if detected
+      if (selectedSource === 'registry') {
+        const parsed = parseImageString(imageString)
+        if (parsed.registryType) {
+          scanRequest.registryType = parsed.registryType
+        }
       }
 
       // For local Docker images, add source and Docker image ID
