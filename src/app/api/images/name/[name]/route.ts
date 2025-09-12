@@ -27,7 +27,7 @@ export async function GET(
         id: true,
         name: true,
         tag: true,
-        registry: true,
+        source: true,
         digest: true,
         sizeBytes: true,
         createdAt: true,
@@ -62,12 +62,9 @@ export async function GET(
       imageId: true,
       startedAt: true,
       finishedAt: true,
-      sizeBytes: true,
       status: true,
       errorMessage: true,
-      vulnerabilityCount: true,
       riskScore: true,
-      complianceScore: true,
       createdAt: true,
       updatedAt: true,
       source: true,
@@ -77,7 +74,7 @@ export async function GET(
           id: true,
           name: true,
           tag: true,
-          registry: true,
+          source: true,
           digest: true
         }
       }
@@ -102,7 +99,7 @@ export async function GET(
             id: true,
             name: true,
             tag: true,
-            registry: true,
+            source: true,
             digest: true
           }
         }
@@ -114,7 +111,6 @@ export async function GET(
     // Convert BigInt to string for JSON serialization
     const serializedScans = scans.map((scan: any) => ({
       ...scan,
-      sizeBytes: scan.sizeBytes?.toString() || null,
       image: scan.image ? {
         ...scan.image,
         sizeBytes: scan.image.sizeBytes?.toString() || null
@@ -138,7 +134,7 @@ export async function GET(
       // Summary stats
       totalScans,
       tags: [...new Set(images.map(img => img.tag))].sort(),
-      registries: [...new Set(images.map(img => img.registry).filter(Boolean))],
+      registries: [...new Set(images.map(img => img.source).filter(Boolean))],
       pagination: {
         limit: scanLimit,
         offset: scanOffset,

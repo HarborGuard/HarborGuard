@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
               id: true,
               name: true,
               tag: true,
-              registry: true,
+              source: true,
               digest: true
             }
           },

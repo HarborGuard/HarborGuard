@@ -551,7 +551,6 @@ export class PatchExecutorTarUnshare {
       data: {
         name,
         tag,
-        registry: 'local',
         source: 'LOCAL_DOCKER',
         digest,
         platform: originalImage.platform,

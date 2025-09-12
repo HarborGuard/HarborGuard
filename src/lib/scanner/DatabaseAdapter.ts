@@ -4,10 +4,18 @@ import { prisma } from '@/lib/prisma';
 import { inspectDockerImage } from '@/lib/docker';
 import { IDatabaseAdapter, ScanReports, AggregatedData, VulnerabilityCount, ComplianceScore } from './types';
 import type { ScanRequest } from '@/types';
+import { RepositoryService } from '@/services/RepositoryService';
+import { RegistryProviderFactory } from '@/lib/registry/providers/RegistryProviderFactory';
+import type { Repository } from '@/generated/prisma';
 
 const execAsync = promisify(exec);
 
 export class DatabaseAdapter implements IDatabaseAdapter {
+  private repositoryService: RepositoryService;
+  
+  constructor() {
+    this.repositoryService = RepositoryService.getInstance(prisma);
+  }
 
   async initializeScanRecord(requestId: string, request: ScanRequest): Promise<{ scanId: string; imageId: string }> {
     if (this.isLocalDockerScan(request)) {
@@ -49,7 +57,6 @@ export class DatabaseAdapter implements IDatabaseAdapter {
           data: {
             name: request.image,
             tag: request.tag,
-            registry: 'local',
             source: 'LOCAL_DOCKER',
             digest,
             platform: `${imageData.Os}/${imageData.Architecture}`,
@@ -88,7 +95,6 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         data: {
           name: request.image,
           tag: request.tag,
-          registry: 'local',
           source: 'FILE_UPLOAD',
           digest,
           platform: 'linux/amd64',
@@ -116,48 +122,147 @@ export class DatabaseAdapter implements IDatabaseAdapter {
   }
 
   private async initializeRegistryScanRecord(requestId: string, request: ScanRequest) {
-    const fullImageName = request.registry ? `${request.registry}/${request.image}` : request.image;
-    const imageRef = `${fullImageName}:${request.tag}`;
-
+    // Declare imageRef outside try block so it's accessible in catch block
+    let imageRef = '';
+    
     try {
-      // Get authentication arguments if repository ID is provided
-      let authArgs = await this.getAuthenticationArgsFromRepository(request.repositoryId);
+      // Get registry URL from repository service
+      let registryUrl = await this.repositoryService.getRegistryUrl(request.repositoryId, request.image) || request.registry;
+      let cleanImageName = request.image;
       
-      // If no repositoryId provided but image appears to be private, try to find matching repository
-      if (!authArgs && !request.repositoryId && this.isLikelyPrivateImage(request.image)) {
-        const matchingRepositoryId = await this.findMatchingRepositoryForImage(request.image);
-        if (matchingRepositoryId) {
-          authArgs = await this.getAuthenticationArgsFromRepository(matchingRepositoryId);
+      // Extract registry URL from image name if present
+      if (request.image.includes('/')) {
+        const parts = request.image.split('/');
+        // If first part looks like a registry (has port or domain), extract it
+        if (parts[0].includes(':') || parts[0].includes('.')) {
+          const extractedRegistry = parts[0];
+          const extractedImageName = parts.slice(1).join('/');
+          
+          if (!registryUrl) {
+            // No repository found, use the extracted registry
+            registryUrl = extractedRegistry;
+            cleanImageName = extractedImageName;
+          } else {
+            // We have a registry from repository, clean the image name
+            cleanImageName = extractedImageName;
+          }
         }
       }
       
-      // Use --no-creds flag to explicitly disable Docker config auth when no repository credentials
-      const noCredsFlag = request.repositoryId ? '' : '--no-creds';
-      const finalAuthArgs = authArgs || noCredsFlag;
+      // If cleanImageName already starts with the registry URL, remove it to avoid duplication
+      if (registryUrl && cleanImageName.startsWith(`${registryUrl}/`)) {
+        cleanImageName = cleanImageName.substring(registryUrl.length + 1);
+      }
       
-      const { stdout: digestOutput } = await execAsync(
-        `skopeo inspect ${finalAuthArgs} --format '{{.Digest}}' docker://${imageRef}`
-      );
-      const digest = digestOutput.trim();
+      // If we still don't have a registry URL, we need to handle this case
+      if (!registryUrl) {
+        // Check if the image name itself already contains a registry
+        if (cleanImageName.includes('/') && (cleanImageName.split('/')[0].includes('.') || cleanImageName.split('/')[0].includes(':'))) {
+          // The image name already has a registry prefix
+          imageRef = `${cleanImageName}:${request.tag}`;
+        } else {
+          // No registry found - cannot proceed without knowing where to pull from
+          throw new Error(`No registry specified for image ${cleanImageName}:${request.tag}. Please provide a registry URL or repository ID.`);
+        }
+      } else {
+        // Construct full image reference with registry
+        imageRef = `${registryUrl}/${cleanImageName}:${request.tag}`;
+      }
 
-      let image = await prisma.image.findUnique({ where: { digest } });
+      // Get repository - required for registry operations
+      let repository: Repository | null = null;
+      if (request.repositoryId) {
+        repository = await prisma.repository.findUnique({
+          where: { id: request.repositoryId }
+        });
+      } else if (request.image) {
+        // Try to find a repository for this image
+        repository = await this.repositoryService.findForImage(request.image);
+      }
       
-      if (!image) {
-        const { stdout: metadataOutput } = await execAsync(
-          `skopeo inspect ${finalAuthArgs} docker://${imageRef}`
-        );
-        const metadata = JSON.parse(metadataOutput);
+      if (!repository) {
+        // Create a temporary generic repository for public images
+        repository = {
+          id: 'temp',
+          name: 'Docker Hub',
+          type: 'DOCKERHUB',
+          protocol: 'https',
+          registryUrl: 'docker.io',
+          username: '',
+          encryptedPassword: '',
+          organization: null,
+          status: 'ACTIVE',
+          lastTested: null,
+          repositoryCount: null,
+          apiVersion: null,
+          capabilities: null,
+          rateLimits: null,
+          healthCheck: null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        } as Repository;
+      }
+      
+      // Use registry handler for all operations
+      const provider = RegistryProviderFactory.createFromRepository(repository);
+      const inspection = await provider.inspectImage(cleanImageName, request.tag);
+      const digest = inspection.digest;
+      const metadata = inspection.config || {};
 
-        image = await prisma.image.create({
-          data: {
-            name: request.image,
-            tag: request.tag,
-            registry: request.registry,
-            source: request.registry && request.registry !== 'docker.io' ? 'REGISTRY_PRIVATE' : 'REGISTRY',
-            digest,
-            platform: `${metadata.Os}/${metadata.Architecture}`,
-            sizeBytes: Number(metadata.Size || 0),
+      // Prepare image data
+      const imageData: any = {
+        name: cleanImageName,
+        tag: request.tag,
+        source: registryUrl && registryUrl !== 'docker.io' ? 'REGISTRY_PRIVATE' : 'REGISTRY',
+        digest,
+        platform: metadata.os ? `${metadata.os}/${metadata.architecture || 'unknown'}` : `${metadata.Os || 'unknown'}/${metadata.Architecture || 'unknown'}`,
+        sizeBytes: Number(metadata.size || metadata.Size || 0),
+      };
+
+      // If we have a repository ID, set it as the primary repository
+      if (request.repositoryId) {
+        imageData.primaryRepositoryId = request.repositoryId;
+      }
+
+      // Use upsert to handle both new and existing images
+      const image = await prisma.image.upsert({
+        where: { digest },
+        update: {
+          // Always update these fields in case they've changed
+          name: cleanImageName,
+          tag: request.tag,
+          // Only update primary repository if provided
+          ...(request.repositoryId && { primaryRepositoryId: request.repositoryId })
+        },
+        create: imageData
+      });
+
+        // Create repository-image relationship if repository ID is provided
+      if (request.repositoryId && image) {
+        await prisma.repositoryImage.upsert({
+          where: {
+            repositoryId_imageId: {
+              repositoryId: request.repositoryId,
+              imageId: image.id
+            }
+          },
+          update: {
+            imageName: cleanImageName,
+            namespace: this.extractNamespaceFromImageName(cleanImageName),
+            lastSynced: new Date(),
+            syncStatus: 'COMPLETED'
+          },
+          create: {
+            repositoryId: request.repositoryId,
+            imageId: image.id,
+            imageName: cleanImageName,
+            namespace: this.extractNamespaceFromImageName(cleanImageName),
+            lastSynced: new Date(),
+            syncStatus: 'COMPLETED'
           }
+        }).catch(error => {
+          // Log errors but don't fail the scan
+          console.warn('Failed to create/update repository-image relationship:', error);
         });
       }
 
@@ -1139,99 +1244,15 @@ export class DatabaseAdapter implements IDatabaseAdapter {
   }
 
   /**
-   * Check if an image name appears to be a private repository
+   * Extract namespace from image name (e.g., "username/repo" -> "username")
    */
-  private isLikelyPrivateImage(imageName: string): boolean {
-    // Images with usernames (like username/repo) are likely private
-    return imageName.includes('/') && !imageName.startsWith('library/');
+  private extractNamespaceFromImageName(imageName: string): string | null {
+    const parts = imageName.split('/');
+    if (parts.length > 1) {
+      // Return all parts except the last one as namespace
+      return parts.slice(0, -1).join('/');
+    }
+    return null;
   }
 
-  /**
-   * Find a repository that might contain the given image
-   */
-  private async findMatchingRepositoryForImage(imageName: string): Promise<string | null> {
-    try {
-      const repositories = await prisma.repository.findMany({
-        where: {
-          status: 'ACTIVE'
-        }
-      });
-
-      for (const repo of repositories) {
-        // For Docker Hub repositories, check if the image matches the organization/username pattern
-        if (repo.type === 'DOCKERHUB') {
-          const username = repo.organization || repo.username;
-          if (username && imageName.startsWith(`${username}/`)) {
-            return repo.id;
-          }
-        }
-        // For GitHub Container Registry, check ghcr.io pattern
-        else if (repo.type === 'GHCR' && repo.registryUrl?.includes('ghcr.io')) {
-          const username = repo.organization || repo.username;
-          if (username && imageName.startsWith(`ghcr.io/${username}/`)) {
-            return repo.id;
-          }
-        }
-        // For generic registries, check if the registry URL matches
-        else if (repo.type === 'GENERIC' && repo.registryUrl) {
-          const registryHost = repo.registryUrl.replace(/^https?:\/\//, '').split('/')[0];
-          if (imageName.startsWith(`${registryHost}/`)) {
-            return repo.id;
-          }
-        }
-      }
-
-      return null;
-    } catch (error) {
-      console.error('Failed to find matching repository:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Get authentication arguments for skopeo commands using repository credentials
-   */
-  private async getAuthenticationArgsFromRepository(repositoryId?: string): Promise<string> {
-    if (!repositoryId) {
-      return '';
-    }
-
-    try {
-      const repository = await prisma.repository.findUnique({
-        where: { id: repositoryId },
-      });
-
-      if (!repository || repository.status !== 'ACTIVE') {
-        console.warn(`Repository ${repositoryId} not found or inactive`);
-        return '';
-      }
-
-      let authArgs = '';
-      
-      // Add TLS verification flag for HTTP registries
-      if (repository.protocol === 'http') {
-        authArgs += '--tls-verify=false ';
-        console.log(`[DatabaseAdapter] Adding --tls-verify=false for HTTP registry ${repository.registryUrl}`);
-      }
-
-      // For now, treating encryptedPassword as plaintext password
-      // In production, this should be properly decrypted
-      const username = repository.username;
-      const password = repository.encryptedPassword;
-
-      if (username && password) {
-        // Escape credentials to prevent command injection
-        const escapedUsername = username.replace(/"/g, '\\"');
-        const escapedPassword = password.replace(/"/g, '\\"');
-        authArgs += `--creds "${escapedUsername}:${escapedPassword}"`;
-      } else if (!authArgs) {
-        console.warn(`Invalid or missing credentials for repository ${repositoryId}`);
-      }
-
-      return authArgs.trim();
-    } catch (error) {
-      console.error(`Failed to get authentication for repository ${repositoryId}:`, error);
-      return '';
-    }
-  }
 }

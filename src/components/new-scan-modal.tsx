@@ -713,8 +713,8 @@ export function NewScanModal({ children }: NewScanModalProps) {
                                         
                                         toast.info(`Starting scans for ${images.length} images...`);
                                         
-                                        let successCount = 0;
-                                        let failCount = 0;
+                                        // Collect all scan requests in a batch
+                                        const batchScanRequests = [];
                                         
                                         // Start scanning all images
                                         for (const image of images) {
@@ -755,68 +755,88 @@ export function NewScanModal({ children }: NewScanModalProps) {
                                           
                                           console.log(`Found ${tags.length} tags for ${image.name}:`, tags);
                                           
-                                          // Scan ALL tags found for this image
-                                          for (const tag of tags) {
-                                            // Build the full image string based on repository type
-                                            const fullImageString = repo.type === 'GENERIC' 
-                                              ? `${repo.registryUrl}/${image.name}`
-                                              : image.name;
+                                          // Prepare batch scan requests for all tags
+                                          const scanRequests = tags.map((tag: any) => {
+                                            // Use fullName which contains the complete repository path (e.g., "hello-world" or "namespace/image")
+                                            // Never include registry URL - that should be handled separately via repositoryId
+                                            const imageName = image.fullName || image.name;
                                             
-                                            // The scan API expects either (image & tag) or (imageName & imageTag)
-                                            const scanRequest = {
-                                              image: fullImageString,
+                                            return {
+                                              image: imageName,
                                               tag: tag,
                                               source: 'registry',
                                               repositoryId: repo.id
                                             };
+                                          });
+                                          
+                                          // Add these scan requests to the batch
+                                          batchScanRequests.push(...scanRequests);
+                                        }
+                                        
+                                        // Submit all scans as a batch
+                                        if (batchScanRequests.length > 0) {
+                                          console.log(`Submitting batch of ${batchScanRequests.length} scans...`);
+                                          
+                                          try {
+                                            const batchResponse = await fetch('/api/scans/start', {
+                                              method: 'POST',
+                                              headers: { 'Content-Type': 'application/json' },
+                                              body: JSON.stringify({
+                                                scans: batchScanRequests,
+                                                priority: -1 // Lower priority for bulk scans
+                                              })
+                                            });
                                             
-                                            try {
-                                              const response = await fetch('/api/scans/start', {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify(scanRequest)
-                                              });
+                                            if (batchResponse.ok) {
+                                              const batchResult = await batchResponse.json();
+                                              console.log('Batch scan result:', batchResult);
                                               
-                                              if (response.ok) {
-                                                const result = await response.json();
-                                                if (result.requestId) {
+                                              // Process batch results
+                                              let successCount = 0;
+                                              let failCount = 0;
+                                              
+                                              for (const result of batchResult.results) {
+                                                if (result.success) {
                                                   addScanJob({
                                                     requestId: result.requestId,
                                                     scanId: result.scanId || '',
                                                     imageId: result.imageId || '',
-                                                    imageName: `${fullImageString}:${tag}`,
+                                                    imageName: `${result.image}:${result.tag}`,
                                                     status: 'RUNNING' as const,
                                                     progress: 0
                                                   });
                                                   successCount++;
-                                                  console.log(`✓ Started scan for ${fullImageString}:${tag}`);
+                                                  console.log(`✓ Started scan for ${result.image}:${result.tag}`);
+                                                } else {
+                                                  failCount++;
+                                                  console.error(`Failed to start scan for ${result.image}:${result.tag}:`, result.error);
                                                 }
-                                              } else {
-                                                failCount++;
-                                                console.error(`Failed to start scan for ${fullImageString}:${tag}`);
                                               }
-                                            } catch (error) {
-                                              failCount++;
-                                              console.error(`Failed to scan ${fullImageString}:${tag}:`, error);
+                                              
+                                              // Show final results
+                                              if (successCount > 0 && failCount === 0) {
+                                                toast.success(`Successfully started ${successCount} scans`);
+                                              } else if (successCount > 0 && failCount > 0) {
+                                                toast.warning(`Started ${successCount} scans, ${failCount} failed`);
+                                              } else if (failCount > 0) {
+                                                toast.error(`Failed to start scans (${failCount} failures)`);
+                                              }
+                                              
+                                              if (successCount > 0) {
+                                                setIsOpen(false);
+                                                await refreshData();
+                                              }
+                                            } else {
+                                              const errorData = await batchResponse.json();
+                                              console.error('Batch scan request failed:', errorData);
+                                              toast.error(`Failed to submit batch scans: ${errorData.error || 'Unknown error'}`);
                                             }
-                                            
-                                            // Small delay between scans to avoid overwhelming the system
-                                            await new Promise(resolve => setTimeout(resolve, 500));
+                                          } catch (error) {
+                                            console.error('Failed to submit batch scans:', error);
+                                            toast.error('Failed to submit batch scans');
                                           }
-                                        }
-                                        
-                                        // Show final results
-                                        if (successCount > 0 && failCount === 0) {
-                                          toast.success(`Successfully started ${successCount} scans`);
-                                        } else if (successCount > 0 && failCount > 0) {
-                                          toast.warning(`Started ${successCount} scans, ${failCount} failed`);
-                                        } else if (failCount > 0) {
-                                          toast.error(`Failed to start scans (${failCount} failures)`);
-                                        }
-                                        
-                                        if (successCount > 0) {
-                                          setIsOpen(false);
-                                          await refreshData();
+                                        } else {
+                                          toast.warning('No images with tags found to scan');
                                         }
                                       } catch (error) {
                                         console.error('Failed to scan all images:', error);

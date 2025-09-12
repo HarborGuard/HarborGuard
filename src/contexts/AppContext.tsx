@@ -77,7 +77,7 @@ function transformScansForUI(scans: ScanWithImage[]): LegacyScan[] {
       attested: false,
       sbomFormat: "spdx",
       dbAge: duration,
-      registry: scan.image.registry || undefined,
+      registry: undefined,
       project: undefined,
       lastScan: typeof scan.finishedAt === 'string' ? scan.finishedAt : scan.finishedAt?.toISOString() || (typeof scan.createdAt === 'string' ? scan.createdAt : scan.createdAt.toISOString()),
       status: mapScanStatus(scan.status),
