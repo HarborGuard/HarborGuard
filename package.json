@@ -3,7 +3,8 @@
   "version": "0.2b",
   "private": true,
   "scripts": {
-    "dev": "npx prisma generate && NODE_ENV=development next dev --turbopack",
+    "dev": "NODE_ENV=development next dev --turbopack",
+    "dev:fresh": "npm run fresh && NODE_ENV=development next dev --turbopack",
     "build": "npx prisma generate && npm run generate:openapi && next build",
     "build:docker": "npx prisma generate && next build",
     "generate:openapi": "npx tsx scripts/generate-openapi.ts",
@@ -15,7 +16,8 @@
     "db:init": "node scripts/init-database.js",
     "db:migrate": "npx prisma migrate deploy",
     "db:push": "npx prisma db push",
-    "db:reset": "npx prisma migrate reset --force",
+    "db:reset": "npx prisma migrate reset --force && npx prisma generate",
+    "fresh": "rm -rf src/generated/prisma node_modules/.prisma && npx prisma generate",
     "db:generate": "npx prisma generate"
   },
   "dependencies": {
