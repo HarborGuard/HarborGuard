@@ -398,12 +398,11 @@ export class RegistryMetadataCache {
       if (index > -1) this.cacheAccessOrder.splice(index, 1);
     });
     
-    // Clean L2 cache
-    const cutoffDate = new Date(Date.now() - this.config.databaseTTL);
+    // Clean L2 cache - delete expired entries
+    const cutoffDate = new Date();
     await this.prisma.repositoryImageMetadata.deleteMany({
       where: {
-        lastSyncedAt: { lt: cutoffDate },
-        syncStatus: { in: ['STALE', 'ERROR'] }
+        expiresAt: { lt: cutoffDate }
       }
     });
   }
