@@ -654,9 +654,9 @@
                     "type": "string",
                     "description": "targetImageName parameter"
                   },
-                  "targetImageTag": {
+                  "targetImageTag = 'latest'": {
                     "type": "string",
-                    "description": "targetImageTag parameter"
+                    "description": "targetImageTag = 'latest' parameter"
                   },
                   "repositoryId": {
                     "type": "string",
@@ -1217,9 +1217,13 @@
                     "type": "string",
                     "description": "organization parameter"
                   },
-                  "testResult": {
+                  "protocol": {
                     "type": "string",
-                    "description": "testResult parameter"
+                    "description": "protocol parameter"
+                  },
+                  "testConnection = true": {
+                    "type": "string",
+                    "description": "testConnection = true parameter"
                   }
                 }
               }

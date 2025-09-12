@@ -168,7 +168,7 @@ export function scanToLegacyScan(scan: ScanWithImage, vulnCount?: VulnerabilityC
     attested: false,
     sbomFormat: "spdx",
     dbAge: "0h",
-    registry: scan.image?.registry || undefined,
+    registry: undefined,
     project: undefined,
     lastScan: scan.finishedAt?.toISOString() || scan.createdAt.toISOString(),
     status: mapScanStatus(scan.status),

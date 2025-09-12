@@ -74,9 +74,7 @@ export default function ImageDetailsPage() {
     )[0];
 
     const tags = [...new Set(scansForImages.map((scan) => scan.tag).filter(Boolean))];
-    const registries = [
-      ...new Set(imagesByName.map((img) => img.registry).filter(Boolean)),
-    ];
+    const registries: string[] = [];
 
     return {
       name: imageName,
