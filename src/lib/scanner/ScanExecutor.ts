@@ -157,7 +157,8 @@ export class ScanExecutor implements IScanExecutor {
           repoType = request.registryType as any;
           switch (request.registryType) {
             case 'GHCR':
-              repoName = 'GitHub Container Registry';
+              // Check if it's public (no auth) or private
+              repoName = (!request.repositoryId && !registryUrl) ? 'GHCR Public' : 'GitHub Container Registry';
               break;
             case 'ECR':
               repoName = 'AWS Elastic Container Registry';
@@ -166,7 +167,7 @@ export class ScanExecutor implements IScanExecutor {
               repoName = 'Google Container Registry';
               break;
             case 'DOCKERHUB':
-              repoName = 'Docker Hub';
+              repoName = 'Docker Hub Public';
               break;
             default:
               repoName = 'Generic Registry';
@@ -176,7 +177,7 @@ export class ScanExecutor implements IScanExecutor {
         // Auto-detect repository type based on registry URL
         if (repoUrl.includes('ghcr.io')) {
           repoType = 'GHCR';
-          repoName = 'GitHub Container Registry';
+          repoName = 'GHCR Public';
         } else if (repoUrl.includes('gitlab')) {
           repoType = 'GENERIC';
           repoName = 'GitLab Container Registry';
@@ -186,7 +187,10 @@ export class ScanExecutor implements IScanExecutor {
         } else if (repoUrl.includes('gcr.io') || repoUrl.includes('pkg.dev')) {
           repoType = 'GCR';
           repoName = 'Google Container Registry';
-        } else if (repoUrl !== 'docker.io' && repoUrl !== 'registry-1.docker.io') {
+        } else if (repoUrl === 'docker.io' || repoUrl === 'registry-1.docker.io') {
+          repoType = 'DOCKERHUB';
+          repoName = 'Docker Hub Public';
+        } else {
           repoType = 'GENERIC';
           repoName = 'Generic Registry';
         }
