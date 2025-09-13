@@ -51,6 +51,7 @@ import {
   VisibilityState,
 } from "@tanstack/react-table"
 import { toast } from "sonner"
+import { buildRescanRequest } from "@/lib/registry/registry-utils"
 import { z } from "zod"
 
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -405,84 +406,18 @@ function createColumns(handleDeleteClick: (imageName: string) => void): ColumnDe
     accessorKey: "registry",
     header: "Registry",
     cell: ({ row }) => {
-      // Use pre-computed registries from the grouping phase
-      const allRegistries = (row.original as any)._allRegistries;
-      
-      // If we have pre-computed registries, use them
-      if (allRegistries && allRegistries.length > 0) {
-        // Sort registries for consistent display
-        const sortedRegistries = allRegistries.sort((a: string, b: string) => {
-          // Put Docker Hub first, then local, then generic, then others alphabetically
-          if (a === "docker.io") return -1;
-          if (b === "docker.io") return 1;
-          if (a === "local") return -1;
-          if (b === "local") return 1;
-          if (a === "generic") return -1;
-          if (b === "generic") return 1;
-          return a.localeCompare(b);
-        });
-        
-        // Create badges for all unique registries
-        const badges = sortedRegistries.map((reg: string) => {
-          if (reg === "local") {
-            return (
-              <Badge key="local" variant="secondary" className="text-xs">
-                Local Docker
-              </Badge>
-            );
-          } else if (reg === "docker.io") {
-            return (
-              <Badge key="dockerhub" variant="default" className="text-xs">
-                Docker Hub
-              </Badge>
-            );
-          } else if (reg === "generic") {
-            return (
-              <Badge key="generic" variant="default" className="text-xs">
-                Generic Registry
-              </Badge>
-            );
-          } else {
-            return (
-              <Badge key={reg} variant="outline" className="text-xs">
-                {reg}
-              </Badge>
-            );
-          }
-        });
-        
-        return <div className="flex flex-wrap gap-1">{badges}</div>;
-      }
-      
-      // Fallback to single registry from current row
+      // Simply use the registry from the image object
       const imageData = row.original.image;
-      const imageSource = typeof imageData === 'object' ? (imageData as any)?.source : null;
-      const currentRegistry = typeof imageData === 'object' ? (imageData as any)?.registry : null;
-      const source = row.original.source;
-      
-      let registry = "docker.io";
-      if (source === "local") {
-        registry = "local";
-      } else if (imageSource === "REGISTRY_PRIVATE" || source === "REGISTRY_PRIVATE") {
-        registry = "generic";
-      } else if (currentRegistry) {
-        registry = currentRegistry;
-      }
+      const registry = typeof imageData === 'object' && imageData !== null 
+        ? (imageData as any).registry || "Docker Hub"
+        : "Docker Hub";
       
       return (
         <Badge 
-          variant={
-            registry === "docker.io" ? "default" : 
-            registry === "local" ? "secondary" :
-            registry === "generic" ? "default" :
-            "outline"
-          }
+          variant={registry === "Docker Hub" ? "default" : "outline"}
           className="text-xs"
         >
-          {registry === "docker.io" ? "Docker Hub" : 
-           registry === "local" ? "Local Docker" :
-           registry === "generic" ? "Generic Registry" : 
-           registry}
+          {registry}
         </Badge>
       );
     },
@@ -893,18 +828,24 @@ export function DataTable({
     const actualTag = tag || 'latest'
     const loadingToastId = toast.loading(`Starting ${scanSource} rescan for ${imageName}:${actualTag}...`)
     
+    // Find the row data to get registry information
+    const rowData = data.find(row => row.imageName === imageName)
+    const imageData = rowData?.image
+    const registry = typeof imageData === 'object' && imageData !== null 
+      ? (imageData as any).registry 
+      : undefined
+    
     try {
+      // Build request using utility function
+      const requestBody = buildRescanRequest(imageName, actualTag, registry, scanSource)
+      
       // Use the correct API endpoint for starting scans
       const response = await fetch('/api/scans/start', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          image: imageName,
-          tag: actualTag,
-          source: scanSource
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       if (response.ok) {
