@@ -13,6 +13,7 @@ model Image {
   id                       String               @id @default(cuid())
   name                     String
   tag                      String
+  registry                 String?
   source                   ImageSource          @default(REGISTRY)
   digest                   String               @unique
   platform                 String?
@@ -43,17 +44,17 @@ model Scan {
   id                    String                     @id @default(cuid())
   requestId             String                     @unique
   imageId               String
-  tag                   String                     @default("latest")
   startedAt             DateTime
   finishedAt            DateTime?
   status                ScanStatus                 @default(RUNNING)
   reportsDir            String?
   errorMessage          String?
   riskScore             Int?
-  metadataId            String?                    @unique
   source                String?
   createdAt             DateTime                   @default(now())
   updatedAt             DateTime                   @updatedAt
+  metadataId            String?                    @unique
+  tag                   String                     @default("latest")
   bulkScanItems         BulkScanItem[]
   patchOperations       PatchOperation[]
   complianceFindings    ScanComplianceFinding[]
@@ -515,8 +516,8 @@ model ImageVulnerability {
   installedVersion   String?
   fixedVersion       String?
   status             VulnerabilityStatus @default(DETECTED)
-  patchStatus        PatchStatus         @default(NOT_ATTEMPTED)
   detectedAt         DateTime            @default(now())
+  patchStatus        PatchStatus         @default(NOT_ATTEMPTED)
   cveClassifications CveClassification[]
   image              Image               @relation(fields: [imageId], references: [id], onDelete: Cascade)
   vulnerability      Vulnerability       @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
@@ -575,7 +576,6 @@ model Repository {
   id                 String                    @id @default(cuid())
   name               String
   type               RepositoryType
-  protocol           String                    @default("https")
   registryUrl        String
   username           String
   encryptedPassword  String
@@ -583,12 +583,13 @@ model Repository {
   status             RepositoryStatus          @default(UNTESTED)
   lastTested         DateTime?
   repositoryCount    Int?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  protocol           String                    @default("https")
   apiVersion         String?
   capabilities       Json?
   rateLimits         Json?
   healthCheck        Json?
-  createdAt          DateTime                  @default(now())
-  updatedAt          DateTime                  @updatedAt
   primaryImages      Image[]                   @relation("PrimaryRepository")
   imageMetadataCache RepositoryImageMetadata[]
   images             RepositoryImage[]
@@ -981,14 +982,14 @@ enum PatchStatus {
 enum PatchOperationStatus {
   PENDING
   ANALYZING
-  PULLING
   BUILDING
   PATCHING
   PUSHING
-  VERIFYING
   COMPLETED
   FAILED
   CANCELLED
+  PULLING
+  VERIFYING
 }
 
 enum PatchResultStatus {

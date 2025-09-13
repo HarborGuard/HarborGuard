@@ -475,6 +475,7 @@ export interface ScanRequest {
   repositoryId?: string; // For private repositories
   scanners?: ScannerConfig; // Optional scanner configuration
   tarPath?: string; // Path to tar file for direct tar scanning
+  registryType?: 'DOCKERHUB' | 'GHCR' | 'GENERIC' | 'ECR' | 'GCR' | 'GITLAB'; // Hint for registry type
 }
 
 export interface CreateScanRequest extends ScanRequest {

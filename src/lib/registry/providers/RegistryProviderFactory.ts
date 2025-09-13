@@ -44,6 +44,12 @@ export class RegistryProviderFactory {
     if (repository.registryUrl?.includes('gitlab')) {
       return new GitLabRegistryHandler(repository);
     }
+    
+    // Auto-detect GHCR if type is GHCR or registry URL is ghcr.io
+    if (repository.type === 'GHCR' || repository.registryUrl?.includes('ghcr.io')) {
+      return new GHCRProvider(repository);
+    }
+    
     return this.create(repository.type, repository);
   }
   

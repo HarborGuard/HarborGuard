@@ -43,6 +43,7 @@ import {
   TabsTrigger,
 } from "components/components/ui/tabs"
 import { toast } from "sonner"
+import { buildScanRequest, parseImageString as parseImage } from "@/lib/registry/registry-utils"
 import { useApp } from "@/contexts/AppContext"
 import { useScanning } from "@/providers/ScanningProvider"
 import { DockerImageAutocomplete } from "@/components/DockerImageAutocomplete"
@@ -236,34 +237,14 @@ export function NewScanModal({ children }: NewScanModalProps) {
   })
 
 
-  const parseImageString = (imageString: string): { imageName: string; imageTag: string; registry?: string } => {
-    // Handle different image formats
-    let fullImage = imageString.trim()
-    
-    // Extract registry, image name, and tag
-    let registry: string | undefined
-    let imageName: string
-    let imageTag = 'latest'
-    
-    // Check if it has a registry (contains domain/port)
-    if (fullImage.includes('/') && (fullImage.includes('.') || fullImage.includes(':'))) {
-      const parts = fullImage.split('/')
-      if (parts[0].includes('.') || parts[0].includes(':')) {
-        registry = parts[0]
-        fullImage = parts.slice(1).join('/')
-      }
+  const parseImageString = (imageString: string) => {
+    const parsed = parseImage(imageString)
+    return {
+      imageName: parsed.imageName,
+      imageTag: parsed.tag,
+      registry: parsed.registry,
+      registryType: parsed.registryType
     }
-    
-    // Split image name and tag
-    if (fullImage.includes(':')) {
-      const lastColonIndex = fullImage.lastIndexOf(':')
-      imageName = fullImage.substring(0, lastColonIndex)
-      imageTag = fullImage.substring(lastColonIndex + 1)
-    } else {
-      imageName = fullImage
-    }
-    
-    return { imageName, imageTag, registry }
   }
 
   const getCurrentImageString = (): string => {
@@ -356,12 +337,12 @@ export function NewScanModal({ children }: NewScanModalProps) {
         registry = parsed.registry
       }
       
-      // Prepare scan request based on source type
-      const scanRequest: any = {
-        image: imageName,
-        tag: imageTag,
+      // Build scan request using utility function
+      const scanRequest = buildScanRequest(imageString, selectedSource, {
         registry,
-      }
+        image: imageName,
+        tag: imageTag
+      })
 
       // For local Docker images, add source and Docker image ID
       if (selectedSource === 'local' && selectedDockerImage) {

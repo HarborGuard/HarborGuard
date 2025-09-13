@@ -154,6 +154,28 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         cleanImageName = cleanImageName.substring(registryUrl.length + 1);
       }
       
+      // If we still don't have a registry URL, check if we have a registry type hint
+      if (!registryUrl && request.registryType) {
+        // Use registry type hint to determine the registry URL
+        switch (request.registryType) {
+          case 'GHCR':
+            registryUrl = 'ghcr.io';
+            break;
+          case 'DOCKERHUB':
+            registryUrl = 'docker.io';
+            break;
+          case 'ECR':
+            // ECR needs more specific URL, but we can't determine it without more info
+            break;
+          case 'GCR':
+            registryUrl = 'gcr.io';
+            break;
+          case 'GITLAB':
+            // GitLab needs specific instance URL
+            break;
+        }
+      }
+      
       // If we still don't have a registry URL, we need to handle this case
       if (!registryUrl) {
         // Check if the image name itself already contains a registry
@@ -181,13 +203,70 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       }
       
       if (!repository) {
-        // Create a temporary generic repository for public images
+        // Create a temporary repository based on the registry URL and type hint
+        let repoType: 'DOCKERHUB' | 'GHCR' | 'GENERIC' | 'ECR' | 'GCR' = 'DOCKERHUB';
+        let repoName = 'Docker Hub';
+        let repoUrl = registryUrl || 'docker.io';
+        
+        // Use registryType hint if provided
+        if (request.registryType) {
+          if (request.registryType === 'GITLAB') {
+            // GitLab uses GENERIC type with special handling
+            repoType = 'GENERIC';
+            repoName = 'GitLab Container Registry';
+          } else {
+            repoType = request.registryType as any;
+            switch (request.registryType) {
+              case 'GHCR':
+                // Set correct registry URL for GHCR
+                if (!registryUrl || registryUrl === 'docker.io') {
+                  repoUrl = 'ghcr.io';
+                }
+                // Check if it's public (no auth) or private
+                repoName = (!request.repositoryId) ? 'GHCR Public' : 'GitHub Container Registry';
+                break;
+              case 'ECR':
+                repoName = 'AWS Elastic Container Registry';
+                break;
+              case 'GCR':
+                repoName = 'Google Container Registry';
+                break;
+              case 'DOCKERHUB':
+                repoName = 'Docker Hub Public';
+                break;
+              default:
+                repoName = 'Generic Registry';
+            }
+          }
+        } else {
+          // Auto-detect repository type based on registry URL
+          if (repoUrl.includes('ghcr.io')) {
+            repoType = 'GHCR';
+            repoName = 'GHCR Public';
+          } else if (repoUrl.includes('gitlab')) {
+            repoType = 'GENERIC';
+            repoName = 'GitLab Container Registry';
+          } else if (repoUrl.includes('ecr')) {
+            repoType = 'ECR';
+            repoName = 'AWS Elastic Container Registry';
+          } else if (repoUrl.includes('gcr.io') || repoUrl.includes('pkg.dev')) {
+            repoType = 'GCR';
+            repoName = 'Google Container Registry';
+          } else if (repoUrl === 'docker.io' || repoUrl === 'registry-1.docker.io') {
+            repoType = 'DOCKERHUB';
+            repoName = 'Docker Hub Public';
+          } else {
+            repoType = 'GENERIC';
+            repoName = 'Generic Registry';
+          }
+        }
+        
         repository = {
           id: 'temp',
-          name: 'Docker Hub',
-          type: 'DOCKERHUB',
+          name: repoName,
+          type: repoType,
           protocol: 'https',
-          registryUrl: 'docker.io',
+          registryUrl: repoUrl,
           username: '',
           encryptedPassword: '',
           organization: null,
@@ -217,6 +296,8 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         digest,
         platform: metadata.os ? `${metadata.os}/${metadata.architecture || 'unknown'}` : `${metadata.Os || 'unknown'}/${metadata.Architecture || 'unknown'}`,
         sizeBytes: Number(metadata.size || metadata.Size || 0),
+        // Save the descriptive repository name for one-off scans
+        registry: repository ? repository.name : null,
       };
 
       // If we have a repository ID, set it as the primary repository
@@ -231,6 +312,8 @@ export class DatabaseAdapter implements IDatabaseAdapter {
           // Always update these fields in case they've changed
           name: cleanImageName,
           tag: request.tag,
+          // Update registry name if we have a repository
+          registry: repository ? repository.name : null,
           // Only update primary repository if provided
           ...(request.repositoryId && { primaryRepositoryId: request.repositoryId })
         },
