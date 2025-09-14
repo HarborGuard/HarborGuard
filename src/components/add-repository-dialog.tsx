@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { IconBrandDocker, IconBrandGithub, IconServer, IconCheck, IconX, IconLoader } from "@tabler/icons-react"
+import { IconBrandDocker, IconBrandGithub, IconBrandGitlab, IconServer, IconCheck, IconX, IconLoader } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 interface AddRepositoryDialogProps {
@@ -25,7 +25,7 @@ interface AddRepositoryDialogProps {
   onRepositoryAdded: () => void
 }
 
-type RepositoryType = 'dockerhub' | 'ghcr' | 'generic'
+type RepositoryType = 'dockerhub' | 'ghcr' | 'gitlab' | 'generic'
 
 interface RepositoryConfig {
   name: string
@@ -34,6 +34,8 @@ interface RepositoryConfig {
   username: string
   password: string
   organization?: string
+  authUrl?: string
+  groupId?: string
 }
 
 export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: AddRepositoryDialogProps) {
@@ -67,6 +69,13 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
       registryUrl: 'ghcr.io',
     },
     {
+      type: 'gitlab' as const,
+      title: 'GitLab Container Registry',
+      description: 'Connect to GitLab Container Registry with JWT authentication',
+      icon: <IconBrandGitlab className="h-8 w-8" />,
+      registryUrl: '',
+    },
+    {
       type: 'generic' as const,
       title: 'Generic Registry',
       description: 'Connect to any OCI-compliant container registry',
@@ -91,9 +100,9 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
     setTestStatus('testing')
     setTestResult(null)
 
-    // Prepare the config with protocol for generic registries
+    // Prepare the config with protocol for generic and gitlab registries
     const testConfig = { ...config }
-    if (config.type === 'generic' && config.registryUrl) {
+    if ((config.type === 'generic' || config.type === 'gitlab') && config.registryUrl) {
       testConfig.registryUrl = `${protocol}://${config.registryUrl.replace(/^https?:\/\//, '')}`
     }
 
@@ -126,9 +135,9 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
   }
 
   const handleAddRepository = async () => {
-    // Prepare the config with protocol for generic registries
+    // Prepare the config with protocol for generic and gitlab registries
     const saveConfig = { ...config }
-    if (config.type === 'generic' && config.registryUrl) {
+    if ((config.type === 'generic' || config.type === 'gitlab') && config.registryUrl) {
       saveConfig.registryUrl = `${protocol}://${config.registryUrl.replace(/^https?:\/\//, '')}`
     }
 
@@ -182,7 +191,7 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
   }
 
   const canTestConnection = config.name && config.username && config.password && 
-    (config.type !== 'generic' || config.registryUrl)
+    ((config.type !== 'generic' && config.type !== 'gitlab') || config.registryUrl)
 
   const canAddRepository = testStatus === 'success'
 
@@ -232,7 +241,7 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
               />
             </div>
 
-            {config.type === 'generic' && (
+            {(config.type === 'generic' || config.type === 'gitlab') && (
               <div className="space-y-2">
                 <Label htmlFor="registryUrl">Registry URL</Label>
                 <div className="flex gap-2">
@@ -273,7 +282,8 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
             <div className="space-y-2">
               <Label htmlFor="username">
                 {config.type === 'dockerhub' ? 'Docker Hub Username' : 
-                 config.type === 'ghcr' ? 'GitHub Username' : 'Username'}
+                 config.type === 'ghcr' ? 'GitHub Username' : 
+                 config.type === 'gitlab' ? 'GitLab Username' : 'Username'}
               </Label>
               <Input
                 id="username"
@@ -286,7 +296,8 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
             <div className="space-y-2">
               <Label htmlFor="password">
                 {config.type === 'dockerhub' ? 'Personal Access Token' : 
-                 config.type === 'ghcr' ? 'GitHub Personal Access Token' : 'Password/Token'}
+                 config.type === 'ghcr' ? 'GitHub Personal Access Token' : 
+                 config.type === 'gitlab' ? 'GitLab Password' : 'Password/Token'}
               </Label>
               <Input
                 id="password"
@@ -296,6 +307,7 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
                 placeholder={
                   config.type === 'dockerhub' ? 'Enter Docker Hub PAT' :
                   config.type === 'ghcr' ? 'Enter GitHub PAT with packages:read scope' :
+                  config.type === 'gitlab' ? 'Enter GitLab admin password' :
                   'Enter password or token'
                 }
               />
@@ -311,6 +323,35 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
                   placeholder="Enter organization name for org packages"
                 />
               </div>
+            )}
+
+            {config.type === 'gitlab' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="authUrl">JWT Auth URL (optional)</Label>
+                  <Input
+                    id="authUrl"
+                    value={config.authUrl}
+                    onChange={(e) => setConfig(prev => ({ ...prev, authUrl: e.target.value }))}
+                    placeholder="https://gitlab.example.com/jwt/auth"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Leave blank to auto-detect from registry URL
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="groupId">Group/Project ID (optional)</Label>
+                  <Input
+                    id="groupId"
+                    value={config.groupId}
+                    onChange={(e) => setConfig(prev => ({ ...prev, groupId: e.target.value }))}
+                    placeholder="e.g., mygroup/myproject"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Limit access to specific GitLab group or project
+                  </p>
+                </div>
+              </>
             )}
 
             <div className="bg-blue-50 p-4 rounded-lg">
@@ -329,7 +370,7 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
               <div className="space-y-2 text-sm">
                 <div><strong>Name:</strong> {config.name}</div>
                 <div><strong>Type:</strong> {repositoryTypes.find(t => t.type === config.type)?.title}</div>
-                <div><strong>Registry:</strong> {config.type === 'generic' && config.registryUrl ? `${protocol}://${config.registryUrl}` : config.registryUrl}</div>
+                <div><strong>Registry:</strong> {(config.type === 'generic' || config.type === 'gitlab') && config.registryUrl ? `${protocol}://${config.registryUrl}` : config.registryUrl}</div>
                 <div><strong>Username:</strong> {config.username}</div>
               </div>
             </div>

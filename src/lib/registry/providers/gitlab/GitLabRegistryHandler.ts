@@ -13,41 +13,54 @@ import type {
 import { logger } from '@/lib/logger';
 
 interface GitLabConfig extends RegistryConfig {
-  gitlabUrl: string;
+  registryUrl: string;  // Base registry URL (e.g., https://104.236.206.145:5050)
+  authUrl: string;      // JWT auth endpoint (e.g., https://104.236.206.145/jwt/auth)
+  username: string;     // Admin username for authentication
+  password: string;     // Admin password for authentication
   projectId?: string;
   groupId?: string;
-  token: string; // Personal Access Token or CI Job Token
-  tokenType: 'personal' | 'job' | 'deploy';
 }
 
-interface GitLabRepository {
-  id: number;
-  name: string;
-  path: string;
-  location: string;
-  created_at: string;
-  tags_count: number;
+interface GitLabCatalogResponse {
+  repositories: string[];
 }
 
-interface GitLabTag {
+interface GitLabTagsResponse {
   name: string;
-  path: string;
-  location: string;
-  digest: string;
-  revision: string;
-  short_revision: string;
-  total_size: number;
-  created_at: string;
+  tags: string[];
+}
+
+interface DockerManifest {
+  schemaVersion: number;
+  name: string;
+  tag: string;
+  architecture?: string;
+  fsLayers?: Array<{ blobSum: string }>;
+  history?: Array<{ v1Compatibility: string }>;
+  config?: {
+    size: number;
+    digest: string;
+  };
+  layers?: Array<{
+    size: number;
+    digest: string;
+  }>;
+}
+
+interface JWTTokenResponse {
+  token: string;
+  expires_in?: number;
+  issued_at?: string;
 }
 
 export class GitLabRegistryHandler extends EnhancedRegistryProvider {
   protected config: GitLabConfig;
-  private apiBaseUrl: string;
+  private jwtToken: string | null = null;
+  private tokenExpiry: Date | null = null;
   
   constructor(repository: Repository) {
     super(repository);
     this.config = this.parseConfig(repository) as GitLabConfig;
-    this.apiBaseUrl = `${this.config.gitlabUrl}/api/v4`;
   }
   
   getProviderName(): string {
@@ -74,134 +87,288 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
   }
   
   protected parseConfig(repository: Repository): GitLabConfig {
-    // Parse GitLab-specific configuration from repository data
-    const gitlabUrl = repository.registryUrl.replace('/registry', '');
+    // Parse GitLab Registry V2 configuration
+    // Expecting registryUrl format: https://host:port
+    // Auth URL should be stored in a custom field or derived from registryUrl
+    const registryUrl = repository.registryUrl;
+    const authUrl = repository.authUrl || `${registryUrl.replace(':5050', '')}/jwt/auth`;
     
     return {
-      gitlabUrl,
-      projectId: repository.organization || undefined, // Could store project ID in organization field
-      token: repository.encryptedPassword, // Should be decrypted
-      tokenType: repository.username === 'gitlab-ci-token' ? 'job' : 'personal',
-      registryUrl: repository.registryUrl,
+      registryUrl,
+      authUrl,
       username: repository.username,
-      password: repository.encryptedPassword
+      password: repository.encryptedPassword, // Should be decrypted in production
+      projectId: repository.organization || undefined,
+      groupId: repository.groupId || undefined
     };
   }
   
   async getSkopeoAuthArgs(): Promise<string> {
-    // GitLab supports both username/password and token auth
-    const username = this.config.tokenType === 'job' ? 'gitlab-ci-token' : this.config.username;
-    const password = this.config.token;
+    // For GitLab Registry V2, we use basic auth with username/password
+    // The registry will handle JWT token exchange internally
+    const escapedUsername = this.config.username.replace(/"/g, '\\"');
+    const escapedPassword = this.config.password.replace(/"/g, '\\"');
     
-    // Escape credentials
-    const escapedUsername = username.replace(/"/g, '\\"');
-    const escapedPassword = password.replace(/"/g, '\\"');
-    
-    return `--creds "${escapedUsername}:${escapedPassword}"`;
+    return `--creds "${escapedUsername}:${escapedPassword}" --tls-verify=false`;
   }
   
-  async getAuthHeaders(): Promise<Record<string, string>> {
-    if (this.config.tokenType === 'personal') {
-      return {
-        'PRIVATE-TOKEN': this.config.token
-      };
-    } else {
-      // For job tokens, use Bearer auth
-      return {
-        'Authorization': `Bearer ${this.config.token}`
-      };
+  /**
+   * Get JWT token for registry authentication
+   */
+  private async getJWTToken(scope?: string): Promise<string> {
+    // Check if we have a valid cached token
+    if (this.jwtToken && this.tokenExpiry && this.tokenExpiry > new Date()) {
+      return this.jwtToken;
     }
+
+    // Request new JWT token
+    const authUrl = new URL(this.config.authUrl);
+    authUrl.searchParams.append('service', 'container_registry');
+    if (scope) {
+      authUrl.searchParams.append('scope', scope);
+    } else {
+      // Default scope for catalog access
+      authUrl.searchParams.append('scope', 'registry:catalog:*');
+    }
+
+    const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
+    
+    const response = await fetch(authUrl.toString(), {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get JWT token: ${response.status} ${response.statusText}`);
+    }
+
+    const data: JWTTokenResponse = await response.json();
+    this.jwtToken = data.token;
+    
+    // Set token expiry (default to 5 minutes if not provided)
+    const expiresIn = data.expires_in || 300;
+    this.tokenExpiry = new Date(Date.now() + expiresIn * 1000);
+    
+    return data.token;
+  }
+
+  async getAuthHeaders(): Promise<Record<string, string>> {
+    const token = await this.getJWTToken();
+    return {
+      'Authorization': `Bearer ${token}`
+    };
   }
   
   async testConnection(): Promise<ConnectionTestResult> {
     try {
-      // Test the GitLab API connection
-      const projectUrl = this.config.projectId 
-        ? `${this.apiBaseUrl}/projects/${this.config.projectId}`
-        : `${this.apiBaseUrl}/version`;
+      // Test connection by getting JWT token and listing catalog
+      const token = await this.getJWTToken('registry:catalog:*');
       
-      const response = await this.makeAuthenticatedRequest(projectUrl);
-      const data = await response.json();
+      // Test catalog endpoint
+      const catalogUrl = `${this.config.registryUrl}/v2/_catalog?n=1`;
+      const response = await fetch(catalogUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
       
-      // Try to list container repositories
-      if (this.config.projectId) {
-        const reposUrl = `${this.apiBaseUrl}/projects/${this.config.projectId}/registry/repositories`;
-        await this.makeAuthenticatedRequest(reposUrl);
+      if (!response.ok) {
+        throw new Error(`Registry returned ${response.status}: ${response.statusText}`);
       }
+      
+      const data: GitLabCatalogResponse = await response.json();
+      const repoCount = data.repositories?.length || 0;
       
       return {
         success: true,
-        message: `Successfully connected to GitLab Container Registry (version: ${data.version || 'unknown'})`,
+        message: `Successfully connected to GitLab Container Registry`,
+        repositoryCount: repoCount,
         capabilities: this.getSupportedCapabilities()
       };
     } catch (error: any) {
       return {
         success: false,
-        message: `GitLab connection failed: ${error.message}`,
+        message: `GitLab Registry connection failed: ${error.message}`,
         error: error.message
       };
     }
   }
   
   async listImages(options?: ListImagesOptions): Promise<RegistryImage[]> {
-    if (!this.config.projectId) {
-      throw new Error('Project ID is required to list images');
-    }
-    
-    const url = `${this.apiBaseUrl}/projects/${this.config.projectId}/registry/repositories`;
-    const response = await this.makeAuthenticatedRequest(url);
-    const repositories: GitLabRepository[] = await response.json();
-    
     const images: RegistryImage[] = [];
+    const limit = options?.limit || 100;
+    let lastRepo: string | undefined;
+    let hasMore = true;
     
-    for (const repo of repositories) {
-      // Get tags for each repository
-      const tagsUrl = `${this.apiBaseUrl}/projects/${this.config.projectId}/registry/repositories/${repo.id}/tags`;
-      const tagsResponse = await this.makeAuthenticatedRequest(tagsUrl);
-      const tags: GitLabTag[] = await tagsResponse.json();
+    // Get JWT token with catalog scope
+    const token = await this.getJWTToken('registry:catalog:*');
+    
+    while (hasMore && images.length < limit) {
+      // Build catalog URL with pagination
+      let catalogUrl = `${this.config.registryUrl}/v2/_catalog?n=${limit}`;
+      if (lastRepo) {
+        catalogUrl += `&last=${lastRepo}`;
+      }
       
-      images.push({
-        name: repo.path,
-        fullName: `${this.config.projectId}/${repo.path}`,
-        namespace: this.config.projectId,
-        description: `GitLab repository ${repo.name}`,
-        isPrivate: true, // GitLab registries are private by default
-        starCount: 0,
-        pullCount: 0,
-        lastUpdated: new Date(repo.created_at)
+      const response = await fetch(catalogUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
       });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to list repositories: ${response.status} ${response.statusText}`);
+      }
+      
+      const data: GitLabCatalogResponse = await response.json();
+      
+      if (!data.repositories || data.repositories.length === 0) {
+        hasMore = false;
+        break;
+      }
+      
+      // Process each repository
+      for (const repoName of data.repositories) {
+        // Parse namespace and image name
+        const parts = repoName.split('/');
+        const namespace = parts.length > 1 ? parts.slice(0, -1).join('/') : null;
+        const imageName = parts[parts.length - 1];
+        
+        images.push({
+          name: imageName,
+          fullName: repoName,
+          namespace: namespace,
+          description: `GitLab Registry image: ${repoName}`,
+          isPrivate: true, // GitLab registries are private by default
+          starCount: 0,
+          pullCount: 0,
+          lastUpdated: new Date()
+        });
+      }
+      
+      // Check for more pages via Link header
+      const linkHeader = response.headers.get('Link');
+      if (linkHeader && linkHeader.includes('rel="next"')) {
+        lastRepo = data.repositories[data.repositories.length - 1];
+      } else {
+        hasMore = false;
+      }
+      
+      // Also check if we got fewer results than requested
+      if (data.repositories.length < limit) {
+        hasMore = false;
+      }
     }
     
     return images;
   }
   
   async getTags(namespace: string | null, imageName: string): Promise<ImageTag[]> {
-    if (!this.config.projectId) {
-      throw new Error('Project ID is required to get tags');
+    // Construct full repository name
+    const repoName = namespace ? `${namespace}/${imageName}` : imageName;
+    
+    // Get JWT token with repository scope
+    const token = await this.getJWTToken(`repository:${repoName}:pull`);
+    
+    const tags: ImageTag[] = [];
+    let lastTag: string | undefined;
+    let hasMore = true;
+    const limit = 100;
+    
+    while (hasMore) {
+      // Build tags list URL with pagination
+      let tagsUrl = `${this.config.registryUrl}/v2/${repoName}/tags/list?n=${limit}`;
+      if (lastTag) {
+        tagsUrl += `&last=${lastTag}`;
+      }
+      
+      const response = await fetch(tagsUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          // Repository doesn't exist or has no tags
+          return [];
+        }
+        throw new Error(`Failed to list tags: ${response.status} ${response.statusText}`);
+      }
+      
+      const data: GitLabTagsResponse = await response.json();
+      
+      if (!data.tags || data.tags.length === 0) {
+        hasMore = false;
+        break;
+      }
+      
+      // Get manifest for each tag to get more details
+      for (const tagName of data.tags) {
+        try {
+          const manifestUrl = `${this.config.registryUrl}/v2/${repoName}/manifests/${tagName}`;
+          const manifestResponse = await fetch(manifestUrl, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/vnd.docker.distribution.manifest.v2+json'
+            }
+          });
+          
+          if (manifestResponse.ok) {
+            const manifest: DockerManifest = await manifestResponse.json();
+            const digest = manifestResponse.headers.get('Docker-Content-Digest');
+            
+            // Calculate total size from layers
+            let totalSize = 0;
+            if (manifest.layers) {
+              totalSize = manifest.layers.reduce((sum, layer) => sum + (layer.size || 0), 0);
+            }
+            
+            tags.push({
+              name: tagName,
+              digest: digest || undefined,
+              size: totalSize || undefined,
+              created: new Date(), // Would need to parse from manifest history
+              lastModified: new Date()
+            });
+          } else {
+            // Fallback if we can't get manifest
+            tags.push({
+              name: tagName,
+              created: new Date(),
+              lastModified: new Date()
+            });
+          }
+        } catch (error) {
+          logger.warn(`Failed to get manifest for ${repoName}:${tagName}`, error);
+          tags.push({
+            name: tagName,
+            created: new Date(),
+            lastModified: new Date()
+          });
+        }
+      }
+      
+      // Check for more pages
+      const linkHeader = response.headers.get('Link');
+      if (linkHeader && linkHeader.includes('rel="next"')) {
+        lastTag = data.tags[data.tags.length - 1];
+      } else {
+        hasMore = false;
+      }
+      
+      if (data.tags.length < limit) {
+        hasMore = false;
+      }
     }
     
-    // First, find the repository ID
-    const reposUrl = `${this.apiBaseUrl}/projects/${this.config.projectId}/registry/repositories`;
-    const reposResponse = await this.makeAuthenticatedRequest(reposUrl);
-    const repositories: GitLabRepository[] = await reposResponse.json();
-    
-    const repo = repositories.find(r => r.path === imageName || r.name === imageName);
-    if (!repo) {
-      throw new Error(`Repository ${imageName} not found`);
-    }
-    
-    // Get tags for the repository
-    const tagsUrl = `${this.apiBaseUrl}/projects/${this.config.projectId}/registry/repositories/${repo.id}/tags`;
-    const tagsResponse = await this.makeAuthenticatedRequest(tagsUrl);
-    const tags: GitLabTag[] = await tagsResponse.json();
-    
-    return tags.map(tag => ({
-      name: tag.name,
-      digest: tag.digest,
-      size: tag.total_size,
-      created: new Date(tag.created_at),
-      lastModified: new Date(tag.created_at)
-    }));
+    return tags;
   }
   
   async getImageMetadata(namespace: string | null, imageName: string): Promise<ImageMetadata> {
@@ -220,27 +387,119 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
   }
   
   async deleteImage(image: string, tag: string): Promise<void> {
-    if (!this.config.projectId) {
-      throw new Error('Project ID is required to delete images');
+    // Get JWT token with delete scope
+    const token = await this.getJWTToken(`repository:${image}:delete`);
+    
+    // First get the manifest digest
+    const manifestUrl = `${this.config.registryUrl}/v2/${image}/manifests/${tag}`;
+    const manifestResponse = await fetch(manifestUrl, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.docker.distribution.manifest.v2+json'
+      }
+    });
+    
+    if (!manifestResponse.ok) {
+      throw new Error(`Failed to get manifest for deletion: ${manifestResponse.status}`);
     }
     
-    // Find the repository
-    const reposUrl = `${this.apiBaseUrl}/projects/${this.config.projectId}/registry/repositories`;
-    const reposResponse = await this.makeAuthenticatedRequest(reposUrl);
-    const repositories: GitLabRepository[] = await reposResponse.json();
-    
-    const repo = repositories.find(r => r.path === image || r.name === image);
-    if (!repo) {
-      throw new Error(`Repository ${image} not found`);
+    const digest = manifestResponse.headers.get('Docker-Content-Digest');
+    if (!digest) {
+      throw new Error('Could not get digest for image deletion');
     }
     
-    // Delete the specific tag
-    const deleteUrl = `${this.apiBaseUrl}/projects/${this.config.projectId}/registry/repositories/${repo.id}/tags/${tag}`;
-    await this.makeAuthenticatedRequest(deleteUrl, { method: 'DELETE' });
+    // Delete by digest
+    const deleteUrl = `${this.config.registryUrl}/v2/${image}/manifests/${digest}`;
+    const deleteResponse = await fetch(deleteUrl, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!deleteResponse.ok && deleteResponse.status !== 202) {
+      throw new Error(`Failed to delete image: ${deleteResponse.status} ${deleteResponse.statusText}`);
+    }
     
     logger.info(`Deleted image ${image}:${tag} from GitLab registry`);
   }
   
+  /**
+   * Export image data for backup or migration
+   */
+  async exportImageData(image: string, tag: string): Promise<{
+    manifest: any;
+    config: any;
+    layers: Array<{ digest: string; size: number }>;
+  }> {
+    const token = await this.getJWTToken(`repository:${image}:pull`);
+    
+    // Get manifest
+    const manifestUrl = `${this.config.registryUrl}/v2/${image}/manifests/${tag}`;
+    const manifestResponse = await fetch(manifestUrl, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.docker.distribution.manifest.v2+json'
+      }
+    });
+    
+    if (!manifestResponse.ok) {
+      throw new Error(`Failed to get manifest: ${manifestResponse.status}`);
+    }
+    
+    const manifest = await manifestResponse.json();
+    
+    // Get config blob if available
+    let config = null;
+    if (manifest.config?.digest) {
+      const configUrl = `${this.config.registryUrl}/v2/${image}/blobs/${manifest.config.digest}`;
+      const configResponse = await fetch(configUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (configResponse.ok) {
+        config = await configResponse.json();
+      }
+    }
+    
+    // Extract layer information
+    const layers = manifest.layers?.map((layer: any) => ({
+      digest: layer.digest,
+      size: layer.size || 0
+    })) || [];
+    
+    return {
+      manifest,
+      config,
+      layers
+    };
+  }
+
+  /**
+   * Rescan an image to refresh its metadata and security status
+   */
+  async rescanImage(namespace: string | null, imageName: string, tag: string): Promise<void> {
+    // For GitLab Registry V2, rescanning involves:
+    // 1. Re-fetching the manifest and metadata
+    // 2. Triggering a new security scan if configured
+    
+    const fullImageName = namespace ? `${namespace}/${imageName}` : imageName;
+    
+    // Get fresh manifest
+    const exportData = await this.exportImageData(fullImageName, tag);
+    
+    logger.info(`Rescanned image ${fullImageName}:${tag}`, {
+      manifestDigest: exportData.manifest?.config?.digest,
+      layerCount: exportData.layers.length,
+      totalSize: exportData.layers.reduce((sum, l) => sum + l.size, 0)
+    });
+    
+    // Note: Actual security scanning would be triggered by the caller
+    // This method just ensures we have fresh registry data
+  }
+
   // ===== GitLab-Specific Features =====
   
   /**

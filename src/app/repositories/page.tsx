@@ -18,6 +18,7 @@ import {
   IconTestPipe,
   IconBrandDocker,
   IconBrandGithub,
+  IconBrandGitlab,
   IconServer,
   IconGitBranch,
 } from "@tabler/icons-react";
@@ -28,7 +29,7 @@ import { toast } from "sonner";
 interface Repository {
   id: string;
   name: string;
-  type: "DOCKERHUB" | "GHCR" | "GENERIC";
+  type: "DOCKERHUB" | "GHCR" | "GITLAB" | "GENERIC";
   protocol?: string;
   registryUrl: string;
   username?: string;
@@ -133,6 +134,8 @@ export default function RepositoriesPage() {
         return <IconBrandDocker className="h-5 w-5" />;
       case "GHCR":
         return <IconBrandGithub className="h-5 w-5" />;
+      case "GITLAB":
+        return <IconBrandGitlab className="h-5 w-5" />;
       default:
         return <IconServer className="h-5 w-5" />;
     }

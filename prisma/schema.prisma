@@ -587,6 +587,8 @@ model Repository {
   updatedAt          DateTime                  @updatedAt
   protocol           String                    @default("https")
   apiVersion         String?
+  authUrl            String?                   // JWT auth endpoint for GitLab Registry
+  groupId            String?                   // GitLab group ID for scoped access
   capabilities       Json?
   rateLimits         Json?
   healthCheck        Json?
@@ -855,6 +857,7 @@ model PatchedImage {
 enum RepositoryType {
   DOCKERHUB
   GHCR
+  GITLAB
   GENERIC
   ECR
   GCR
