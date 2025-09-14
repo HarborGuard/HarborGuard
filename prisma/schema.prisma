@@ -589,6 +589,7 @@ model Repository {
   apiVersion         String?
   authUrl            String?                   // JWT auth endpoint for GitLab Registry
   groupId            String?                   // GitLab group ID for scoped access
+  skipTlsVerify      Boolean                   @default(false) // Skip TLS verification for self-signed certs
   capabilities       Json?
   rateLimits         Json?
   healthCheck        Json?

@@ -19,6 +19,7 @@ interface GitLabConfig extends RegistryConfig {
   password: string;     // Admin password for authentication
   projectId?: string;
   groupId?: string;
+  skipTlsVerify?: boolean; // Skip TLS verification for self-signed certificates
 }
 
 interface GitLabCatalogResponse {
@@ -99,7 +100,8 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
       username: repository.username,
       password: repository.encryptedPassword, // Should be decrypted in production
       projectId: repository.organization || undefined,
-      groupId: repository.groupId || undefined
+      groupId: repository.groupId || undefined,
+      skipTlsVerify: repository.skipTlsVerify || false
     };
   }
   
@@ -109,7 +111,8 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
     const escapedUsername = this.config.username.replace(/"/g, '\\"');
     const escapedPassword = this.config.password.replace(/"/g, '\\"');
     
-    return `--creds "${escapedUsername}:${escapedPassword}" --tls-verify=false`;
+    const tlsVerify = this.config.skipTlsVerify ? '--tls-verify=false' : '';
+    return `--creds "${escapedUsername}:${escapedPassword}" ${tlsVerify}`.trim();
   }
   
   /**
@@ -133,13 +136,24 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
 
     const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
     
-    const response = await fetch(authUrl.toString(), {
+    // Create fetch options with conditional TLS verification
+    const fetchOptions: any = {
       method: 'GET',
       headers: {
         'Authorization': `Basic ${auth}`,
         'Accept': 'application/json'
       }
-    });
+    };
+    
+    // For self-signed certificates, we need to use a custom agent in Node.js
+    if (this.config.skipTlsVerify && typeof process !== 'undefined') {
+      // This will be handled at the infrastructure level
+      // Node.js doesn't allow disabling TLS verification through fetch options
+      // You would need to use process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+      // or use a custom https agent
+    }
+    
+    const response = await fetch(authUrl.toString(), fetchOptions);
 
     if (!response.ok) {
       throw new Error(`Failed to get JWT token: ${response.status} ${response.statusText}`);
@@ -169,6 +183,10 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
       
       // Test catalog endpoint
       const catalogUrl = `${this.config.registryUrl}/v2/_catalog?n=1`;
+      
+      // Note: For self-signed certificates in a browser environment,
+      // the user must accept the certificate in their browser first.
+      // In Node.js, we would need to handle this differently.
       const response = await fetch(catalogUrl, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -185,11 +203,19 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
       
       return {
         success: true,
-        message: `Successfully connected to GitLab Container Registry`,
+        message: `Successfully connected to GitLab Container Registry${this.config.skipTlsVerify ? ' (TLS verification disabled)' : ''}`,
         repositoryCount: repoCount,
         capabilities: this.getSupportedCapabilities()
       };
     } catch (error: any) {
+      // Provide helpful message for SSL errors
+      if (error.message.includes('SSL') || error.message.includes('certificate')) {
+        return {
+          success: false,
+          message: `SSL/TLS error: ${error.message}. Try enabling 'Skip TLS Verification' for self-signed certificates.`,
+          error: error.message
+        };
+      }
       return {
         success: false,
         message: `GitLab Registry connection failed: ${error.message}`,

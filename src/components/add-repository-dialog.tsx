@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,7 @@ interface RepositoryConfig {
   organization?: string
   authUrl?: string
   groupId?: string
+  skipTlsVerify?: boolean
 }
 
 export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: AddRepositoryDialogProps) {
@@ -49,6 +51,7 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
     username: '',
     password: '',
     organization: '',
+    skipTlsVerify: false,
   })
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
   const [testResult, setTestResult] = useState<{ repositoryCount?: number; error?: string } | null>(null)
@@ -92,6 +95,7 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
       type,
       registryUrl: registryInfo?.registryUrl || '',
       name: registryInfo?.title || '',
+      skipTlsVerify: false,
     }))
     setStep('configure')
   }
@@ -184,6 +188,7 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
       username: '',
       password: '',
       organization: '',
+      skipTlsVerify: false,
     })
     setTestStatus('idle')
     setTestResult(null)
@@ -242,41 +247,67 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
             </div>
 
             {(config.type === 'generic' || config.type === 'gitlab') && (
-              <div className="space-y-2">
-                <Label htmlFor="registryUrl">Registry URL</Label>
-                <div className="flex gap-2">
-                  <Select value={protocol} onValueChange={(value: 'https' | 'http') => setProtocol(value)}>
-                    <SelectTrigger className="w-[100px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="https">HTTPS</SelectItem>
-                      <SelectItem value="http">HTTP</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    id="registryUrl"
-                    value={config.registryUrl}
-                    onChange={(e) => {
-                      let value = e.target.value
-                      // If user pastes a URL with protocol, extract it
-                      if (value.startsWith('http://')) {
-                        setProtocol('http')
-                        value = value.substring(7)
-                      } else if (value.startsWith('https://')) {
-                        setProtocol('https')
-                        value = value.substring(8)
-                      }
-                      setConfig(prev => ({ ...prev, registryUrl: value }))
-                    }}
-                    placeholder="registry.company.com"
-                    className="flex-1"
-                  />
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="registryUrl">Registry URL</Label>
+                  <div className="flex gap-2">
+                    <Select value={protocol} onValueChange={(value: 'https' | 'http') => setProtocol(value)}>
+                      <SelectTrigger className="w-[100px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="https">HTTPS</SelectItem>
+                        <SelectItem value="http">HTTP</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      id="registryUrl"
+                      value={config.registryUrl}
+                      onChange={(e) => {
+                        let value = e.target.value
+                        // If user pastes a URL with protocol, extract it
+                        if (value.startsWith('http://')) {
+                          setProtocol('http')
+                          value = value.substring(7)
+                        } else if (value.startsWith('https://')) {
+                          setProtocol('https')
+                          value = value.substring(8)
+                        }
+                        setConfig(prev => ({ ...prev, registryUrl: value }))
+                      }}
+                      placeholder="registry.company.com"
+                      className="flex-1"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Use HTTP for insecure registries (e.g., localhost or internal registries)
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Use HTTP for insecure registries (e.g., localhost or internal registries)
-                </p>
-              </div>
+                
+                {protocol === 'https' && (
+                  <div className="flex items-start space-x-3 py-2">
+                    <Checkbox
+                      id="skipTlsVerify"
+                      checked={config.skipTlsVerify}
+                      onCheckedChange={(checked) => 
+                        setConfig(prev => ({ ...prev, skipTlsVerify: checked === true }))
+                      }
+                    />
+                    <div className="space-y-1">
+                      <Label 
+                        htmlFor="skipTlsVerify" 
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Skip TLS Verification
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Enable this for registries with self-signed SSL certificates. 
+                        <span className="text-orange-600">⚠️ Warning: This reduces security.</span>
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             <div className="space-y-2">
@@ -351,6 +382,30 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
                     Limit access to specific GitLab group or project
                   </p>
                 </div>
+                
+                {protocol === 'https' && (
+                  <div className="flex items-start space-x-3 py-2">
+                    <Checkbox
+                      id="gitlab-skipTlsVerify"
+                      checked={config.skipTlsVerify}
+                      onCheckedChange={(checked) => 
+                        setConfig(prev => ({ ...prev, skipTlsVerify: checked === true }))
+                      }
+                    />
+                    <div className="space-y-1">
+                      <Label 
+                        htmlFor="gitlab-skipTlsVerify" 
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Skip TLS Verification
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Enable this for GitLab instances with self-signed SSL certificates. 
+                        <span className="text-orange-600">⚠️ Warning: This reduces security.</span>
+                      </p>
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
