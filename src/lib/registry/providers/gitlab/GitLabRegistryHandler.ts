@@ -92,7 +92,30 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
     // Expecting registryUrl format: https://host:port
     // Auth URL should be stored in a custom field or derived from registryUrl
     const registryUrl = repository.registryUrl;
-    const authUrl = repository.authUrl || `${registryUrl.replace(':5050', '')}/jwt/auth`;
+    
+    // Derive auth URL by removing the registry port and using the base GitLab URL
+    let authUrl = repository.authUrl;
+    if (!authUrl) {
+      // Parse the registry URL to extract the base domain
+      try {
+        const url = new URL(registryUrl);
+        // Remove any registry-specific port and use the standard GitLab instance URL
+        // Common patterns:
+        // - https://gitlab.com:5050 -> https://gitlab.com/jwt/auth
+        // - https://registry.gitlab.com -> https://gitlab.com/jwt/auth
+        // - https://192.168.1.100:5000 -> https://192.168.1.100/jwt/auth
+        
+        let baseUrl = `${url.protocol}//${url.hostname}`;
+        // If it's a registry subdomain, try to use the main domain
+        if (url.hostname.startsWith('registry.')) {
+          baseUrl = `${url.protocol}//${url.hostname.replace('registry.', '')}`;
+        }
+        authUrl = `${baseUrl}/jwt/auth`;
+      } catch (e) {
+        // Fallback to simple string manipulation if URL parsing fails
+        authUrl = `${registryUrl.replace(/:\d+$/, '')}/jwt/auth`;
+      }
+    }
     
     return {
       registryUrl,

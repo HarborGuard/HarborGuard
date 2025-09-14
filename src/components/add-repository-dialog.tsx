@@ -275,12 +275,12 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
                         }
                         setConfig(prev => ({ ...prev, registryUrl: value }))
                       }}
-                      placeholder="registry.company.com"
+                      placeholder="registry.company.com:5050"
                       className="flex-1"
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Use HTTP for insecure registries (e.g., localhost or internal registries)
+                    Include port if non-standard (e.g., :5050, :5000). Use HTTP for insecure registries.
                   </p>
                 </div>
                 
@@ -382,30 +382,6 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
                     Limit access to specific GitLab group or project
                   </p>
                 </div>
-                
-                {protocol === 'https' && (
-                  <div className="flex items-start space-x-3 py-2">
-                    <Checkbox
-                      id="gitlab-skipTlsVerify"
-                      checked={config.skipTlsVerify}
-                      onCheckedChange={(checked) => 
-                        setConfig(prev => ({ ...prev, skipTlsVerify: checked === true }))
-                      }
-                    />
-                    <div className="space-y-1">
-                      <Label 
-                        htmlFor="gitlab-skipTlsVerify" 
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        Skip TLS Verification
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        Enable this for GitLab instances with self-signed SSL certificates. 
-                        <span className="text-orange-600">⚠️ Warning: This reduces security.</span>
-                      </p>
-                    </div>
-                  </div>
-                )}
               </>
             )}
 
