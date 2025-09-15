@@ -15,13 +15,35 @@ export async function GET(
     const namespace = searchParams.get('namespace') || null
     const forceRefresh = searchParams.get('forceRefresh') === 'true'
 
+    console.log('[Tags API] Request received:', {
+      repositoryId: id,
+      imageName,
+      namespace,
+      forceRefresh,
+      decodedImageName: decodeURIComponent(imageName)
+    })
+
     const tags = await registryService.getTags(id, namespace, imageName, {
       forceRefresh
     })
 
+    console.log('[Tags API] Tags fetched successfully:', {
+      repositoryId: id,
+      imageName,
+      namespace,
+      tagCount: tags.length,
+      tags: tags.map(t => t.name)
+    })
+
     return NextResponse.json(tags)
   } catch (error) {
-    console.error('Failed to fetch image tags:', error)
+    console.error('[Tags API] Failed to fetch image tags:', {
+      repositoryId: id,
+      imageName,
+      namespace: searchParams?.get('namespace'),
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    })
     const errorMessage = error instanceof Error ? error.message : 'Failed to fetch image tags'
     
     return NextResponse.json(

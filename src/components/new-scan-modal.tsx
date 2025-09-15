@@ -140,10 +140,18 @@ export function NewScanModal({ children }: NewScanModalProps) {
       if (response.ok) {
         const data = await response.json()
         setRepositoryImages(prev => ({ ...prev, [repository.id]: data }))
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('Failed to fetch repository images - server error:', response.status, errorData)
+        toast.error(`Failed to fetch repository images: ${errorData.error || 'Server error'}`)
+        // Set empty array so UI shows "No images found" instead of staying in loading state
+        setRepositoryImages(prev => ({ ...prev, [repository.id]: [] }))
       }
     } catch (error) {
       console.error('Failed to fetch repository images:', error)
       toast.error('Failed to fetch repository images')
+      // Set empty array so UI shows "No images found" instead of staying in loading state
+      setRepositoryImages(prev => ({ ...prev, [repository.id]: [] }))
     } finally {
       setLoadingImages(prev => ({ ...prev, [repository.id]: false }))
     }
@@ -153,14 +161,48 @@ export function NewScanModal({ children }: NewScanModalProps) {
     setLoadingTags(prev => ({ ...prev, [repository.id]: true }))
     
     try {
-      const response = await fetch(`/api/repositories/${repository.id}/images/${encodeURIComponent(image.name)}/tags`)
+      // Build the URL with namespace if it exists
+      const url = new URL(`/api/repositories/${repository.id}/images/${encodeURIComponent(image.name)}/tags`, window.location.origin)
+      if (image.namespace) {
+        url.searchParams.append('namespace', image.namespace)
+      }
+      
+      console.log('[Modal] Fetching tags for image:', {
+        repository: repository.name,
+        image: image.name,
+        fullName: image.fullName,
+        namespace: image.namespace,
+        url: url.toString()
+      })
+      
+      const response = await fetch(url.toString())
       if (response.ok) {
         const data = await response.json()
+        console.log('[Modal] Tags fetched successfully:', {
+          image: image.name,
+          tagCount: data.length,
+          tags: data.map((t: any) => t.name || t)
+        })
         setRepositoryTags(prev => ({ ...prev, [repository.id]: data }))
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('[Modal] Failed to fetch image tags - server error:', {
+          image: image.name,
+          status: response.status,
+          error: errorData
+        })
+        toast.error(`Failed to fetch image tags: ${errorData.error || 'Server error'}`)
+        // Set empty array so UI shows "No tags found" instead of staying in loading state
+        setRepositoryTags(prev => ({ ...prev, [repository.id]: [] }))
       }
     } catch (error) {
-      console.error('Failed to fetch image tags:', error)
+      console.error('[Modal] Failed to fetch image tags:', {
+        image: image.name,
+        error: error instanceof Error ? error.message : error
+      })
       toast.error('Failed to fetch image tags')
+      // Set empty array so UI shows "No tags found" instead of staying in loading state
+      setRepositoryTags(prev => ({ ...prev, [repository.id]: [] }))
     } finally {
       setLoadingTags(prev => ({ ...prev, [repository.id]: false }))
     }
@@ -700,7 +742,11 @@ export function NewScanModal({ children }: NewScanModalProps) {
                                         // Start scanning all images
                                         for (const image of images) {
                                           // Fetch actual tags for this image from the registry
-                                          const tagsResponse = await fetch(`/api/repositories/${repo.id}/images/${encodeURIComponent(image.name)}/tags`);
+                                          const tagsUrl = new URL(`/api/repositories/${repo.id}/images/${encodeURIComponent(image.name)}/tags`, window.location.origin)
+                                          if (image.namespace) {
+                                            tagsUrl.searchParams.append('namespace', image.namespace)
+                                          }
+                                          const tagsResponse = await fetch(tagsUrl.toString());
                                           
                                           if (!tagsResponse.ok) {
                                             console.error(`Failed to fetch tags for ${image.name}`);
