@@ -61,7 +61,20 @@ export default function ImageDetailsPage() {
 
   // Filter data for the specific image name
   const imageData = useMemo(() => {
-    const imagesByName = images.filter((img) => img.name === imageName);
+    // Handle both full image names (e.g., "x86_64/keepalived-exported") and cleaned names (e.g., "keepalived-exported")
+    const imagesByName = images.filter((img) => {
+      // Match exact name
+      if (img.name === imageName) return true;
+
+      // For names with '/', also try matching the cleaned version (everything after first '/')
+      if (imageName.includes('/')) {
+        const cleanedName = imageName.split('/').slice(1).join('/');
+        if (img.name === cleanedName) return true;
+      }
+
+      return false;
+    });
+
     const scansForImages = scans.filter((scan) =>
       imagesByName.some((img) => img.id === scan.imageId)
     );
