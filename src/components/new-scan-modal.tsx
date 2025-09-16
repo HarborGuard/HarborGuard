@@ -140,10 +140,18 @@ export function NewScanModal({ children }: NewScanModalProps) {
       if (response.ok) {
         const data = await response.json()
         setRepositoryImages(prev => ({ ...prev, [repository.id]: data }))
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('Failed to fetch repository images - server error:', response.status, errorData)
+        toast.error(`Failed to fetch repository images: ${errorData.error || 'Server error'}`)
+        // Set empty array so UI shows "No images found" instead of staying in loading state
+        setRepositoryImages(prev => ({ ...prev, [repository.id]: [] }))
       }
     } catch (error) {
       console.error('Failed to fetch repository images:', error)
       toast.error('Failed to fetch repository images')
+      // Set empty array so UI shows "No images found" instead of staying in loading state
+      setRepositoryImages(prev => ({ ...prev, [repository.id]: [] }))
     } finally {
       setLoadingImages(prev => ({ ...prev, [repository.id]: false }))
     }
@@ -153,14 +161,27 @@ export function NewScanModal({ children }: NewScanModalProps) {
     setLoadingTags(prev => ({ ...prev, [repository.id]: true }))
     
     try {
-      const response = await fetch(`/api/repositories/${repository.id}/images/${encodeURIComponent(image.name)}/tags`)
+      // Build the URL with namespace if it exists
+      const url = new URL(`/api/repositories/${repository.id}/images/${encodeURIComponent(image.name)}/tags`, window.location.origin)
+      if (image.namespace) {
+        url.searchParams.append('namespace', image.namespace)
+      }
+      
+      
+      const response = await fetch(url.toString())
       if (response.ok) {
         const data = await response.json()
         setRepositoryTags(prev => ({ ...prev, [repository.id]: data }))
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        toast.error(`Failed to fetch image tags: ${errorData.error || 'Server error'}`)
+        // Set empty array so UI shows "No tags found" instead of staying in loading state
+        setRepositoryTags(prev => ({ ...prev, [repository.id]: [] }))
       }
     } catch (error) {
-      console.error('Failed to fetch image tags:', error)
       toast.error('Failed to fetch image tags')
+      // Set empty array so UI shows "No tags found" instead of staying in loading state
+      setRepositoryTags(prev => ({ ...prev, [repository.id]: [] }))
     } finally {
       setLoadingTags(prev => ({ ...prev, [repository.id]: false }))
     }
@@ -329,6 +350,21 @@ export function NewScanModal({ children }: NewScanModalProps) {
         imageName = selectedDockerImage.repository
         imageTag = selectedDockerImage.tag
         registry = 'local' // Set registry to 'local' for local images
+      } else if (selectedSource === 'private' && selectedRepository) {
+        // Handle private repository images specially to preserve namespace
+        const selectedImage = selectedImages[selectedRepository.id]
+        const selectedTag = selectedTags[selectedRepository.id]
+        if (selectedImage && selectedTag) {
+          // For GitLab and other registries with namespaces, use fullName to preserve the namespace
+          // fullName contains the complete path with namespace (e.g., "root/docker-image")
+          imageName = selectedImage.fullName || selectedImage.name
+          imageTag = selectedTag
+          registry = selectedRepository.registryUrl
+        } else {
+          toast.error("Please select an image and tag")
+          setIsLoading(false)
+          return
+        }
       } else {
         // Parse image string for registry images
         const parsed = parseImageString(imageString)
@@ -363,17 +399,11 @@ export function NewScanModal({ children }: NewScanModalProps) {
         }
       }
 
-      // For private repositories, set registry and repository ID
+      // For private repositories, ensure repository ID is set
       if (selectedSource === 'private' && selectedRepository) {
-        const selectedImage = selectedImages[selectedRepository.id]
-        const selectedTag = selectedTags[selectedRepository.id]
-        if (selectedImage && selectedTag) {
-          // Include protocol with registry URL for proper skopeo handling
-          const protocol = selectedRepository.protocol || 'https'
-          scanRequest.registry = selectedRepository.registryUrl
-          scanRequest.repositoryId = selectedRepository.id
-          scanRequest.source = 'registry'
-        }
+        scanRequest.repositoryId = selectedRepository.id
+        scanRequest.source = 'registry'
+        // Note: image name and tag are already set correctly above with namespace preserved
       }
       
       const response = await fetch('/api/scans/start', {
@@ -679,7 +709,6 @@ export function NewScanModal({ children }: NewScanModalProps) {
                                         }
                                         
                                         const data = await response.json();
-                                        console.log('Fetched images for scan all:', data);
                                         // The API returns the images array directly, not wrapped in an object
                                         const images = Array.isArray(data) ? data : (data.images || data || []);
                                         
@@ -700,7 +729,11 @@ export function NewScanModal({ children }: NewScanModalProps) {
                                         // Start scanning all images
                                         for (const image of images) {
                                           // Fetch actual tags for this image from the registry
-                                          const tagsResponse = await fetch(`/api/repositories/${repo.id}/images/${encodeURIComponent(image.name)}/tags`);
+                                          const tagsUrl = new URL(`/api/repositories/${repo.id}/images/${encodeURIComponent(image.name)}/tags`, window.location.origin)
+                                          if (image.namespace) {
+                                            tagsUrl.searchParams.append('namespace', image.namespace)
+                                          }
+                                          const tagsResponse = await fetch(tagsUrl.toString());
                                           
                                           if (!tagsResponse.ok) {
                                             console.error(`Failed to fetch tags for ${image.name}`);
@@ -708,7 +741,6 @@ export function NewScanModal({ children }: NewScanModalProps) {
                                           }
                                           
                                           const tagsData = await tagsResponse.json();
-                                          console.log(`Tags response for ${image.name}:`, tagsData);
                                           
                                           // Extract tags - handle both array and object formats
                                           let tags = [];
@@ -730,11 +762,9 @@ export function NewScanModal({ children }: NewScanModalProps) {
                                           
                                           // If no tags found, skip this image
                                           if (tags.length === 0) {
-                                            console.warn(`No tags found for ${image.name}, skipping`);
                                             continue;
                                           }
                                           
-                                          console.log(`Found ${tags.length} tags for ${image.name}:`, tags);
                                           
                                           // Prepare batch scan requests for all tags
                                           const scanRequests = tags.map((tag: any) => {
@@ -756,7 +786,6 @@ export function NewScanModal({ children }: NewScanModalProps) {
                                         
                                         // Submit all scans as a batch
                                         if (batchScanRequests.length > 0) {
-                                          console.log(`Submitting batch of ${batchScanRequests.length} scans...`);
                                           
                                           try {
                                             const batchResponse = await fetch('/api/scans/start', {
@@ -770,7 +799,6 @@ export function NewScanModal({ children }: NewScanModalProps) {
                                             
                                             if (batchResponse.ok) {
                                               const batchResult = await batchResponse.json();
-                                              console.log('Batch scan result:', batchResult);
                                               
                                               // Process batch results
                                               let successCount = 0;
@@ -787,10 +815,8 @@ export function NewScanModal({ children }: NewScanModalProps) {
                                                     progress: 0
                                                   });
                                                   successCount++;
-                                                  console.log(`✓ Started scan for ${result.image}:${result.tag}`);
                                                 } else {
                                                   failCount++;
-                                                  console.error(`Failed to start scan for ${result.image}:${result.tag}:`, result.error);
                                                 }
                                               }
                                               
@@ -809,7 +835,6 @@ export function NewScanModal({ children }: NewScanModalProps) {
                                               }
                                             } else {
                                               const errorData = await batchResponse.json();
-                                              console.error('Batch scan request failed:', errorData);
                                               toast.error(`Failed to submit batch scans: ${errorData.error || 'Unknown error'}`);
                                             }
                                           } catch (error) {

@@ -188,7 +188,9 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         }
       } else {
         // Construct full image reference with registry
-        imageRef = `${registryUrl}/${cleanImageName}:${request.tag}`;
+        // Remove protocol from registry URL for docker:// format
+        const cleanRegistryUrl = registryUrl.replace(/^https?:\/\//, '');
+        imageRef = `${cleanRegistryUrl}/${cleanImageName}:${request.tag}`;
       }
 
       // Get repository - required for registry operations
@@ -196,6 +198,13 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       if (request.repositoryId) {
         repository = await prisma.repository.findUnique({
           where: { id: request.repositoryId }
+        });
+        console.log('[DatabaseAdapter] Using repository from DB:', {
+          id: repository?.id,
+          type: repository?.type,
+          registryUrl: repository?.registryUrl,
+          registryPort: repository?.registryPort,
+          skipTlsVerify: repository?.skipTlsVerify
         });
       } else if (request.image) {
         // Try to find a repository for this image
@@ -283,7 +292,9 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       }
       
       // Use registry handler for all operations
+      console.log('[DatabaseAdapter] Creating provider for repository type:', repository.type);
       const provider = RegistryProviderFactory.createFromRepository(repository);
+      console.log('[DatabaseAdapter] Provider created:', provider.getProviderName());
       const inspection = await provider.inspectImage(cleanImageName, request.tag);
       const digest = inspection.digest;
       const metadata = inspection.config || {};

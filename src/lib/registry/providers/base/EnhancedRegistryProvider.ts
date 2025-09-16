@@ -98,8 +98,7 @@ export abstract class EnhancedRegistryProvider {
    * Pull an image from the registry to local tar archive
    */
   async pullImage(image: string, tag: string, destination: string): Promise<void> {
-    // Build the full image reference with registry
-    const registry = this.repository.registryUrl;
+    const registry = this.formatRegistryForSkopeo();
     const imageRef = `${registry}/${image}:${tag || 'latest'}`;
     const authArgs = await this.getSkopeoAuthArgs();
     // For copy command pulling FROM registry, replace --creds with --src-creds
@@ -147,13 +146,22 @@ export abstract class EnhancedRegistryProvider {
    * Inspect an image to get detailed metadata
    */
   async inspectImage(image: string, tag: string): Promise<ImageInspection> {
-    // Build the full image reference with registry
-    const registry = this.repository.registryUrl;
+    const registry = this.formatRegistryForSkopeo();
     const imageRef = `${registry}/${image}:${tag || 'latest'}`;
     const authArgs = await this.getSkopeoAuthArgs();
     const tlsVerify = this.shouldVerifyTLS() ? '' : '--tls-verify=false';
     
     const command = `skopeo inspect ${authArgs} ${tlsVerify} docker://${imageRef}`;
+    
+    console.log('[EnhancedRegistryProvider.inspectImage] Building skopeo command:', {
+      repositoryType: this.repository.type,
+      registry,
+      image,
+      tag: tag || 'latest',
+      imageRef,
+      tlsVerify,
+      finalCommand: command.replace(/--creds "[^"]+"/, '--creds "***"')
+    });
     
     logger.debug(`Inspecting image ${imageRef}`);
     const { stdout } = await this.executeSkopeoCommand(command);
@@ -181,8 +189,7 @@ export abstract class EnhancedRegistryProvider {
    * Get the digest of an image
    */
   async getImageDigest(image: string, tag: string): Promise<string> {
-    // Build the full image reference with registry
-    const registry = this.repository.registryUrl;
+    const registry = this.formatRegistryForSkopeo();
     const imageRef = `${registry}/${image}:${tag || 'latest'}`;
     const authArgs = await this.getSkopeoAuthArgs();
     const tlsVerify = this.shouldVerifyTLS() ? '' : '--tls-verify=false';
@@ -245,6 +252,35 @@ export abstract class EnhancedRegistryProvider {
   // ===== Utility Methods =====
   
   /**
+   * Format registry URL for skopeo commands (removes protocol, adds port for GitLab)
+   */
+  protected formatRegistryForSkopeo(): string {
+    let registry = this.repository.registryUrl;
+    
+    console.log('[EnhancedRegistryProvider.formatRegistryForSkopeo] Input:', {
+      repositoryType: this.repository.type,
+      registryUrl: this.repository.registryUrl,
+      registryPort: this.repository.registryPort
+    });
+    
+    // Remove protocol if present for docker:// format
+    registry = registry.replace(/^https?:\/\//, '');
+    
+    // For GitLab repositories, the port is already included in the registryUrl
+    // (e.g., "http://24.199.119.91:5050" becomes "24.199.119.91:5050")
+    // For other registries, add port if specified separately
+    if (this.repository.type !== 'GITLAB' && this.repository.registryPort && !registry.includes(':')) {
+      registry = `${registry}:${this.repository.registryPort}`;
+    }
+    
+    console.log('[EnhancedRegistryProvider.formatRegistryForSkopeo] Output:', {
+      cleanedRegistry: registry
+    });
+    
+    return registry;
+  }
+  
+  /**
    * Handle rate limiting
    */
   protected async handleRateLimit(): Promise<void> {
@@ -300,9 +336,18 @@ export abstract class EnhancedRegistryProvider {
    * Format an image reference for the registry
    */
   protected formatImageReference(ref: ImageReference): string {
-    // Check if the image already contains the registry URL
-    const registry = ref.registry || this.repository.registryUrl;
+    // Use the helper method to format registry URL
+    let registry = ref.registry ? ref.registry.replace(/^https?:\/\//, '') : this.formatRegistryForSkopeo();
     let imageName = ref.image;
+    
+    console.log('[EnhancedRegistryProvider.formatImageReference] Input:', {
+      repositoryType: this.repository.type,
+      refRegistry: ref.registry,
+      refImage: ref.image,
+      refNamespace: ref.namespace,
+      refTag: ref.tag,
+      computedRegistry: registry
+    });
     
     // If the image already starts with the registry URL, don't add it again
     if (imageName.startsWith(registry + '/')) {
@@ -323,7 +368,14 @@ export abstract class EnhancedRegistryProvider {
     
     parts.push(`${imageName}:${ref.tag || 'latest'}`);
     
-    return parts.join('/');
+    const result = parts.join('/');
+    
+    console.log('[EnhancedRegistryProvider.formatImageReference] Output:', {
+      parts,
+      result
+    });
+    
+    return result;
   }
   
   /**

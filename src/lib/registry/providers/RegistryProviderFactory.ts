@@ -14,8 +14,8 @@ export class RegistryProviderFactory {
     // Register default providers
     this.register('DOCKERHUB', DockerHubProvider);
     this.register('GHCR', GHCRProvider);
+    this.register('GITLAB', GitLabRegistryHandler);
     this.register('GENERIC', GenericOCIProvider);
-    // GitLab will be registered as GENERIC with special handling
   }
   
   /**
@@ -40,13 +40,25 @@ export class RegistryProviderFactory {
    * Create a provider instance directly from repository (uses repository.type)
    */
   static createFromRepository(repository: Repository): EnhancedRegistryProvider {
-    // Check for special cases based on registry URL
-    if (repository.registryUrl?.includes('gitlab')) {
+    // Check for special cases based on registry URL if type is GENERIC
+    if (repository.type === 'GENERIC') {
+      // Auto-detect GitLab
+      if (repository.registryUrl?.includes('gitlab') || repository.authUrl?.includes('/jwt/auth')) {
+        return new GitLabRegistryHandler(repository);
+      }
+      
+      // Auto-detect GHCR
+      if (repository.registryUrl?.includes('ghcr.io')) {
+        return new GHCRProvider(repository);
+      }
+    }
+    
+    // Direct type mapping
+    if (repository.type === 'GITLAB') {
       return new GitLabRegistryHandler(repository);
     }
     
-    // Auto-detect GHCR if type is GHCR or registry URL is ghcr.io
-    if (repository.type === 'GHCR' || repository.registryUrl?.includes('ghcr.io')) {
+    if (repository.type === 'GHCR') {
       return new GHCRProvider(repository);
     }
     
@@ -90,6 +102,10 @@ export class RegistryProviderFactory {
         lastTested: null,
         repositoryCount: null,
         apiVersion: null,
+        authUrl: null,
+        groupId: null,
+        skipTlsVerify: false,
+        registryPort: null,
         capabilities: null,
         rateLimits: null,
         healthCheck: null,
@@ -146,6 +162,14 @@ export class RegistryProviderFactory {
         if (!repository.encryptedPassword?.startsWith('ghp_') && !repository.encryptedPassword?.startsWith('ghs_')) {
           errors.push('GHCR requires a GitHub Personal Access Token (PAT) starting with ghp_ or ghs_');
         }
+        break;
+        
+      case 'GITLAB':
+        // GitLab Registry specific validations
+        if (!repository.registryUrl?.trim()) {
+          errors.push('Registry URL is required for GitLab Registry');
+        }
+        // authUrl is optional as it can be derived from registryUrl
         break;
         
       default:
