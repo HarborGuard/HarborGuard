@@ -42,9 +42,11 @@ export async function GET(request: NextRequest) {
           id: true,
           name: true,
           tag: true,
-          registry: true,
+          source: true,
           digest: true,
           sizeBytes: true,
+          platform: true,
+          primaryRepositoryId: true,
           createdAt: true,
           updatedAt: true
         }

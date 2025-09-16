@@ -4,16 +4,20 @@
   "private": true,
   "scripts": {
     "dev": "NODE_ENV=development next dev --turbopack",
+    "dev:fresh": "npm run fresh && NODE_ENV=development next dev --turbopack",
     "build": "npx prisma generate && npm run generate:openapi && next build",
     "build:docker": "npx prisma generate && next build",
     "generate:openapi": "npx tsx scripts/generate-openapi.ts",
     "start": "node scripts/init-database.js && next start -p ${PORT:-3000}",
     "start:dev": "next start",
     "lint": "next lint",
+    "test:build": "npx prisma generate && npx tsc --noEmit",
+    "prebuild": "npx prisma generate",
     "db:init": "node scripts/init-database.js",
     "db:migrate": "npx prisma migrate deploy",
     "db:push": "npx prisma db push",
-    "db:reset": "npx prisma migrate reset --force",
+    "db:reset": "npx prisma migrate reset --force && npx prisma generate",
+    "fresh": "rm -rf src/generated/prisma node_modules/.prisma && npx prisma generate",
     "db:generate": "npx prisma generate"
   },
   "dependencies": {

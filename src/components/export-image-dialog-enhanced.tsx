@@ -18,6 +18,12 @@ interface Repository {
   protocol?: string;
 }
 
+interface RegistryImage {
+  name: string;
+  fullName: string;
+  namespace?: string;
+}
+
 interface ExportImageDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -43,6 +49,9 @@ export function ExportImageDialogEnhanced({
   const [targetImageTag, setTargetImageTag] = useState("");
   const [useCustomRegistry, setUseCustomRegistry] = useState(false);
   const [dockerAvailable, setDockerAvailable] = useState<boolean | null>(null);
+  const [repositoryImages, setRepositoryImages] = useState<RegistryImage[]>([]);
+  const [loadingImages, setLoadingImages] = useState(false);
+  const [selectedTargetImage, setSelectedTargetImage] = useState<string>("");
   
   // Load repositories and check Docker when dialog opens
   useEffect(() => {
@@ -59,6 +68,23 @@ export function ExportImageDialogEnhanced({
       fetchRepositories();
     }
   }, [dockerAvailable, open]);
+  
+  // Fetch images when a GitLab repository is selected
+  useEffect(() => {
+    if (selectedRepository && selectedRepository !== 'custom' && selectedRepository !== 'docker-local') {
+      const repo = repositories.find(r => r.id === selectedRepository);
+      if (repo && repo.type === 'GITLAB') {
+        fetchRepositoryImages(selectedRepository);
+      } else {
+        // Clear images for non-GitLab repositories
+        setRepositoryImages([]);
+        setSelectedTargetImage("");
+      }
+    } else {
+      setRepositoryImages([]);
+      setSelectedTargetImage("");
+    }
+  }, [selectedRepository, repositories]);
   
   const checkDockerAvailability = async () => {
     try {
@@ -101,6 +127,36 @@ export function ExportImageDialogEnhanced({
       }
     } catch (error) {
       console.error('Failed to fetch repositories:', error);
+    }
+  };
+  
+  const fetchRepositoryImages = async (repositoryId: string) => {
+    setLoadingImages(true);
+    try {
+      const response = await fetch(`/api/repositories/${repositoryId}/images`);
+      if (response.ok) {
+        const data = await response.json();
+        setRepositoryImages(data);
+        // If there's only one image or if the current image exists in the list, pre-select it
+        if (data.length === 1) {
+          setSelectedTargetImage(data[0].fullName);
+          setTargetImageName(data[0].fullName);
+        } else {
+          // Try to find a matching image
+          const matchingImage = data.find((img: RegistryImage) => 
+            img.name === imageName || img.fullName === imageName
+          );
+          if (matchingImage) {
+            setSelectedTargetImage(matchingImage.fullName);
+            setTargetImageName(matchingImage.fullName);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch repository images:', error);
+      toast.error('Failed to fetch repository images');
+    } finally {
+      setLoadingImages(false);
     }
   };
   
@@ -247,25 +303,82 @@ export function ExportImageDialogEnhanced({
             </div>
           )}
           
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Target Image Name</Label>
-              <Input
-                value={targetImageName}
-                onChange={(e) => setTargetImageName(e.target.value)}
-                placeholder="Image name"
-              />
+          {/* Show dropdown for GitLab repositories, input for others */}
+          {selectedRepository && repositories.find(r => r.id === selectedRepository)?.type === 'GITLAB' ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Target Image</Label>
+                {loadingImages ? (
+                  <div className="flex items-center justify-center p-2 border rounded">
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Loading images...
+                  </div>
+                ) : repositoryImages.length > 0 ? (
+                  <Select 
+                    value={selectedTargetImage}
+                    onValueChange={(value) => {
+                      setSelectedTargetImage(value);
+                      setTargetImageName(value);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select target image" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {repositoryImages.map(image => (
+                        <SelectItem key={image.fullName} value={image.fullName}>
+                          <div className="flex flex-col">
+                            <span>{image.fullName}</span>
+                            {image.namespace && (
+                              <span className="text-xs text-muted-foreground">
+                                Namespace: {image.namespace}
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="p-2 border rounded text-muted-foreground text-sm">
+                    No images found in this repository
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Select an existing project image to overwrite it with the patched version
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Target Image Tag</Label>
+                <Input
+                  value={targetImageTag}
+                  onChange={(e) => setTargetImageTag(e.target.value)}
+                  placeholder="Tag"
+                />
+              </div>
             </div>
-            
-            <div className="space-y-2">
-              <Label>Target Image Tag</Label>
-              <Input
-                value={targetImageTag}
-                onChange={(e) => setTargetImageTag(e.target.value)}
-                placeholder="Tag"
-              />
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Target Image Name</Label>
+                <Input
+                  value={targetImageName}
+                  onChange={(e) => setTargetImageName(e.target.value)}
+                  placeholder="Image name"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Target Image Tag</Label>
+                <Input
+                  value={targetImageTag}
+                  onChange={(e) => setTargetImageTag(e.target.value)}
+                  placeholder="Tag"
+                />
+              </div>
             </div>
-          </div>
+          )}
           
           {selectedRepository === 'docker-local' && (
             <Alert>

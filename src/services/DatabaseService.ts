@@ -458,8 +458,7 @@ export class DatabaseService {
       where: {
         OR: [
           { name: { contains: query } },
-          { tag: { contains: query } },
-          { registry: { contains: query } },
+          { tag: { contains: query } }
         ]
       },
       take: 10,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
@@ -18,8 +18,11 @@ import {
   IconTestPipe,
   IconBrandDocker,
   IconBrandGithub,
+  IconBrandGitlab,
   IconServer,
   IconGitBranch,
+  IconRefresh,
+  IconLoader2,
 } from "@tabler/icons-react";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AddRepositoryDialog } from "@/components/add-repository-dialog";
@@ -28,7 +31,7 @@ import { toast } from "sonner";
 interface Repository {
   id: string;
   name: string;
-  type: "DOCKERHUB" | "GHCR" | "GENERIC";
+  type: "DOCKERHUB" | "GHCR" | "GITLAB" | "GENERIC";
   protocol?: string;
   registryUrl: string;
   username?: string;
@@ -37,10 +40,21 @@ interface Repository {
   repositoryCount?: number;
 }
 
+interface SyncStatus {
+  [key: string]: {
+    lastSync: string | null;
+    syncing: boolean;
+    error?: string;
+  };
+}
+
 export default function RepositoriesPage() {
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [syncStatuses, setSyncStatuses] = useState<SyncStatus>({});
+  const [syncingRepos, setSyncingRepos] = useState<Set<string>>(new Set());
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   const breadcrumbs = [
     { label: "Dashboard", href: "/" },
@@ -49,7 +63,18 @@ export default function RepositoriesPage() {
 
   useEffect(() => {
     fetchRepositories();
-  }, []);
+    fetchSyncStatuses();
+    
+    // Set up auto-refresh interval (every 30 seconds)
+    if (autoRefresh) {
+      const interval = setInterval(() => {
+        fetchRepositories();
+        fetchSyncStatuses();
+      }, 30000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [autoRefresh]);
 
   const fetchRepositories = async () => {
     try {
@@ -133,6 +158,8 @@ export default function RepositoriesPage() {
         return <IconBrandDocker className="h-5 w-5" />;
       case "GHCR":
         return <IconBrandGithub className="h-5 w-5" />;
+      case "GITLAB":
+        return <IconBrandGitlab className="h-5 w-5" />;
       default:
         return <IconServer className="h-5 w-5" />;
     }
@@ -153,8 +180,88 @@ export default function RepositoriesPage() {
     }
   };
 
+  const fetchSyncStatuses = async () => {
+    try {
+      const response = await fetch("/api/repositories/sync");
+      if (response.ok) {
+        const data = await response.json();
+        setSyncStatuses(data.statuses || {});
+      }
+    } catch (error) {
+      console.error("Failed to fetch sync statuses:", error);
+    }
+  };
+
+  const handleSyncRepository = async (id: string) => {
+    setSyncingRepos(prev => new Set(prev).add(id));
+    
+    try {
+      const response = await fetch("/api/repositories/sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          repositoryId: id,
+          forceRefresh: true,
+          action: "sync"
+        }),
+      });
+
+      if (response.ok) {
+        toast.success("Repository sync started");
+        // Refresh data after a short delay
+        setTimeout(() => {
+          fetchRepositories();
+          fetchSyncStatuses();
+        }, 2000);
+      } else {
+        toast.error("Failed to start sync");
+      }
+    } catch (error) {
+      console.error("Failed to sync repository:", error);
+      toast.error("Failed to sync repository");
+    } finally {
+      setSyncingRepos(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
+    }
+  };
+
+  const handleSyncAll = async () => {
+    try {
+      const response = await fetch("/api/repositories/sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          forceRefresh: true,
+          action: "sync"
+        }),
+      });
+
+      if (response.ok) {
+        toast.success("All repositories sync started");
+        // Refresh data after a short delay
+        setTimeout(() => {
+          fetchRepositories();
+          fetchSyncStatuses();
+        }, 2000);
+      } else {
+        toast.error("Failed to start sync");
+      }
+    } catch (error) {
+      console.error("Failed to sync all repositories:", error);
+      toast.error("Failed to sync all repositories");
+    }
+  };
+
   const handleRepositoryAdded = () => {
     fetchRepositories();
+    fetchSyncStatuses();
     setIsAddDialogOpen(false);
   };
 
@@ -171,10 +278,20 @@ export default function RepositoriesPage() {
                 Manage your private container registries and repositories
               </p>
             </div>
-            <Button onClick={() => setIsAddDialogOpen(true)}>
-              <IconPlus className="mr-2 h-4 w-4" />
-              Add Repository
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleSyncAll} 
+                variant="outline"
+                disabled={repositories.length === 0}
+              >
+                <IconRefresh className="mr-2 h-4 w-4" />
+                Sync All
+              </Button>
+              <Button onClick={() => setIsAddDialogOpen(true)}>
+                <IconPlus className="mr-2 h-4 w-4" />
+                Add Repository
+              </Button>
+            </div>
           </div>
 
           {loading ? (
@@ -237,7 +354,40 @@ export default function RepositoriesPage() {
                           {new Date(repo.lastTested).toLocaleDateString()}
                         </div>
                       )}
+                      {syncStatuses[repo.id] && (
+                        <div className="text-sm">
+                          {syncStatuses[repo.id].syncing ? (
+                            <span className="flex items-center text-blue-600">
+                              <IconLoader2 className="mr-1 h-3 w-3 animate-spin" />
+                              Syncing...
+                            </span>
+                          ) : syncStatuses[repo.id].lastSync ? (
+                            <span className="text-muted-foreground">
+                              Last sync: {new Date(syncStatuses[repo.id].lastSync!).toLocaleTimeString()}
+                            </span>
+                          ) : null}
+                          {syncStatuses[repo.id].error && (
+                            <span className="text-red-600 text-xs">
+                              {syncStatuses[repo.id].error}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       <div className="flex gap-2 pt-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleSyncRepository(repo.id)}
+                          disabled={syncingRepos.has(repo.id) || syncStatuses[repo.id]?.syncing}
+                          className="flex-1"
+                        >
+                          {syncingRepos.has(repo.id) || syncStatuses[repo.id]?.syncing ? (
+                            <IconLoader2 className="mr-1 h-3 w-3 animate-spin" />
+                          ) : (
+                            <IconRefresh className="mr-1 h-3 w-3" />
+                          )}
+                          Sync
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"

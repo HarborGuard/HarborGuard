@@ -1,11 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { RegistryService } from '@/lib/registry/RegistryService'
+import { RegistryProviderFactory } from '@/lib/registry/providers/RegistryProviderFactory'
+import type { Repository } from '@/generated/prisma'
+
+const registryService = new RegistryService(prisma)
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { type, registryUrl, username, password, organization } = body
+    const { type, registryUrl, username, password, organization, skipTlsVerify, registryPort } = body
+
+    console.log('[Test Connection] Request received:', {
+      type,
+      registryUrl,
+      username,
+      organization,
+      skipTlsVerify,
+      registryPort,
+      hasPassword: !!password
+    })
 
     if (!type || !username || !password) {
+      console.error('[Test Connection] Missing required fields')
       return NextResponse.json(
         { error: 'Missing required fields: type, username, password' },
         { status: 400 }
@@ -19,30 +36,98 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Test connection based on repository type
-    let repositoryCount = 0
-
     try {
-      switch (type) {
-        case 'dockerhub':
-          repositoryCount = await testDockerHubConnection(username, password)
-          break
-
-        case 'ghcr':
-          repositoryCount = await testGHCRConnection(username, password, organization)
-          break
-
-        case 'generic':
-          repositoryCount = await testGenericRegistryConnection(registryUrl, username, password)
-          break
-
-        default:
-          throw new Error(`Unsupported repository type: ${type}`)
+      // Create a temporary repository object for testing
+      const upperType = type.toUpperCase() as any
+      
+      // Process registry URL and protocol
+      let protocol = 'https'
+      let cleanRegistryUrl = registryUrl || ''
+      
+      if (upperType === 'DOCKERHUB') {
+        cleanRegistryUrl = 'docker.io'
+      } else if (upperType === 'GHCR') {
+        cleanRegistryUrl = 'ghcr.io'
+      } else if (upperType === 'GITLAB') {
+        // For GitLab, keep the full URL with protocol
+        // The GitLabHandler will parse it and determine the registry and auth URLs
+        if (!cleanRegistryUrl.startsWith('http://') && !cleanRegistryUrl.startsWith('https://')) {
+          cleanRegistryUrl = `https://${cleanRegistryUrl}`
+        }
+      } else {
+        // For other types, strip the protocol
+        if (cleanRegistryUrl) {
+          if (cleanRegistryUrl.startsWith('http://')) {
+            protocol = 'http'
+            cleanRegistryUrl = cleanRegistryUrl.substring(7)
+          } else if (cleanRegistryUrl.startsWith('https://')) {
+            protocol = 'https'
+            cleanRegistryUrl = cleanRegistryUrl.substring(8)
+          }
+          cleanRegistryUrl = cleanRegistryUrl.replace(/\/$/, '')
+        }
       }
 
+      const tempRepository: Repository = {
+        id: 'temp-test',
+        name: 'Test Connection',
+        type: upperType,
+        protocol,
+        registryUrl: cleanRegistryUrl,
+        username,
+        encryptedPassword: password,
+        organization: organization || null,
+        authUrl: null,
+        groupId: null,
+        skipTlsVerify: skipTlsVerify || false,
+        registryPort: registryPort || null,
+        status: 'UNTESTED',
+        lastTested: null,
+        repositoryCount: null,
+        apiVersion: null,
+        capabilities: null,
+        rateLimits: null,
+        healthCheck: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+
+      console.log('[Test Connection] Created temp repository:', {
+        type: tempRepository.type,
+        registryUrl: tempRepository.registryUrl,
+        protocol: tempRepository.protocol,
+        skipTlsVerify: tempRepository.skipTlsVerify,
+        registryPort: tempRepository.registryPort
+      })
+
+      // Validate configuration
+      const validation = RegistryProviderFactory.validateConfiguration(tempRepository)
+      if (!validation.valid) {
+        console.error('[Test Connection] Validation failed:', validation.errors)
+        return NextResponse.json({
+          success: false,
+          error: `Invalid configuration: ${validation.errors.join(', ')}`
+        })
+      }
+
+      console.log('[Test Connection] Creating provider for type:', upperType)
+      // Test connection using provider
+      const provider = RegistryProviderFactory.create(upperType, tempRepository)
+      
+      console.log('[Test Connection] Testing connection...')
+      const result = await provider.testConnection()
+      
+      console.log('[Test Connection] Test result:', {
+        success: result.success,
+        repositoryCount: result.repositoryCount,
+        error: result.error,
+        message: result.message
+      })
+
       return NextResponse.json({
-        success: true,
-        repositoryCount,
+        success: result.success,
+        repositoryCount: result.repositoryCount,
+        error: result.success ? undefined : result.message
       })
     } catch (connectionError) {
       const errorMessage = connectionError instanceof Error ? connectionError.message : 'Connection test failed'
@@ -58,104 +143,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
-
-async function testDockerHubConnection(username: string, password: string): Promise<number> {
-  // Login to Docker Hub
-  const loginResponse = await fetch('https://hub.docker.com/v2/users/login/', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ username, password }),
-  })
-
-  if (!loginResponse.ok) {
-    const errorData = await loginResponse.text()
-    throw new Error(`Docker Hub authentication failed: ${errorData}`)
-  }
-
-  const loginData = await loginResponse.json()
-  const token = loginData.token
-
-  // Get repositories
-  const repoResponse = await fetch(`https://hub.docker.com/v2/repositories/${username}/?page_size=100`, {
-    headers: {
-      'Authorization': `JWT ${token}`,
-    },
-  })
-
-  if (!repoResponse.ok) {
-    throw new Error('Failed to fetch Docker Hub repositories')
-  }
-
-  const repoData = await repoResponse.json()
-  return repoData.count || 0
-}
-
-async function testGHCRConnection(username: string, token: string, organization?: string): Promise<number> {
-  let repositoryCount = 0
-
-  // Test user packages
-  const userPackagesResponse = await fetch('https://api.github.com/user/packages?package_type=container', {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/vnd.github.v3+json',
-    },
-  })
-
-  if (userPackagesResponse.ok) {
-    const userPackages = await userPackagesResponse.json()
-    repositoryCount += userPackages.length
-  }
-
-  // Test organization packages if provided
-  if (organization) {
-    const orgPackagesResponse = await fetch(`https://api.github.com/orgs/${organization}/packages?package_type=container`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/vnd.github.v3+json',
-      },
-    })
-
-    if (orgPackagesResponse.ok) {
-      const orgPackages = await orgPackagesResponse.json()
-      repositoryCount += orgPackages.length
-    }
-  }
-
-  if (repositoryCount === 0) {
-    throw new Error('No container packages found or authentication failed')
-  }
-
-  return repositoryCount
-}
-
-async function testGenericRegistryConnection(registryUrl: string, username: string, password: string): Promise<number> {
-  const auth = Buffer.from(`${username}:${password}`).toString('base64')
-  
-  // For API calls, ensure we have a protocol
-  let url = registryUrl
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    url = `https://${url}`
-  }
-  
-  // Ensure the URL ends properly for the catalog endpoint
-  if (!url.endsWith('/')) {
-    url += '/'
-  }
-  
-  // Test catalog endpoint
-  const catalogResponse = await fetch(`${url}v2/_catalog`, {
-    headers: {
-      'Authorization': `Basic ${auth}`,
-    },
-  })
-
-  if (!catalogResponse.ok) {
-    throw new Error(`Registry authentication failed (${catalogResponse.status})`)
-  }
-
-  const catalogData = await catalogResponse.json()
-  return catalogData.repositories?.length || 0
 }

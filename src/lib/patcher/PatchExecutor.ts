@@ -268,9 +268,6 @@ export class PatchExecutor {
   }
 
   private buildImageReference(image: any): string {
-    if (image.registry && image.registry !== 'local') {
-      return `${image.registry}/${image.name}:${image.tag}`;
-    }
     return `${image.name}:${image.tag}`;
   }
 
@@ -334,7 +331,7 @@ export class PatchExecutor {
     targetRegistry?: string,
     targetTag?: string
   ): Promise<string> {
-    const registry = targetRegistry || originalImage.registry || 'localhost:5000';
+    const registry = targetRegistry || 'localhost:5000';
     const tag = targetTag || `${originalImage.tag}-patched`;
     const imageName = `${registry}/${originalImage.name}:${tag}`;
     
@@ -371,7 +368,6 @@ export class PatchExecutor {
       data: {
         name,
         tag,
-        registry,
         source: 'REGISTRY',
         digest,
         platform: originalImage.platform,

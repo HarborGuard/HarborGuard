@@ -49,8 +49,9 @@ export async function GET(request: NextRequest) {
               id: true,
               name: true,
               tag: true,
-              registry: true,
-              digest: true
+              source: true,
+              digest: true,
+              registry: true
             }
           },
           // Include vulnerability findings for accurate counting

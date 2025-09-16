@@ -519,7 +519,6 @@ export class PatchExecutorTar {
       data: {
         name,
         tag,
-        registry: originalImage.registry,
         source: 'REGISTRY',
         digest,
         platform: originalImage.platform,

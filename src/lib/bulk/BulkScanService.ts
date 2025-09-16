@@ -129,7 +129,7 @@ export class BulkScanService {
                 id: true,
                 name: true,
                 tag: true,
-                registry: true
+                source: true
               }
             }
           }
@@ -217,14 +217,8 @@ export class BulkScanService {
       });
     }
 
-    if (patterns.registryPattern) {
-      const registryPattern = patterns.registryPattern.replace(/\*/g, '%');
-      whereConditions.push({
-        registry: {
-          contains: registryPattern.replace(/%/g, '')
-        }
-      });
-    }
+    // Registry pattern filtering is not directly supported on images anymore
+    // since registry is now stored in the Repository model
 
     const images = await prisma.image.findMany({
       where: whereConditions.length > 0 ? {
@@ -234,7 +228,6 @@ export class BulkScanService {
         id: true,
         name: true,
         tag: true,
-        registry: true,
         source: true,
         digest: true
       },
@@ -254,9 +247,7 @@ export class BulkScanService {
     }
 
     return images.filter(image => {
-      const fullName = image.registry 
-        ? `${image.registry}/${image.name}:${image.tag}`
-        : `${image.name}:${image.tag}`;
+      const fullName = `${image.name}:${image.tag}`;
 
       return !excludePatterns.some(pattern => {
         const regexPattern = pattern
@@ -294,7 +285,6 @@ export class BulkScanService {
         const scanRequest: ScanRequest = {
           image: image.name,
           tag: image.tag,
-          registry: image.registry,
           source: scanSource,
           scanners: scanners // Pass scanner configuration
         };
@@ -456,7 +446,7 @@ export class BulkScanService {
               select: {
                 name: true,
                 tag: true,
-                registry: true
+                source: true
               }
             },
             scan: {

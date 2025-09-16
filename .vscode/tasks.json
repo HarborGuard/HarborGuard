@@ -1,0 +1,30 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Test Build (Like Docker)",
+      "type": "shell",
+      "command": "npx prisma generate && npx tsc --noEmit && npm run build:docker",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": ["$tsc"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "Fresh Prisma Generate",
+      "type": "shell",
+      "command": "rm -rf src/generated/prisma && npx prisma generate",
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    }
+  ]
+}
