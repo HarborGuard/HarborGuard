@@ -63,11 +63,22 @@ export class RegistryService {
   }
   
   async testConnection(repositoryId: string): Promise<ConnectionTestResult & { repositoryCount?: number }> {
+    console.log('[RegistryService] Testing connection for repository:', repositoryId);
     const repository = await this.getRepositoryById(repositoryId);
+    console.log('[RegistryService] Repository found:', {
+      id: repository.id,
+      type: repository.type,
+      registryUrl: repository.registryUrl,
+      skipTlsVerify: repository.skipTlsVerify,
+      registryPort: repository.registryPort
+    });
+    
     const provider = RegistryProviderFactory.createFromRepository(repository);
+    console.log('[RegistryService] Provider created:', provider.getProviderName());
     
     try {
       const result = await provider.testConnection();
+      console.log('[RegistryService] Test result:', result);
       
       // Update repository status in database
       await this.prisma.repository.update({
@@ -213,6 +224,7 @@ export class RegistryService {
     password: string;
     organization?: string;
     protocol?: string;
+    skipTlsVerify?: boolean;
     testConnection?: boolean;
   }): Promise<{ repository: Repository; testResult?: ConnectionTestResult }> {
     const { testConnection = true, ...repositoryData } = data;
@@ -257,6 +269,10 @@ export class RegistryService {
       username: repositoryData.username,
       encryptedPassword: repositoryData.password, // TODO: encrypt in production
       organization: repositoryData.organization || null,
+      authUrl: null,
+      groupId: null,
+      skipTlsVerify: repositoryData.skipTlsVerify || false,
+      registryPort: null,
       status: 'UNTESTED',
       lastTested: null,
       repositoryCount: null,
@@ -322,6 +338,7 @@ export class RegistryService {
           protocol,
           encryptedPassword: repositoryData.password, // TODO: encrypt
           organization: repositoryData.organization || null,
+          skipTlsVerify: repositoryData.skipTlsVerify || false,
           status,
           repositoryCount,
           lastTested
@@ -352,6 +369,7 @@ export class RegistryService {
         username: repositoryData.username,
         encryptedPassword: repositoryData.password, // TODO: encrypt
         organization: repositoryData.organization || null,
+        skipTlsVerify: repositoryData.skipTlsVerify || false,
         status,
         repositoryCount,
         lastTested
@@ -391,6 +409,8 @@ export class RegistryService {
         status: true,
         repositoryCount: true,
         createdAt: true,
+        skipTlsVerify: true,
+        registryPort: true,
       },
       orderBy: {
         [orderBy]: orderDirection,

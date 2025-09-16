@@ -1138,6 +1138,61 @@
             "description": "id parameter"
           }
         ]
+      },
+      "patch": {
+        "summary": "PATCH /api/repositories/{id}",
+        "tags": [
+          "Repositories"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "registryUrl": {
+                    "type": "string",
+                    "description": "registryUrl parameter (optional)"
+                  },
+                  "skipTlsVerify": {
+                    "type": "string",
+                    "description": "skipTlsVerify parameter (optional)"
+                  },
+                  "registryPort": {
+                    "type": "string",
+                    "description": "registryPort parameter (optional)"
+                  },
+                  "username": {
+                    "type": "string",
+                    "description": "username parameter (optional)"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "password parameter (optional)"
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        }
       }
     },
     "/api/repositories/{id}/test": {
@@ -1221,6 +1276,10 @@
                     "type": "string",
                     "description": "protocol parameter"
                   },
+                  "skipTlsVerify": {
+                    "type": "string",
+                    "description": "skipTlsVerify parameter"
+                  },
                   "testConnection = true": {
                     "type": "string",
                     "description": "testConnection = true parameter"
@@ -1228,6 +1287,54 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/repositories/sync": {
+      "post": {
+        "summary": "POST /api/repositories/sync",
+        "tags": [
+          "Repositories"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "repositoryId": {
+                    "type": "string",
+                    "description": "repositoryId parameter"
+                  },
+                  "forceRefresh = false": {
+                    "type": "string",
+                    "description": "forceRefresh = false parameter"
+                  },
+                  "action = 'sync'": {
+                    "type": "string",
+                    "description": "action = 'sync' parameter"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "GET /api/repositories/sync",
+        "tags": [
+          "Repositories"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
           }
         }
       }
@@ -1269,6 +1376,14 @@
                   "organization": {
                     "type": "string",
                     "description": "organization parameter"
+                  },
+                  "skipTlsVerify": {
+                    "type": "string",
+                    "description": "skipTlsVerify parameter"
+                  },
+                  "registryPort": {
+                    "type": "string",
+                    "description": "registryPort parameter"
                   }
                 }
               }

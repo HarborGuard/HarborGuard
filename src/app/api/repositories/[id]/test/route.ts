@@ -10,12 +10,14 @@ export async function POST(
 ) {
   try {
     const { id } = await params
+    console.log('[Test Repository API] Testing connection for repository ID:', id)
 
     const testResult = await registryService.testConnection(id)
+    console.log('[Test Repository API] Test result:', testResult)
 
     return NextResponse.json(testResult)
   } catch (error) {
-    console.error('Failed to test repository connection:', error)
+    console.error('[Test Repository API] Failed to test repository connection:', error)
     const errorMessage = error instanceof Error ? error.message : 'Failed to test connection'
     
     return NextResponse.json({

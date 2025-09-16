@@ -38,6 +38,7 @@ interface RepositoryConfig {
   authUrl?: string
   groupId?: string
   skipTlsVerify?: boolean
+  registryPort?: number
 }
 
 export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: AddRepositoryDialogProps) {
@@ -358,6 +359,19 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
 
             {config.type === 'gitlab' && (
               <>
+                <div className="space-y-2">
+                  <Label htmlFor="registryPort">Registry Port</Label>
+                  <Input
+                    id="registryPort"
+                    type="number"
+                    value={config.registryPort || ''}
+                    onChange={(e) => setConfig(prev => ({ ...prev, registryPort: e.target.value ? parseInt(e.target.value) : undefined }))}
+                    placeholder="5050"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    GitLab registry port (default: 5050). Uses HTTP protocol on this port.
+                  </p>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="authUrl">JWT Auth URL (optional)</Label>
                   <Input

@@ -37,13 +37,6 @@ export async function GET(
 
     return NextResponse.json(tags)
   } catch (error) {
-    console.error('[Tags API] Failed to fetch image tags:', {
-      repositoryId: id,
-      imageName,
-      namespace: searchParams?.get('namespace'),
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
-    })
     const errorMessage = error instanceof Error ? error.message : 'Failed to fetch image tags'
     
     return NextResponse.json(

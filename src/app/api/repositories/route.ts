@@ -20,7 +20,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, type, registryUrl, username, password, organization, protocol, testConnection = true } = body
+    const { name, type, registryUrl, username, password, organization, protocol, skipTlsVerify, testConnection = true } = body
 
     if (!name || !type || !username || !password) {
       return NextResponse.json(
@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
       password,
       organization,
       protocol,
+      skipTlsVerify,
       testConnection
     })
 

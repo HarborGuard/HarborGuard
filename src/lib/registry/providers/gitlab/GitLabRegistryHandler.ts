@@ -62,6 +62,13 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
   constructor(repository: Repository) {
     super(repository);
     this.config = this.parseConfig(repository) as GitLabConfig;
+    
+    // Update the repository object with the correct registry URL that includes the port
+    // This is needed because the base class uses this.repository.registryUrl
+    this.repository = {
+      ...this.repository,
+      registryUrl: this.config.registryUrl
+    };
   }
   
   getProviderName(): string {
@@ -89,35 +96,92 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
   
   protected parseConfig(repository: Repository): GitLabConfig {
     // Parse GitLab Registry V2 configuration
-    // Expecting registryUrl format: https://host:port
-    // Auth URL should be stored in a custom field or derived from registryUrl
-    const registryUrl = repository.registryUrl;
+    // The user enters the GitLab instance URL (e.g., https://24.199.119.91)
+    // We need to determine the registry URL and auth URL from this
     
-    // Derive auth URL by removing the registry port and using the base GitLab URL
+    logger.info('[GitLab] Parsing configuration', {
+      inputUrl: repository.registryUrl,
+      hasCustomPort: !!repository.registryPort,
+      customPort: repository.registryPort,
+      hasAuthUrl: !!repository.authUrl,
+      skipTlsVerify: repository.skipTlsVerify
+    });
+    
+    let registryUrl = repository.registryUrl;
     let authUrl = repository.authUrl;
-    if (!authUrl) {
-      // Parse the registry URL to extract the base domain
-      try {
-        const url = new URL(registryUrl);
-        // Remove any registry-specific port and use the standard GitLab instance URL
-        // Common patterns:
-        // - https://gitlab.com:5050 -> https://gitlab.com/jwt/auth
-        // - https://registry.gitlab.com -> https://gitlab.com/jwt/auth
-        // - https://192.168.1.100:5000 -> https://192.168.1.100/jwt/auth
+    
+    try {
+      // Add default protocol if missing
+      let urlToParse = repository.registryUrl;
+      if (!urlToParse.startsWith('http://') && !urlToParse.startsWith('https://')) {
+        urlToParse = `https://${urlToParse}`;
+      }
+      
+      const inputUrl = new URL(urlToParse);
+      
+      // Parse the URL to determine registry configuration
+      
+      // Check if user provided a custom registry port
+      if (repository.registryPort) {
+        // User explicitly specified a registry port
+        registryUrl = `http://${inputUrl.hostname}:${repository.registryPort}`;
+        authUrl = authUrl || `${inputUrl.protocol}//${inputUrl.hostname}/jwt/auth`;
+        logger.info('[GitLab] Using custom registry port', {
+          registryUrl,
+          authUrl
+        });
+      } else if (!inputUrl.port || inputUrl.port === '443' || inputUrl.port === '80') {
+        // No port specified or using standard ports, assume registry is on port 5050
+        // GitLab registry typically runs on port 5050 with HTTP
+        // For standard GitLab installations:
+        // - Auth endpoint: https://host/jwt/auth
+        // - Registry endpoint: http://host:5050
         
-        let baseUrl = `${url.protocol}//${url.hostname}`;
-        // If it's a registry subdomain, try to use the main domain
-        if (url.hostname.startsWith('registry.')) {
-          baseUrl = `${url.protocol}//${url.hostname.replace('registry.', '')}`;
-        }
-        authUrl = `${baseUrl}/jwt/auth`;
-      } catch (e) {
-        // Fallback to simple string manipulation if URL parsing fails
+        const defaultPort = 5050; // Default GitLab registry port
+        registryUrl = `http://${inputUrl.hostname}:${defaultPort}`;
+        authUrl = `${inputUrl.protocol}//${inputUrl.hostname}/jwt/auth`;
+        logger.info('[GitLab] Using default port configuration', {
+          registryUrl,
+          authUrl,
+          defaultPort
+        });
+      } else if (inputUrl.port === '5050' || inputUrl.port === '5000') {
+        // User specified the registry port directly in the URL
+        // Assume HTTP for registry port
+        registryUrl = `http://${inputUrl.hostname}:${inputUrl.port}`;
+        authUrl = `https://${inputUrl.hostname}/jwt/auth`;
+        logger.info('[GitLab] Registry port detected in URL', {
+          registryUrl,
+          authUrl,
+          detectedPort: inputUrl.port
+        });
+      } else {
+        // Keep the URL as-is if it has a non-standard port
+        registryUrl = repository.registryUrl;
+        authUrl = authUrl || `${inputUrl.protocol}//${inputUrl.hostname}/jwt/auth`;
+        logger.info('[GitLab] Using non-standard port configuration', {
+          registryUrl,
+          authUrl
+        });
+      }
+      
+      // Override with explicit authUrl if provided
+      if (repository.authUrl) {
+        authUrl = repository.authUrl;
+        logger.info('[GitLab] Using explicit auth URL', { authUrl });
+      }
+    } catch (e) {
+      logger.error('[GitLab] Failed to parse URL', {
+        error: e instanceof Error ? e.message : String(e),
+        registryUrl: repository.registryUrl
+      });
+      // If URL parsing fails, try to make reasonable defaults
+      if (!authUrl) {
         authUrl = `${registryUrl.replace(/:\d+$/, '')}/jwt/auth`;
       }
     }
     
-    return {
+    const config = {
       registryUrl,
       authUrl,
       username: repository.username,
@@ -126,6 +190,16 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
       groupId: repository.groupId || undefined,
       skipTlsVerify: repository.skipTlsVerify || false
     };
+    
+    logger.info('[GitLab] Final configuration', {
+      registryUrl: config.registryUrl,
+      authUrl: config.authUrl,
+      username: config.username,
+      hasPassword: !!config.password,
+      skipTlsVerify: config.skipTlsVerify
+    });
+    
+    return config;
   }
   
   async getSkopeoAuthArgs(): Promise<string> {
@@ -144,6 +218,9 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
   private async getJWTToken(scope?: string): Promise<string> {
     // Check if we have a valid cached token
     if (this.jwtToken && this.tokenExpiry && this.tokenExpiry > new Date()) {
+      logger.debug('[GitLab] Using cached JWT token', {
+        expiresAt: this.tokenExpiry.toISOString()
+      });
       return this.jwtToken;
     }
 
@@ -156,6 +233,13 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
       // Default scope for catalog access
       authUrl.searchParams.append('scope', 'registry:catalog:*');
     }
+
+    logger.info('[GitLab] Requesting JWT token', {
+      authUrl: authUrl.toString(),
+      service: 'container_registry',
+      scope: scope || 'registry:catalog:*',
+      username: this.config.username
+    });
 
     const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
     
@@ -170,15 +254,53 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
     
     // For self-signed certificates, we need to use a custom agent in Node.js
     if (this.config.skipTlsVerify && typeof process !== 'undefined') {
-      // This will be handled at the infrastructure level
-      // Node.js doesn't allow disabling TLS verification through fetch options
-      // You would need to use process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
-      // or use a custom https agent
+      // Temporarily disable TLS verification for this request
+      // Store the original value to restore it later
+      const originalRejectUnauthorized = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+      logger.warn('[GitLab] TLS verification disabled for JWT auth request (NODE_TLS_REJECT_UNAUTHORIZED=0)');
+      
+      try {
+        // Send JWT auth request with TLS verification disabled
+        
+        const response = await fetch(authUrl.toString(), fetchOptions);
+        
+        // Restore the original value
+        if (originalRejectUnauthorized === undefined) {
+          delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+        } else {
+          process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalRejectUnauthorized;
+        }
+        
+        return await this.handleJWTResponse(response, authUrl.toString());
+      } catch (error) {
+        // Restore the original value even on error
+        if (originalRejectUnauthorized === undefined) {
+          delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+        } else {
+          process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalRejectUnauthorized;
+        }
+        throw error;
+      }
+    } else {
+      // Send JWT auth request with normal TLS verification
+      
+      const response = await fetch(authUrl.toString(), fetchOptions);
+      return await this.handleJWTResponse(response, authUrl.toString());
     }
-    
-    const response = await fetch(authUrl.toString(), fetchOptions);
+  }
+  
+  private async handleJWTResponse(response: Response, authUrl: string): Promise<string> {
+    // Process JWT auth response
 
     if (!response.ok) {
+      const errorBody = await response.text();
+      logger.error('[GitLab] Failed to get JWT token', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorBody,
+        authUrl: authUrl
+      });
       throw new Error(`Failed to get JWT token: ${response.status} ${response.statusText}`);
     }
 
@@ -188,6 +310,12 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
     // Set token expiry (default to 5 minutes if not provided)
     const expiresIn = data.expires_in || 300;
     this.tokenExpiry = new Date(Date.now() + expiresIn * 1000);
+    
+    logger.info('[GitLab] JWT token obtained', {
+      expiresIn,
+      expiresAt: this.tokenExpiry.toISOString(),
+      tokenLength: data.token.length
+    });
     
     return data.token;
   }
@@ -200,16 +328,28 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
   }
   
   async testConnection(): Promise<ConnectionTestResult> {
+    logger.info('[GitLab] Starting connection test', {
+      registryUrl: this.config.registryUrl,
+      authUrl: this.config.authUrl,
+      username: this.config.username,
+      skipTlsVerify: this.config.skipTlsVerify
+    });
+    
     try {
       // Test connection by getting JWT token and listing catalog
+      logger.debug('[GitLab] Requesting JWT token for catalog access');
       const token = await this.getJWTToken('registry:catalog:*');
+      logger.debug('[GitLab] JWT token obtained successfully', {
+        tokenLength: token.length,
+        tokenPrefix: token.substring(0, 20) + '...'
+      });
       
       // Test catalog endpoint
       const catalogUrl = `${this.config.registryUrl}/v2/_catalog?n=1`;
+      logger.info('[GitLab] Testing catalog endpoint', { catalogUrl });
       
-      // Note: For self-signed certificates in a browser environment,
-      // the user must accept the certificate in their browser first.
-      // In Node.js, we would need to handle this differently.
+      // Note: The catalog endpoint is on HTTP, so no TLS issues
+      // But we'll keep the same pattern for consistency
       const response = await fetch(catalogUrl, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -217,12 +357,29 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
         }
       });
       
+      logger.debug('[GitLab] Catalog response received', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+      
       if (!response.ok) {
+        const errorBody = await response.text();
+        logger.error('[GitLab] Registry returned error', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorBody
+        });
         throw new Error(`Registry returned ${response.status}: ${response.statusText}`);
       }
       
       const data: GitLabCatalogResponse = await response.json();
       const repoCount = data.repositories?.length || 0;
+      
+      logger.info('[GitLab] Connection test successful', {
+        repositoryCount: repoCount,
+        repositories: data.repositories
+      });
       
       return {
         success: true,
@@ -231,6 +388,13 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
         capabilities: this.getSupportedCapabilities()
       };
     } catch (error: any) {
+      logger.error('[GitLab] Connection test failed', {
+        error: error.message,
+        stack: error.stack,
+        registryUrl: this.config.registryUrl,
+        authUrl: this.config.authUrl
+      });
+      
       // Provide helpful message for SSL errors
       if (error.message.includes('SSL') || error.message.includes('certificate')) {
         return {

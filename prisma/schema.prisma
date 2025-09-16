@@ -590,6 +590,7 @@ model Repository {
   authUrl            String?                   // JWT auth endpoint for GitLab Registry
   groupId            String?                   // GitLab group ID for scoped access
   skipTlsVerify      Boolean                   @default(false) // Skip TLS verification for self-signed certs
+  registryPort       Int?                      // Custom registry port (e.g., 5050 for GitLab)
   capabilities       Json?
   rateLimits         Json?
   healthCheck        Json?

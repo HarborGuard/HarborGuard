@@ -105,6 +105,7 @@ export class RegistryProviderFactory {
         authUrl: null,
         groupId: null,
         skipTlsVerify: false,
+        registryPort: null,
         capabilities: null,
         rateLimits: null,
         healthCheck: null,

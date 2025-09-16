@@ -112,7 +112,6 @@ const ScanStartSchema = z.union([
 async function processSingleScan(validatedData: any, request: NextRequest, priority: number = 0) {
   // Handle tar file scanning if tarPath is provided
   if (validatedData.tarPath) {
-    console.log(`Starting scan for tar file: ${validatedData.tarPath}`)
     
     // Extract image name from tar path if possible
     const pathParts = validatedData.tarPath.split('/')
@@ -159,7 +158,6 @@ async function processSingleScan(validatedData: any, request: NextRequest, prior
   const imageName = validatedData.image || validatedData.imageName!
   const imageTag = validatedData.tag || validatedData.imageTag!
   
-  console.log(`Starting scan for ${imageName}:${imageTag}${validatedData.source === 'local' ? ' (local Docker image)' : ''}`)
   
   // Convert to ScanRequest format
   const scanRequest: ScanRequest = {
