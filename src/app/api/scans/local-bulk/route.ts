@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
               tag: image.tag,
               source: 'LOCAL_DOCKER',
               platform: 'linux/amd64',
-              sizeBytes: parseInt(image.size.replace(/[^\d]/g, '')) * 1024 * 1024, // Convert MB to bytes
+              sizeBytes: BigInt(parseInt(image.size.replace(/[^\d]/g, '')) * 1024 * 1024), // Convert MB to bytes
               updatedAt: new Date()
             },
             create: {
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
               digest: imageDigest,
               source: 'LOCAL_DOCKER',
               platform: 'linux/amd64',
-              sizeBytes: parseInt(image.size.replace(/[^\d]/g, '')) * 1024 * 1024, // Convert MB to bytes
+              sizeBytes: BigInt(parseInt(image.size.replace(/[^\d]/g, '')) * 1024 * 1024), // Convert MB to bytes
             }
           });
           

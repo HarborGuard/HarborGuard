@@ -2170,7 +2170,7 @@ export default function ScanResultsPage() {
                           <IconStack className="h-3 w-3" />
                           Layer {layer.index + 1}
                           <Badge variant="secondary" className="text-xs ml-1">
-                            {(layer.sizeBytes / (1024 * 1024)).toFixed(1)}MB
+                            {(Number(layer.sizeBytes) / (1024 * 1024)).toFixed(1)}MB
                           </Badge>
                         </TabsTrigger>
                       ))}
@@ -2189,7 +2189,7 @@ export default function ScanResultsPage() {
                                 Layer {layer.index + 1}
                               </Badge>
                               <span className="text-sm text-muted-foreground">
-                                {(layer.sizeBytes / (1024 * 1024)).toFixed(2)}{" "}
+                                {(Number(layer.sizeBytes) / (1024 * 1024)).toFixed(2)}{" "}
                                 MB
                               </span>
                             </div>
