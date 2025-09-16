@@ -12,25 +12,25 @@ export class YumPatchStrategy extends PatchStrategy {
 
   async applyPatches(
     operationId: string,
-    mountPath: string,
+    containerId: string,
     vulnerabilities: PatchableVulnerability[],
     dryRun?: boolean
   ): Promise<PatchResult[]> {
     const results: PatchResult[] = [];
-    
+
     try {
       // Clean YUM cache first
       logger.info('Cleaning YUM cache');
-      const cleanCmd = `yum --installroot=${mountPath} clean all`;
-      
+      const cleanCmd = `buildah run --isolation chroot ${containerId} -- yum clean all`;
+
       if (!dryRun) {
         await execAsync(cleanCmd);
       }
 
       // Update YUM metadata
       logger.info('Updating YUM metadata');
-      const updateCmd = `yum --installroot=${mountPath} makecache`;
-      
+      const updateCmd = `buildah run --isolation chroot ${containerId} -- yum makecache`;
+
       if (!dryRun) {
         await execAsync(updateCmd);
       }
@@ -38,21 +38,21 @@ export class YumPatchStrategy extends PatchStrategy {
       // Process each vulnerability
       for (const vuln of vulnerabilities) {
         let installCmd: string;
-        
+
         if (vuln.fixedVersion && vuln.fixedVersion !== 'unknown') {
           // Install specific version
-          installCmd = `yum --installroot=${mountPath} install -y ${this.buildPackageSpec(vuln.packageName, vuln.fixedVersion)}`;
+          installCmd = `buildah run --isolation chroot ${containerId} -- yum install -y ${this.buildPackageSpec(vuln.packageName, vuln.fixedVersion)}`;
           logger.info(`Installing ${vuln.packageName} version ${vuln.fixedVersion}`);
         } else {
           // Update to latest version
-          installCmd = `yum --installroot=${mountPath} update -y ${vuln.packageName}`;
+          installCmd = `buildah run --isolation chroot ${containerId} -- yum update -y ${vuln.packageName}`;
           logger.info(`Updating ${vuln.packageName} to latest version`);
         }
-        
+
         try {
           if (!dryRun) {
             const { stdout, stderr } = await execAsync(installCmd);
-            
+
             // Check if package was actually updated
             if (stdout.includes('Nothing to do') || stdout.includes('No packages marked for update')) {
               logger.warn(`No update available for ${vuln.packageName}`);
@@ -67,7 +67,7 @@ export class YumPatchStrategy extends PatchStrategy {
               continue;
             }
           }
-          
+
           const result = await this.createPatchResult(
             operationId,
             vuln,
@@ -75,7 +75,7 @@ export class YumPatchStrategy extends PatchStrategy {
             dryRun ? 'SKIPPED' : 'SUCCESS'
           );
           results.push(result);
-          
+
         } catch (error) {
           logger.error(`Failed to patch ${vuln.packageName}:`, error);
           const result = await this.createPatchResult(
@@ -92,8 +92,8 @@ export class YumPatchStrategy extends PatchStrategy {
       // Clean up YUM cache to reduce image size
       if (!dryRun && results.some(r => r.status === 'SUCCESS')) {
         try {
-          await execAsync(`yum --installroot=${mountPath} clean all`);
-          await execAsync(`rm -rf ${mountPath}/var/cache/yum`);
+          await execAsync(`buildah run --isolation chroot ${containerId} -- yum clean all`);
+          await execAsync(`buildah run --isolation chroot ${containerId} -- rm -rf /var/cache/yum`);
           logger.info('Cleaned YUM cache');
         } catch (error) {
           logger.warn('Failed to clean YUM cache:', error);

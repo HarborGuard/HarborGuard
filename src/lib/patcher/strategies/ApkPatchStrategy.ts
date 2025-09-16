@@ -12,17 +12,17 @@ export class ApkPatchStrategy extends PatchStrategy {
 
   async applyPatches(
     operationId: string,
-    mountPath: string,
+    containerId: string,
     vulnerabilities: PatchableVulnerability[],
     dryRun?: boolean
   ): Promise<PatchResult[]> {
     const results: PatchResult[] = [];
-    
+
     try {
       // Update APK package index
       logger.info('Updating APK package index');
-      const updateCmd = `chroot ${mountPath} apk update`;
-      
+      const updateCmd = `buildah run --isolation chroot ${containerId} -- apk update`;
+
       if (!dryRun) {
         await execAsync(updateCmd);
       }
@@ -30,28 +30,28 @@ export class ApkPatchStrategy extends PatchStrategy {
       // Process each vulnerability
       for (const vuln of vulnerabilities) {
         let installCmd: string;
-        
+
         if (vuln.fixedVersion && vuln.fixedVersion !== 'unknown') {
           // Install specific version
           // APK uses = for exact version or ~= for allowing patch versions
           const versionSpec = this.formatApkVersion(vuln.fixedVersion);
-          installCmd = `chroot ${mountPath} apk add --no-cache ${vuln.packageName}${versionSpec}`;
+          installCmd = `buildah run --isolation chroot ${containerId} -- apk add --no-cache ${vuln.packageName}${versionSpec}`;
           logger.info(`Installing ${vuln.packageName} version ${vuln.fixedVersion}`);
         } else {
           // Upgrade to latest version
-          installCmd = `chroot ${mountPath} apk upgrade --no-cache ${vuln.packageName}`;
+          installCmd = `buildah run --isolation chroot ${containerId} -- apk upgrade --no-cache ${vuln.packageName}`;
           logger.info(`Upgrading ${vuln.packageName} to latest version`);
         }
-        
+
         try {
           if (!dryRun) {
             const { stdout, stderr } = await execAsync(installCmd);
-            
+
             // Check if package was actually updated
             if (stderr.includes('UNTRUSTED') || stderr.includes('WARNING')) {
               logger.warn(`Security warning for ${vuln.packageName}: ${stderr}`);
             }
-            
+
             if (stdout.includes('OK:') || stdout.includes('Upgrading')) {
               // Package was successfully installed/upgraded
               const result = await this.createPatchResult(
@@ -91,7 +91,7 @@ export class ApkPatchStrategy extends PatchStrategy {
             );
             results.push(result);
           }
-          
+
         } catch (error) {
           logger.error(`Failed to patch ${vuln.packageName}:`, error);
           const result = await this.createPatchResult(
@@ -108,7 +108,7 @@ export class ApkPatchStrategy extends PatchStrategy {
       // Clean up APK cache (minimal in Alpine, but good practice)
       if (!dryRun && results.some(r => r.status === 'SUCCESS')) {
         try {
-          await execAsync(`rm -rf ${mountPath}/var/cache/apk/*`);
+          await execAsync(`buildah run --isolation chroot ${containerId} -- rm -rf /var/cache/apk/*`);
           logger.info('Cleaned APK cache');
         } catch (error) {
           logger.warn('Failed to clean APK cache:', error);

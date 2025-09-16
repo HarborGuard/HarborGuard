@@ -100,26 +100,23 @@ export class PatchExecutor {
       
       // Create working container with Buildah
       const containerId = await this.createWorkingContainer(sourceImageRef);
-      
-      // Mount container filesystem
-      const mountPath = await this.mountContainer(containerId);
-      
+
       // Update buildah details
       await prisma.patchOperation.update({
         where: { id: patchOperation.id },
         data: {
           buildahContainerId: containerId,
-          buildahMountPath: mountPath
+          buildahMountPath: null // No longer using mount path
         }
       });
 
       // Update status to patching
       await this.updatePatchOperationStatus(patchOperation.id, 'PATCHING');
-      
-      // Apply patches
+
+      // Apply patches using buildah run instead of chroot
       const patchResults = await this.applyPatches(
         patchOperation.id,
-        mountPath,
+        containerId,
         patchableVulns,
         request.dryRun
       );
@@ -132,21 +129,21 @@ export class PatchExecutor {
       let patchedImageId: string | null = null;
       if (!request.dryRun && successCount > 0) {
         await this.updatePatchOperationStatus(patchOperation.id, 'PUSHING');
-        
+
         const patchedImageRef = await this.commitAndPushImage(
           containerId,
           image,
           request.targetRegistry,
           request.targetTag
         );
-        
+
         // Create new image record for patched version
         const patchedImage = await this.createPatchedImageRecord(
           image,
           patchedImageRef,
           patchOperation.id
         );
-        
+
         patchedImageId = patchedImage.id;
       }
 
@@ -279,22 +276,16 @@ export class PatchExecutor {
     return containerId;
   }
 
-  private async mountContainer(containerId: string): Promise<string> {
-    logger.info(`Mounting container ${containerId}`);
-    const { stdout } = await execAsync(`buildah --storage-driver vfs mount ${containerId}`);
-    const mountPath = stdout.trim();
-    logger.info(`Mounted at: ${mountPath}`);
-    return mountPath;
-  }
+
 
   private async applyPatches(
     operationId: string,
-    mountPath: string,
+    containerId: string,
     vulnerabilities: PatchableVulnerability[],
     dryRun?: boolean
   ): Promise<PatchResult[]> {
     const results: PatchResult[] = [];
-    
+
     // Group vulnerabilities by package manager
     const grouped = new Map<string, PatchableVulnerability[]>();
     for (const vuln of vulnerabilities) {
@@ -303,7 +294,7 @@ export class PatchExecutor {
       }
       grouped.get(vuln.packageManager)!.push(vuln);
     }
-    
+
     // Apply patches for each package manager
     for (const [packageManager, vulns] of grouped) {
       const strategy = this.strategies.get(packageManager);
@@ -311,17 +302,17 @@ export class PatchExecutor {
         logger.warn(`No strategy found for package manager: ${packageManager}`);
         continue;
       }
-      
+
       const strategyResults = await strategy.applyPatches(
         operationId,
-        mountPath,
+        containerId,
         vulns,
         dryRun
       );
-      
+
       results.push(...strategyResults);
     }
-    
+
     return results;
   }
 
@@ -394,7 +385,6 @@ export class PatchExecutor {
   private async cleanupContainer(containerId: string): Promise<void> {
     try {
       logger.info(`Cleaning up container ${containerId}`);
-      await execAsync(`buildah --storage-driver vfs umount ${containerId}`);
       await execAsync(`buildah --storage-driver vfs rm ${containerId}`);
     } catch (error) {
       logger.warn(`Failed to cleanup container ${containerId}:`, error);

@@ -7,7 +7,7 @@ export abstract class PatchStrategy {
 
   abstract applyPatches(
     operationId: string,
-    mountPath: string,
+    containerId: string,
     vulnerabilities: PatchableVulnerability[],
     dryRun?: boolean
   ): Promise<PatchResult[]>;

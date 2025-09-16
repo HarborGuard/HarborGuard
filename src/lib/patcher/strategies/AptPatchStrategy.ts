@@ -12,19 +12,19 @@ export class AptPatchStrategy extends PatchStrategy {
 
   async applyPatches(
     operationId: string,
-    mountPath: string,
+    containerId: string,
     vulnerabilities: PatchableVulnerability[],
     dryRun?: boolean
   ): Promise<PatchResult[]> {
     const results: PatchResult[] = [];
-    
+
     try {
       // Update package lists first
       logger.info('Updating APT package lists');
-      const updateCmd = `chroot ${mountPath} apt-get update`;
-      
+      const updateCmd = `buildah run --isolation chroot ${containerId} -- apt-get update`;
+
       if (!dryRun) {
-        await execAsync(updateCmd, { 
+        await execAsync(updateCmd, {
           env: { ...process.env, DEBIAN_FRONTEND: 'noninteractive' }
         });
       }
@@ -43,19 +43,19 @@ export class AptPatchStrategy extends PatchStrategy {
 
       // Apply upgrades for packages without specific versions
       if (packagesToUpgrade.length > 0) {
-        const upgradeCmd = `chroot ${mountPath} apt-get install -y --only-upgrade ${packagesToUpgrade.join(' ')}`;
+        const upgradeCmd = `buildah run --isolation chroot ${containerId} -- apt-get install -y --only-upgrade ${packagesToUpgrade.join(' ')}`;
         logger.info(`Upgrading packages: ${packagesToUpgrade.join(', ')}`);
 
         for (const packageName of packagesToUpgrade) {
           const vuln = vulnerabilities.find(v => v.packageName === packageName)!;
-          
+
           try {
             if (!dryRun) {
               await execAsync(upgradeCmd, {
                 env: { ...process.env, DEBIAN_FRONTEND: 'noninteractive' }
               });
             }
-            
+
             const result = await this.createPatchResult(
               operationId,
               vuln,
@@ -80,17 +80,17 @@ export class AptPatchStrategy extends PatchStrategy {
       // Install specific versions
       for (const [packageName, version] of packagesWithVersions) {
         const vuln = vulnerabilities.find(v => v.packageName === packageName)!;
-        const installCmd = `chroot ${mountPath} apt-get install -y ${this.buildPackageSpec(packageName, version)}`;
-        
+        const installCmd = `buildah run --isolation chroot ${containerId} -- apt-get install -y ${this.buildPackageSpec(packageName, version)}`;
+
         logger.info(`Installing ${packageName} version ${version}`);
-        
+
         try {
           if (!dryRun) {
             await execAsync(installCmd, {
               env: { ...process.env, DEBIAN_FRONTEND: 'noninteractive' }
             });
           }
-          
+
           const result = await this.createPatchResult(
             operationId,
             vuln,
@@ -114,8 +114,8 @@ export class AptPatchStrategy extends PatchStrategy {
       // Clean up APT cache to reduce image size
       if (!dryRun && results.some(r => r.status === 'SUCCESS')) {
         try {
-          await execAsync(`chroot ${mountPath} apt-get clean`);
-          await execAsync(`chroot ${mountPath} rm -rf /var/lib/apt/lists/*`);
+          await execAsync(`buildah run --isolation chroot ${containerId} -- apt-get clean`);
+          await execAsync(`buildah run --isolation chroot ${containerId} -- rm -rf /var/lib/apt/lists/*`);
           logger.info('Cleaned APT cache');
         } catch (error) {
           logger.warn('Failed to clean APT cache:', error);
