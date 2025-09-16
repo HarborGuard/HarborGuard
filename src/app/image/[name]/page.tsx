@@ -410,7 +410,7 @@ export default function ImageDetailsPage() {
                   <p className="text-sm">
                     {imageData.latestImage?.sizeBytes
                       ? Math.round(
-                          (imageData.latestImage.sizeBytes || 0) / 1024 / 1024
+                          Number(imageData.latestImage.sizeBytes || 0) / 1024 / 1024
                         )
                       : 0}{" "}
                     MB
