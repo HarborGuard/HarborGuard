@@ -359,6 +359,13 @@ export class ScanExecutor implements IScanExecutor {
     const reportFiles = ['trivy.json', 'grype.json', 'syft.json', 'dockle.json', 'osv.json', 'dive.json', 'metadata.json'];
     
     for (const filename of reportFiles) {
+      const scannerName = filename.replace('.json', '');
+
+      // Check if the scanner is enabled before reading the file
+      if (!config.enabledScanners.includes(scannerName)) {
+          logger.debug(`Scanner ${scannerName} not enabled, skipping file ${filename}`);
+          continue;
+      }      
       const filePath = path.join(reportDir, filename);
       try {
         const content = await fs.readFile(filePath, 'utf8');
