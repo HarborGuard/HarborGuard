@@ -229,14 +229,13 @@ function createColumns(handleDeleteClick: (imageName: string) => void): ColumnDe
       )
     },
     cell: ({ row }) => {
-      const imageData = row.original.image;
-      // Handle both string and object formats - show only image name
-      const imageName = typeof imageData === 'string' 
-        ? imageData.split(':')[0] // Extract just the image name
-        : (imageData as any)?.name; // Use the name property directly
+      // Use imageName which should contain the full name for navigation/display
+      // This is set during the grouping process and should preserve the full name
+      const imageName = row.original.imageName;
+
       const tagCount = (row.original as any)._tagCount || 1;
       const allTags = (row.original as any)._allTags || '';
-      
+
       return (
         <div className="flex flex-col">
           <span className="font-medium">{imageName}</span>
@@ -645,12 +644,16 @@ export function DataTable({
   // Group data by image name (without tag)
   const groupedData = React.useMemo(() => {
     const grouped = new Map<string, z.infer<typeof schema>[]>()
-    
+
     initialData.forEach(item => {
       // Handle both string and object formats for item.image
+      // For display purposes, we want to show the full image name including registry/namespace
       const imageName = typeof item.image === 'string'
         ? item.image.split(':')[0]
         : (item.image as any)?.name || 'unknown'
+
+      // For grouping, we should use the full image name to avoid mixing different images
+      // But for display, we want to preserve the full name with registry/namespace
       if (!grouped.has(imageName)) {
         grouped.set(imageName, [])
       }
@@ -1169,5 +1172,3 @@ export function DataTable({
     </Tabs>
   )
 }
-
-
