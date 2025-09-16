@@ -39,7 +39,7 @@ echo "Isolation mode: ${BUILDAH_ISOLATION}"
 echo "Storage driver: ${STORAGE_DRIVER}"
 
 # Import tar as container
-echo "Importing image from tar: $TAR_PATH"
+echo "Importing image from tar: \"$TAR_PATH\""
 container=$(buildah $STORAGE_FLAG from docker-archive:$TAR_PATH 2>&1 | tee /tmp/buildah-import.log | grep -o 'alpine-working-container' || tail -1 /tmp/buildah-import.log)
 echo "Created container: $container"
 

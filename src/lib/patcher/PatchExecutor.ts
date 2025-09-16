@@ -273,7 +273,7 @@ export class PatchExecutor {
 
   private async createWorkingContainer(imageRef: string): Promise<string> {
     logger.info(`Creating working container from ${imageRef}`);
-    const { stdout } = await execAsync(`buildah --storage-driver vfs from ${imageRef}`);
+    const { stdout } = await execAsync(`buildah --storage-driver vfs from "${imageRef}"`);
     const containerId = stdout.trim();
     logger.info(`Created container: ${containerId}`);
     return containerId;
@@ -336,13 +336,13 @@ export class PatchExecutor {
     const imageName = `${registry}/${originalImage.name}:${tag}`;
     
     logger.info(`Committing patched image as ${imageName}`);
-    
+
     // Commit the container
-    await execAsync(`buildah --storage-driver vfs commit ${containerId} ${imageName}`);
-    
+    await execAsync(`buildah --storage-driver vfs commit ${containerId} "${imageName}"`);
+
     // Push to registry
     logger.info(`Pushing image to registry`);
-    await execAsync(`buildah --storage-driver vfs push ${imageName}`);
+    await execAsync(`buildah --storage-driver vfs push "${imageName}"`);
     
     return imageName;
   }
@@ -359,7 +359,7 @@ export class PatchExecutor {
     
     // Get digest of patched image
     const { stdout } = await execAsync(
-      `skopeo inspect --format '{{.Digest}}' docker://${patchedImageRef}`
+      `skopeo inspect --format '{{.Digest}}' "docker://${patchedImageRef}"`
     );
     const digest = stdout.trim();
     
