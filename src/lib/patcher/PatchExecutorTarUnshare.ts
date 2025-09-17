@@ -541,7 +541,7 @@ export class PatchExecutorTarUnshare {
     return typeToManager[packageType.toLowerCase()] || null;
   }
 
-  private async createPatchedImageRecord(
+  async createPatchedImageRecord(
     originalImage: any,
     patchedImageRef: string,
     operationId: string
