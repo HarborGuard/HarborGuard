@@ -59,7 +59,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { DatabaseService } from '@/services/DatabaseService';
-import { serializeForJson } from '@/lib/type-utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -78,7 +77,7 @@ export async function GET(request: NextRequest) {
       includeVulnerabilities
     });
 
-    return NextResponse.json(serializeForJson({
+    return NextResponse.json({
       images,
       pagination: {
         total,
@@ -86,7 +85,7 @@ export async function GET(request: NextRequest) {
         offset,
         hasMore: offset + limit < total
       }
-    }));
+    });
 
   } catch (error) {
     console.error('Failed to fetch images:', error);
