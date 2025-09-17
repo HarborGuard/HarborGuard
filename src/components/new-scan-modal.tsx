@@ -284,7 +284,7 @@ export function NewScanModal({ children }: NewScanModalProps) {
         if (selectedRepository) {
           const image = selectedImages[selectedRepository.id]
           const tag = selectedTags[selectedRepository.id]
-          return image && tag ? `${image.name}:${tag}` : ''
+          return image && tag ? `${image.fullName || image.name}:${tag}` : ''
         }
         return ''
       default:
@@ -865,9 +865,9 @@ export function NewScanModal({ children }: NewScanModalProps) {
                               {repositoryImages[repo.id] && repositoryImages[repo.id].length > 0 && (
                                 <div className="flex items-center gap-2">
                                   <Select
-                                    value={selectedImages[repo.id]?.name || ""}
+                                    value={(selectedImages[repo.id]?.fullName || selectedImages[repo.id]?.name) || ""}
                                     onValueChange={(imageName) => {
-                                      const image = repositoryImages[repo.id].find((img: any) => img.name === imageName)
+                                      const image = repositoryImages[repo.id].find((img: any) => (img.fullName || img.name) === imageName)
                                       if (image) {
                                         setSelectedRepository(repo)
                                         setSelectedImages(prev => ({ ...prev, [repo.id]: image }))
@@ -880,11 +880,14 @@ export function NewScanModal({ children }: NewScanModalProps) {
                                       <SelectValue placeholder="Select image" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {repositoryImages[repo.id].map((image: any) => (
-                                        <SelectItem key={image.name} value={image.name}>
-                                          {image.name}
-                                        </SelectItem>
-                                      ))}
+                                      {repositoryImages[repo.id].map((image: any) => {
+                                        const displayName = image.fullName || image.name;
+                                        return (
+                                          <SelectItem key={displayName} value={displayName}>
+                                            {displayName}
+                                          </SelectItem>
+                                        );
+                                      })}
                                     </SelectContent>
                                   </Select>
                                   
