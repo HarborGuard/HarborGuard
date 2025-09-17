@@ -203,6 +203,15 @@ export function serializeScan(scan: any): any {
   ));
 }
 
+/**
+ * Serialize any data structure for JSON response (handle BigInt)
+ */
+export function serializeForJson(data: any): any {
+  return JSON.parse(JSON.stringify(data, (key, value) =>
+    typeof value === 'bigint' ? value.toString() : value
+  ));
+}
+
 // Helper functions
 function extractBaseImage(imageName?: string): string | undefined {
   if (!imageName) return undefined;
