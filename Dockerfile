@@ -31,7 +31,7 @@ RUN apk add --no-cache \
     postgresql16-client \
     postgresql16-contrib \
     ca-certificates skopeo curl tar gzip xz gnupg docker-cli openssl \
-    bash su-exec \
+    bash tzdata su-exec \
     buildah podman fuse-overlayfs shadow-uidmap slirp4netns \
     crun iptables ip6tables \
   && set -eux \

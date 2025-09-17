@@ -127,7 +127,7 @@ export function scanToLegacyScan(scan: ScanWithImage, vulnCount?: VulnerabilityC
     image: scan.image?.name || 'unknown',
     digestShort: scan.image?.digest?.slice(7, 19) || '', // First 12 chars after "sha256:"
     platform: scan.image?.platform || 'unknown',
-    sizeMb: scan.image?.sizeBytes ? Math.round(scan.image.sizeBytes / 1024 / 1024) : 0,
+    sizeMb: scan.image?.sizeBytes ? Math.round(Number(scan.image.sizeBytes) / 1024 / 1024) : 0,
     riskScore: scan.riskScore || 0,
     
     // Map vulnerability counts

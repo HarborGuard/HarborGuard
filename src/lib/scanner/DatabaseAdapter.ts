@@ -60,7 +60,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
             source: 'LOCAL_DOCKER',
             digest,
             platform: `${imageData.Os}/${imageData.Architecture}`,
-            sizeBytes: Number(imageData.Size || 0),
+            sizeBytes: imageData.Size ? BigInt(imageData.Size) : null,
           }
         });
       }
@@ -98,7 +98,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
           source: 'FILE_UPLOAD',
           digest,
           platform: 'linux/amd64',
-          sizeBytes: 0
+          sizeBytes: null
         }
       });
 
@@ -306,7 +306,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         source: registryUrl && registryUrl !== 'docker.io' ? 'REGISTRY_PRIVATE' : 'REGISTRY',
         digest,
         platform: metadata.os ? `${metadata.os}/${metadata.architecture || 'unknown'}` : `${metadata.Os || 'unknown'}/${metadata.Architecture || 'unknown'}`,
-        sizeBytes: Number(metadata.size || metadata.Size || 0),
+        sizeBytes: (metadata.size || metadata.Size) ? BigInt(metadata.size || metadata.Size) : null,
         // Save the descriptive repository name for one-off scans
         registry: repository ? repository.name : null,
       };
@@ -1200,19 +1200,20 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     if (reports.dive?.layer) {
       for (const layer of reports.dive.layer) {
         // Flag large layers
-        if (layer.sizeBytes > 50 * 1024 * 1024) { // > 50MB
+        const layerSizeBytes = Number(layer.sizeBytes || 0);
+        if (layerSizeBytes > 50 * 1024 * 1024) { // > 50MB
           findings.push({
             scanId,
             source: 'dive',
             findingType: 'large_layer',
-            severity: layer.sizeBytes > 100 * 1024 * 1024 ? 'warning' : 'info',
+            severity: layerSizeBytes > 100 * 1024 * 1024 ? 'warning' : 'info',
             layerId: layer.id,
             layerIndex: layer.index,
             layerCommand: layer.command || null,
-            sizeBytes: BigInt(layer.sizeBytes),
+            sizeBytes: BigInt(layerSizeBytes),
             wastedBytes: null,
             efficiencyScore: null,
-            description: `Large layer detected: ${(layer.sizeBytes / 1024 / 1024).toFixed(2)}MB`,
+            description: `Large layer detected: ${(layerSizeBytes / 1024 / 1024).toFixed(2)}MB`,
             filePaths: null,
             rawFinding: layer
           });

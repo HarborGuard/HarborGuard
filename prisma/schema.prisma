@@ -17,7 +17,7 @@ model Image {
   source                   ImageSource          @default(REGISTRY)
   digest                   String               @unique
   platform                 String?
-  sizeBytes                Int?
+  sizeBytes                BigInt?
   createdAt                DateTime             @default(now())
   updatedAt                DateTime             @updatedAt
   primaryRepositoryId      String?

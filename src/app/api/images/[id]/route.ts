@@ -31,12 +31,12 @@ export async function GET(
     // Convert BigInt to string for JSON serialization (if needed)
     const serializedImage = {
       ...image,
-      sizeBytes: image.sizeBytes || null,
+      sizeBytes: image.sizeBytes ? image.sizeBytes.toString() : null,
       scans: image.scans.map(scan => ({
         ...scan,
         image: {
           ...scan.image,
-          sizeBytes: scan.image.sizeBytes || null
+          sizeBytes: scan.image.sizeBytes ? scan.image.sizeBytes.toString() : null
         }
       }))
     }
