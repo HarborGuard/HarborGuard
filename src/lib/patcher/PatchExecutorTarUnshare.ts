@@ -111,7 +111,8 @@ export class PatchExecutorTarUnshare {
       
       // Define output tar path with descriptive name
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
-      const patchedTarPath = path.join(patchWorkDir, `patched-${image.name}-${timestamp}.tar`);
+      const safeImageName = image.name.replace(/[\/:]/g, '_');
+      const patchedTarPath = path.join(patchWorkDir, `patched-${safeImageName}-${timestamp}.tar`);
       
       // Update status to patching
       await this.updatePatchOperationStatus(patchOperation.id, 'PATCHING');
