@@ -37,22 +37,27 @@ function shouldLogRoute(pathname: string): boolean {
 }
 
 function getUserIp(request: NextRequest): string {
+  // Check if DEMO_MODE is enabled
+  if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
+    return 'DEMO_PROTECT';
+  }
+
   const forwarded = request.headers.get('x-forwarded-for');
   const realIp = request.headers.get('x-real-ip');
   const cfConnectingIp = request.headers.get('cf-connecting-ip');
-  
+
   if (forwarded) {
     return forwarded.split(',')[0].trim();
   }
-  
+
   if (realIp) {
     return realIp;
   }
-  
+
   if (cfConnectingIp) {
     return cfConnectingIp;
   }
-  
+
   return 'unknown';
 }
 

@@ -167,10 +167,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Protect IP in demo mode
+    const protectedIp = process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ? 'DEMO_PROTECT' : body.userIp;
+
     const auditLogData = {
       eventType: mapEventType(body.eventType),
       category: mapLogCategory(body.category),
-      userIp: body.userIp,
+      userIp: protectedIp,
       userAgent: body.userAgent || null,
       userId: body.userId || null,
       resource: body.resource || null,
