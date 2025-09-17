@@ -219,12 +219,13 @@ export class PatchExecutorTarUnshare {
         
         patchedImageId = patchedImage.id;
         
-        // Move patched tar to reports directory for download
-        // Use a unique filename that includes the patch operation ID and target image name
-        const reportsDir = path.join(this.workDir, 'reports', scan.requestId);
-        const tarFileName = `patched-${finalImageName}-${finalImageTag}-${patchOperation.id}.tar`;
-        await fs.copyFile(patchedTarPath, path.join(reportsDir, tarFileName));
-        logger.info(`Copied patched TAR to ${path.join(reportsDir, tarFileName)}`);
+      // Move patched tar to reports directory for download
+      // Use a unique filename that includes the patch operation ID and target image name
+      const reportsDir = path.join(this.workDir, 'reports', scan.requestId);
+      const safeFinalImageName = finalImageName.replace(/[\/:]/g, '_');
+      const tarFileName = `patched-${safeFinalImageName}-${finalImageTag}-${patchOperation.id}.tar`;
+      await fs.copyFile(patchedTarPath, path.join(reportsDir, tarFileName));
+      logger.info(`Copied patched TAR to ${path.join(reportsDir, tarFileName)}`);
         
         // Trigger scan of the patched tar file directly
         logger.info(`Triggering automatic scan of patched tar file: ${patchedTarPath}`);
