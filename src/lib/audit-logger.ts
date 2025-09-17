@@ -77,23 +77,28 @@ export interface AuditLogData {
  * Extract user IP from Next.js request
  */
 export function getUserIpFromRequest(request: NextRequest): string {
+  // Check if DEMO_MODE is enabled
+  if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
+    return 'DEMO_PROTECT';
+  }
+
   // Check various headers for IP address
   const forwarded = request.headers.get('x-forwarded-for');
   const realIp = request.headers.get('x-real-ip');
   const cfConnectingIp = request.headers.get('cf-connecting-ip');
-  
+
   if (forwarded) {
     return forwarded.split(',')[0].trim();
   }
-  
+
   if (realIp) {
     return realIp;
   }
-  
+
   if (cfConnectingIp) {
     return cfConnectingIp;
   }
-  
+
   // No IP address available
   return 'unknown';
 }
@@ -203,10 +208,13 @@ export const auditLogger = {
    * Log scan completion
    */
   scanComplete: async (userIp: string, imageName: string, scanId: string) => {
+    // Protect IP in demo mode
+    const protectedIp = process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ? 'DEMO_PROTECT' : userIp;
+
     await logAuditEvent({
       eventType: 'scan_complete',
       category: 'informative',
-      userIp,
+      userIp: protectedIp,
       action: `Completed scan for ${imageName}`,
       resource: imageName,
       details: { scanId, imageName }
@@ -291,10 +299,13 @@ export const auditLogger = {
    * Log system errors
    */
   systemError: async (userIp: string, error: string, context?: Record<string, any>) => {
+    // Protect IP in demo mode
+    const protectedIp = process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ? 'DEMO_PROTECT' : userIp;
+
     await logAuditEvent({
       eventType: 'system_error',
       category: 'error',
-      userIp,
+      userIp: protectedIp,
       action: `System error: ${error}`,
       details: { error, context }
     });
