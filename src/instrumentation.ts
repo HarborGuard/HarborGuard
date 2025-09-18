@@ -32,7 +32,8 @@ async function initializeDemoMode() {
           image: 'nginx',
           tag: 'latest',
           source: 'registry',
-          scanners: ['trivy', 'grype', 'syft', 'dockle'],
+          registryType: 'DOCKERHUB',  // Explicitly specify Docker Hub
+          registry: 'docker.io',       // Provide the registry URL
         }),
       });
 
