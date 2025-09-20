@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { serializeForJson } from '@/lib/type-utils';
 
 export async function GET(
   request: NextRequest,
@@ -242,7 +243,7 @@ export async function GET(
       highConfidence: correlations.filter(c => c.confidenceScore > 0.7).length
     };
 
-    return NextResponse.json(result);
+    return NextResponse.json(serializeForJson(result));
 
   } catch (error) {
     console.error('Failed to fetch scan findings:', error);

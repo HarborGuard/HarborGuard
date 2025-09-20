@@ -127,7 +127,7 @@ export function scanToLegacyScan(scan: ScanWithImage, vulnCount?: VulnerabilityC
     image: scan.image?.name || 'unknown',
     digestShort: scan.image?.digest?.slice(7, 19) || '', // First 12 chars after "sha256:"
     platform: scan.image?.platform || 'unknown',
-    sizeMb: scan.image?.sizeBytes ? Math.round(scan.image.sizeBytes / 1024 / 1024) : 0,
+    sizeMb: scan.image?.sizeBytes ? Math.round(Number(scan.image.sizeBytes) / 1024 / 1024) : 0,
     riskScore: scan.riskScore || 0,
     
     // Map vulnerability counts
@@ -168,7 +168,7 @@ export function scanToLegacyScan(scan: ScanWithImage, vulnCount?: VulnerabilityC
     attested: false,
     sbomFormat: "spdx",
     dbAge: "0h",
-    registry: scan.image?.registry || undefined,
+    registry: undefined,
     project: undefined,
     lastScan: scan.finishedAt?.toISOString() || scan.createdAt.toISOString(),
     status: mapScanStatus(scan.status),
@@ -199,6 +199,15 @@ export function scansToLegacyScans(scans: ScanWithImage[], vulnCounts?: Vulnerab
  */
 export function serializeScan(scan: any): any {
   return JSON.parse(JSON.stringify(scan, (key, value) =>
+    typeof value === 'bigint' ? value.toString() : value
+  ));
+}
+
+/**
+ * Serialize any data structure for JSON response (handle BigInt)
+ */
+export function serializeForJson(data: any): any {
+  return JSON.parse(JSON.stringify(data, (key, value) =>
     typeof value === 'bigint' ? value.toString() : value
   ));
 }

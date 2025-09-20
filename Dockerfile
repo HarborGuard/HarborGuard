@@ -31,7 +31,7 @@ RUN apk add --no-cache \
     postgresql16-client \
     postgresql16-contrib \
     ca-certificates skopeo curl tar gzip xz gnupg docker-cli openssl \
-    bash su-exec \
+    bash tzdata su-exec \
     buildah podman fuse-overlayfs shadow-uidmap slirp4netns \
     crun iptables ip6tables \
   && set -eux \
@@ -39,12 +39,26 @@ RUN apk add --no-cache \
   && echo "Building for architecture: ${TARGETARCH:-not set}" \
   # Set default if TARGETARCH is not provided
   && TARGETARCH="${TARGETARCH:-amd64}" \
+  # Create a fake uname that returns the correct architecture for the target platform
+  && echo '#!/bin/sh' > /usr/local/bin/uname \
+  && echo 'if [ "$1" = "-m" ]; then' >> /usr/local/bin/uname \
+  && echo '  case "${TARGETARCH}" in' >> /usr/local/bin/uname \
+  && echo '    arm64) echo "aarch64" ;;' >> /usr/local/bin/uname \
+  && echo '    amd64) echo "x86_64" ;;' >> /usr/local/bin/uname \
+  && echo '    *) echo "x86_64" ;;' >> /usr/local/bin/uname \
+  && echo '  esac' >> /usr/local/bin/uname \
+  && echo 'else' >> /usr/local/bin/uname \
+  && echo '  /bin/uname "$@"' >> /usr/local/bin/uname \
+  && echo 'fi' >> /usr/local/bin/uname \
+  && chmod +x /usr/local/bin/uname \
   # Install Trivy
   && curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin "${TRIVY_VERSION}" \
-  # Install Grype
+  # Install Grype (will use our fake uname)
   && curl -fsSL https://get.anchore.io/grype | sh -s -- -b /usr/local/bin \
-  # Install Syft
+  # Install Syft (will use our fake uname)
   && curl -sSfL https://get.anchore.io/syft | sh -s -- -b /usr/local/bin \
+  # Remove the fake uname after installation
+  && rm /usr/local/bin/uname \
   # Install OSV Scanner
   && curl -L "https://github.com/google/osv-scanner/releases/download/${OSV_SCANNER_VERSION}/osv-scanner_linux_${TARGETARCH}" -o /usr/local/bin/osv-scanner \
   && chmod +x /usr/local/bin/osv-scanner \

@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
           id: true,
           requestId: true,
           imageId: true,
+          tag: true,
           startedAt: true,
           finishedAt: true,
           status: true,
@@ -48,8 +49,9 @@ export async function GET(request: NextRequest) {
               id: true,
               name: true,
               tag: true,
-              registry: true,
-              digest: true
+              source: true,
+              digest: true,
+              registry: true
             }
           },
           // Include vulnerability findings for accurate counting
@@ -252,6 +254,7 @@ export async function GET(request: NextRequest) {
         id: scanWithoutFindings.id,
         requestId: scanWithoutFindings.requestId,
         imageId: scanWithoutFindings.imageId,
+        tag: scanWithoutFindings.tag,
         startedAt: scanWithoutFindings.startedAt,
         finishedAt: scanWithoutFindings.finishedAt,
         status: scanWithoutFindings.status,

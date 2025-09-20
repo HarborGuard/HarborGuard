@@ -9,15 +9,21 @@ import { prisma } from '@/lib/prisma';
 import type { ScanRequest, ScannerConfig } from '@/types';
 import { config } from '@/lib/config';
 import { logger } from '@/lib/logger';
+import { RepositoryService } from '@/services/RepositoryService';
+import { RegistryProviderFactory } from '@/lib/registry/providers/RegistryProviderFactory';
+import type { Repository } from '@/generated/prisma';
 
 const execAsync = promisify(exec);
 
 export class ScanExecutor implements IScanExecutor {
   private workDir = process.env.SCANNER_WORKDIR || '/workspace';
+  private repositoryService: RepositoryService;
 
   constructor(
     private progressTracker: { updateProgress: (requestId: string, progress: number, step?: string) => void }
-  ) {}
+  ) {
+    this.repositoryService = RepositoryService.getInstance(prisma);
+  }
 
   async executeTarScan(requestId: string, request: ScanRequest, scanId: string, imageId: string): Promise<void> {
     const reportDir = path.join(this.workDir, 'reports', requestId);
@@ -105,24 +111,118 @@ export class ScanExecutor implements IScanExecutor {
     await this.setupDirectories(reportDir, cacheDir);
     this.progressTracker.updateProgress(requestId, 10, 'Setting up scan environment');
 
-    const fullImageName = request.registry ? `${request.registry}/${request.image}` : request.image;
+    // Get registry URL from repository service
+    const registryUrl = await this.repositoryService.getRegistryUrl(request.repositoryId, request.image) || request.registry;
+
+    // Parse the image name to handle cases where it already includes the registry
+    let cleanImageName = request.image;
+    if (registryUrl && cleanImageName.startsWith(registryUrl + '/')) {
+      cleanImageName = cleanImageName.substring(registryUrl.length + 1);
+    } else if (registryUrl && cleanImageName.startsWith(registryUrl)) {
+      cleanImageName = cleanImageName.substring(registryUrl.length);
+      if (cleanImageName.startsWith('/')) {
+        cleanImageName = cleanImageName.substring(1);
+      }
+    }
+    
+    const fullImageName = registryUrl && cleanImageName ? `${registryUrl}/${cleanImageName}` : cleanImageName;
     const imageRef = `${fullImageName}:${request.tag}`;
 
     const env = this.setupEnvironmentVariables(cacheDir);
     
-    // Get authentication arguments for inspect command
-    const inspectAuthArgs = await this.getInspectAuthArgs(request.repositoryId, request.image);
-    // Add insecure registry flag if needed (for registries without auth)
-    const insecureFlag = this.isInsecureRegistry(request.registry) && !request.repositoryId ? '--tls-verify=false ' : '';
-
-    const { stdout: digestOutput } = await execAsync(
-      `skopeo inspect ${insecureFlag}${inspectAuthArgs} --format '{{.Digest}}' docker://${imageRef}`,
-      { env }
-    );
-    const digest = digestOutput.trim();
+    // Get repository - required for registry operations
+    let repository: Repository | null = null;
+    if (request.repositoryId) {
+      repository = await prisma.repository.findUnique({
+        where: { id: request.repositoryId }
+      });
+    } else {
+      // Try to find a repository for this image
+      repository = await this.repositoryService.findForImage(request.image);
+    }
+    
+    if (!repository) {
+      // Create a temporary repository based on the registry URL and type hint
+      let repoType: 'DOCKERHUB' | 'GHCR' | 'GENERIC' | 'ECR' | 'GCR' = 'DOCKERHUB';
+      let repoName = 'Docker Hub';
+      let repoUrl = registryUrl || 'docker.io';
+      
+      // Use registryType hint if provided
+      if (request.registryType) {
+        if (request.registryType === 'GITLAB') {
+          // GitLab uses GENERIC type with special handling
+          repoType = 'GENERIC';
+          repoName = 'GitLab Container Registry';
+        } else {
+          repoType = request.registryType as any;
+          switch (request.registryType) {
+            case 'GHCR':
+              // Check if it's public (no auth) or private
+              repoName = (!request.repositoryId && !registryUrl) ? 'GHCR Public' : 'GitHub Container Registry';
+              break;
+            case 'ECR':
+              repoName = 'AWS Elastic Container Registry';
+              break;
+            case 'GCR':
+              repoName = 'Google Container Registry';
+              break;
+            case 'DOCKERHUB':
+              repoName = 'Docker Hub Public';
+              break;
+            default:
+              repoName = 'Generic Registry';
+          }
+        }
+      } else {
+        // Auto-detect repository type based on registry URL
+        if (repoUrl.includes('ghcr.io')) {
+          repoType = 'GHCR';
+          repoName = 'GHCR Public';
+        } else if (repoUrl.includes('gitlab')) {
+          repoType = 'GENERIC';
+          repoName = 'GitLab Container Registry';
+        } else if (repoUrl.includes('ecr')) {
+          repoType = 'ECR';
+          repoName = 'AWS Elastic Container Registry';
+        } else if (repoUrl.includes('gcr.io') || repoUrl.includes('pkg.dev')) {
+          repoType = 'GCR';
+          repoName = 'Google Container Registry';
+        } else if (repoUrl === 'docker.io' || repoUrl === 'registry-1.docker.io') {
+          repoType = 'DOCKERHUB';
+          repoName = 'Docker Hub Public';
+        } else {
+          repoType = 'GENERIC';
+          repoName = 'Generic Registry';
+        }
+      }
+      
+      repository = {
+        id: 'temp',
+        name: repoName,
+        type: repoType,
+        protocol: 'https',
+        registryUrl: repoUrl,
+        username: '',
+        encryptedPassword: '',
+        organization: null,
+        status: 'ACTIVE',
+        lastTested: null,
+        repositoryCount: null,
+        apiVersion: null,
+        capabilities: null,
+        rateLimits: null,
+        healthCheck: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      } as Repository;
+    }
+    
+    // Use registry handler for digest - use clean image name without registry prefix
+    const provider = RegistryProviderFactory.createFromRepository(repository);
+    const digest = await provider.getImageDigest(cleanImageName, request.tag);
     const imageHash = digest.replace('sha256:', '');
     // Replace both slashes and colons to create a safe filename
-    const safeImageName = request.image.replace(/[/:]/g, '_');
+    const safeImageName = cleanImageName.replace(/[/:]/g, '_');
     const tarPath = path.join(imageDir, `${safeImageName}-${imageHash}.tar`);
 
     logger.scanner(`Scanning ${imageRef} (${digest})`);
@@ -135,13 +235,8 @@ export class ScanExecutor implements IScanExecutor {
 
     this.progressTracker.updateProgress(requestId, 1, 'Starting image download');
     
-    // Get authentication arguments for copy command
-    const copyAuthArgs = await this.getCopyAuthArgs(request.repositoryId, request.image);
-    // Add insecure registry flag if needed (for registries without auth)
-    const insecureCopyFlag = this.isInsecureRegistry(request.registry) && !request.repositoryId ? '--src-tls-verify=false ' : '';
-    
-    console.log(`skopeo copy ${insecureCopyFlag}${copyAuthArgs} docker://${imageRef} docker-archive:${tarPath}`);
-    await execAsync(`skopeo copy ${insecureCopyFlag}${copyAuthArgs} docker://${imageRef} docker-archive:${tarPath}`, { env });
+    // Pull image using registry handler - use clean image name
+    await provider.pullImage(cleanImageName, request.tag, tarPath);
     
     this.progressTracker.updateProgress(requestId, 50, 'Image download completed');
 
@@ -264,14 +359,6 @@ export class ScanExecutor implements IScanExecutor {
     const reportFiles = ['trivy.json', 'grype.json', 'syft.json', 'dockle.json', 'osv.json', 'dive.json', 'metadata.json'];
     
     for (const filename of reportFiles) {
-      const scannerName = filename.replace('.json', '');
-
-      // Check scanner activation before file read
-      if (!config.enabledScanners.includes(scannerName)) {
-          logger.debug(`Scanner ${scannerName} not enabled, skipping file ${filename}`);
-          continue;
-      }
-
       const filePath = path.join(reportDir, filename);
       try {
         const content = await fs.readFile(filePath, 'utf8');
@@ -286,165 +373,4 @@ export class ScanExecutor implements IScanExecutor {
     return reports;
   }
 
-  /**
-   * Check if an image name appears to be a private repository
-   */
-  private isLikelyPrivateImage(imageName: string): boolean {
-    return imageName.includes('/') && !imageName.startsWith('library/');
-  }
-
-  /**
-   * Check if a registry should use insecure/HTTP connection
-   */
-  private isInsecureRegistry(registry?: string): boolean {
-    if (!registry) return false;
-    // Common local/insecure registries
-    return registry.startsWith('localhost:') || 
-           registry.startsWith('127.0.0.1:') || 
-           registry.startsWith('host.docker.internal:');
-  }
-
-  /**
-   * Find a repository that might contain the given image
-   */
-  private async findMatchingRepositoryForImage(imageName: string): Promise<string | null> {
-    try {
-      const repositories = await prisma.repository.findMany({
-        where: { status: 'ACTIVE' }
-      });
-
-      for (const repo of repositories) {
-        if (repo.type === 'DOCKERHUB') {
-          const username = repo.organization || repo.username;
-          if (username && imageName.startsWith(`${username}/`)) {
-            return repo.id;
-          }
-        } else if (repo.type === 'GHCR' && repo.registryUrl?.includes('ghcr.io')) {
-          const username = repo.organization || repo.username;
-          if (username && imageName.startsWith(`ghcr.io/${username}/`)) {
-            return repo.id;
-          }
-        } else if (repo.type === 'GENERIC' && repo.registryUrl) {
-          const registryHost = repo.registryUrl.replace(/^https?:\/\//, '').split('/')[0];
-          if (imageName.startsWith(`${registryHost}/`)) {
-            return repo.id;
-          }
-        }
-      }
-      return null;
-    } catch (error) {
-      logger.error('Failed to find matching repository:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Get authentication arguments for skopeo inspect commands
-   */
-  private async getInspectAuthArgs(repositoryId?: string, imageName?: string): Promise<string> {
-    let repoId = repositoryId;
-    
-    // If no repositoryId provided but image appears private, try to find matching repository
-    if (!repoId && imageName && this.isLikelyPrivateImage(imageName)) {
-      const foundRepoId = await this.findMatchingRepositoryForImage(imageName);
-      repoId = foundRepoId || undefined;
-    }
-    
-    if (!repoId) {
-      return '--no-creds';
-    }
-
-    try {
-      const repository = await prisma.repository.findUnique({
-        where: { id: repoId },
-      });
-
-      if (!repository || repository.status !== 'ACTIVE') {
-        logger.warn(`Repository ${repoId} not found or inactive`);
-        return '--no-creds';
-      }
-
-      const username = repository.username;
-      const password = repository.encryptedPassword;
-      let authArgs = '';
-
-      // Debug logging
-      logger.info(`Repository ${repository.id} protocol: ${repository.protocol}, registryUrl: ${repository.registryUrl}`);
-
-      // Add TLS verification flag for HTTP registries
-      if (repository.protocol === 'http') {
-        authArgs += '--tls-verify=false ';
-        logger.info(`Adding --tls-verify=false for HTTP registry`);
-      }
-
-      if (username && password) {
-        const escapedUsername = username.replace(/"/g, '\\"');
-        const escapedPassword = password.replace(/"/g, '\\"');
-        authArgs += `--creds "${escapedUsername}:${escapedPassword}"`;
-      } else {
-        authArgs += '--no-creds';
-      }
-
-      logger.info(`Final auth args for repository ${repository.id}: ${authArgs.trim()}`);
-      return authArgs.trim();
-    } catch (error) {
-      logger.error(`Failed to get authentication for repository ${repoId}:`, error);
-      return '--no-creds';
-    }
-  }
-
-  /**
-   * Get authentication arguments for skopeo copy commands
-   */
-  private async getCopyAuthArgs(repositoryId?: string, imageName?: string): Promise<string> {
-    let repoId = repositoryId;
-    
-    // If no repositoryId provided but image appears private, try to find matching repository
-    if (!repoId && imageName && this.isLikelyPrivateImage(imageName)) {
-      const foundRepoId = await this.findMatchingRepositoryForImage(imageName);
-      repoId = foundRepoId || undefined;
-    }
-    
-    if (!repoId) {
-      return '--src-no-creds';
-    }
-
-    try {
-      const repository = await prisma.repository.findUnique({
-        where: { id: repoId },
-      });
-
-      if (!repository || repository.status !== 'ACTIVE') {
-        logger.warn(`Repository ${repoId} not found or inactive`);
-        return '--src-no-creds';
-      }
-
-      const username = repository.username;
-      const password = repository.encryptedPassword;
-      let authArgs = '';
-
-      // Debug logging
-      logger.info(`[Copy] Repository ${repository.id} protocol: ${repository.protocol}, registryUrl: ${repository.registryUrl}`);
-
-      // Add TLS verification flag for HTTP registries
-      if (repository.protocol === 'http') {
-        authArgs += '--src-tls-verify=false ';
-        logger.info(`[Copy] Adding --src-tls-verify=false for HTTP registry`);
-      }
-
-      if (username && password) {
-        const escapedUsername = username.replace(/"/g, '\\"');
-        const escapedPassword = password.replace(/"/g, '\\"');
-        authArgs += `--src-creds "${escapedUsername}:${escapedPassword}"`;
-      } else {
-        authArgs += '--src-no-creds';
-      }
-
-      logger.info(`[Copy] Final auth args for repository ${repository.id}: ${authArgs.trim()}`);
-      return authArgs.trim();
-    } catch (error) {
-      logger.error(`Failed to get authentication for repository ${repoId}:`, error);
-      return '--src-no-creds';
-    }
-  }
 }

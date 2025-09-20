@@ -111,7 +111,8 @@ export class PatchExecutorTarUnshare {
       
       // Define output tar path with descriptive name
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
-      const patchedTarPath = path.join(patchWorkDir, `patched-${image.name}-${timestamp}.tar`);
+      const safeImageName = image.name.replace(/[\/:]/g, '_');
+      const patchedTarPath = path.join(patchWorkDir, `patched-${safeImageName}-${timestamp}.tar`);
       
       // Update status to patching
       await this.updatePatchOperationStatus(patchOperation.id, 'PATCHING');
@@ -218,12 +219,13 @@ export class PatchExecutorTarUnshare {
         
         patchedImageId = patchedImage.id;
         
-        // Move patched tar to reports directory for download
-        // Use a unique filename that includes the patch operation ID and target image name
-        const reportsDir = path.join(this.workDir, 'reports', scan.requestId);
-        const tarFileName = `patched-${finalImageName}-${finalImageTag}-${patchOperation.id}.tar`;
-        await fs.copyFile(patchedTarPath, path.join(reportsDir, tarFileName));
-        logger.info(`Copied patched TAR to ${path.join(reportsDir, tarFileName)}`);
+      // Move patched tar to reports directory for download
+      // Use a unique filename that includes the patch operation ID and target image name
+      const reportsDir = path.join(this.workDir, 'reports', scan.requestId);
+      const safeFinalImageName = finalImageName.replace(/[\/:]/g, '_');
+      const tarFileName = `patched-${safeFinalImageName}-${finalImageTag}-${patchOperation.id}.tar`;
+      await fs.copyFile(patchedTarPath, path.join(reportsDir, tarFileName));
+      logger.info(`Copied patched TAR to ${path.join(reportsDir, tarFileName)}`);
         
         // Trigger scan of the patched tar file directly
         logger.info(`Triggering automatic scan of patched tar file: ${patchedTarPath}`);
@@ -539,7 +541,7 @@ export class PatchExecutorTarUnshare {
     return typeToManager[packageType.toLowerCase()] || null;
   }
 
-  private async createPatchedImageRecord(
+  async createPatchedImageRecord(
     originalImage: any,
     patchedImageRef: string,
     operationId: string
@@ -551,7 +553,6 @@ export class PatchExecutorTarUnshare {
       data: {
         name,
         tag,
-        registry: 'local',
         source: 'LOCAL_DOCKER',
         digest,
         platform: originalImage.platform,

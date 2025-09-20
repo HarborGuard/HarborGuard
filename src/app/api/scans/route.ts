@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
       id: true,
       requestId: true,
       imageId: true,
+      tag: true,
       startedAt: true,
       finishedAt: true,
       status: true,
@@ -41,9 +42,11 @@ export async function GET(request: NextRequest) {
           id: true,
           name: true,
           tag: true,
-          registry: true,
+          source: true,
           digest: true,
           sizeBytes: true,
+          platform: true,
+          primaryRepositoryId: true,
           createdAt: true,
           updatedAt: true
         }

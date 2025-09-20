@@ -22,7 +22,7 @@ async function replicateData() {
           name: 'nginx',
           tag: 'latest',
           digest: 'sha256:' + Math.random().toString(36).substring(2, 15),
-          registry: 'docker.io',
+          source: 'REGISTRY',
           platform: 'linux/amd64',
           sizeBytes: 150000000
         }
@@ -63,7 +63,7 @@ async function replicateData() {
             name: `${originalImage.name}-replica${i}`,
             tag: originalImage.tag || 'latest',
             digest: `sha256:${Math.random().toString(36).substring(2, 15)}${i}`,
-            registry: originalImage.registry || 'docker.io',
+            source: originalImage.source || 'REGISTRY',
             platform: originalImage.platform || 'linux/amd64',
             sizeBytes: originalImage.sizeBytes || 100000000
           }

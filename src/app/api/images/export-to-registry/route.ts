@@ -5,6 +5,8 @@ import path from 'path';
 import fs from 'fs/promises';
 import { promisify } from 'util';
 import { exec } from 'child_process';
+import { RegistryProviderFactory } from '@/lib/registry/providers/RegistryProviderFactory';
+import type { Repository } from '@/generated/prisma';
 
 const execAsync = promisify(exec);
 
@@ -15,14 +17,21 @@ export async function POST(request: NextRequest) {
       sourceImage,
       targetRegistry,
       targetImageName,
-      targetImageTag,
+      targetImageTag = 'latest',
       repositoryId,
       patchedTarPath
     } = body;
 
-    if (!sourceImage || !targetRegistry || !targetImageName || !targetImageTag) {
+    if (!sourceImage && !patchedTarPath) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Source image or patched tar path is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!targetRegistry || !targetImageName) {
+      return NextResponse.json(
+        { error: 'Target registry and image name are required' },
         { status: 400 }
       );
     }
@@ -30,27 +39,39 @@ export async function POST(request: NextRequest) {
     // Build target image reference
     const targetImage = `${targetRegistry}/${targetImageName}:${targetImageTag}`.replace(/^https?:\/\//, '');
     
-    // Get authentication if repository is configured
-    let authArgs = '';
+    // Get repository and use registry handler for export
+    let repository: Repository | null = null;
     if (repositoryId && repositoryId !== 'custom') {
-      const repository = await prisma.repository.findUnique({
-        where: { id: repositoryId },
-        select: {
-          username: true,
-          encryptedPassword: true,
-          registryUrl: true
-        }
+      repository = await prisma.repository.findUnique({
+        where: { id: repositoryId }
       });
-
-      if (repository && repository.username && repository.encryptedPassword) {
-        // Note: encryptedPassword is stored in plain text for now
-        // TODO: Implement proper encryption/decryption
-        authArgs = `--dest-creds="${repository.username}:${repository.encryptedPassword}" `;
-      }
+    }
+    
+    // If no repository, create a temporary one for the target registry
+    if (!repository) {
+      repository = {
+        id: 'temp-export',
+        name: 'Export Target',
+        type: 'GENERIC',
+        protocol: targetRegistry.startsWith('https://') ? 'https' : 'http',
+        registryUrl: targetRegistry.replace(/^https?:\/\//, ''),
+        username: '',
+        encryptedPassword: '',
+        organization: null,
+        status: 'ACTIVE',
+        lastTested: null,
+        repositoryCount: null,
+        apiVersion: null,
+        capabilities: null,
+        rateLimits: null,
+        healthCheck: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      } as Repository;
     }
 
-    // Determine source and method
-    let copyCommand = '';
+    // Create registry provider
+    const provider = RegistryProviderFactory.createFromRepository(repository);
     const workDir = process.env.SCANNER_WORKDIR || '/workspace';
     
     if (patchedTarPath) {
@@ -69,7 +90,14 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      copyCommand = `skopeo copy --dest-tls-verify=false ${authArgs}docker-archive:${tarPath} docker://${targetImage}`;
+      // Use registry handler to push the patched image
+      await provider.pushImage(tarPath, targetImageName, targetImageTag);
+      
+      return NextResponse.json({
+        success: true,
+        message: `Successfully exported patched image to ${targetImage}`,
+        targetImage
+      });
     } else {
       // Try to find existing tar file for the image
       const [imageName, imageTag] = sourceImage.split(':');
@@ -100,55 +128,61 @@ export async function POST(request: NextRequest) {
       }
       
       if (tarPath) {
-        copyCommand = `skopeo copy --dest-tls-verify=false ${authArgs}docker-archive:${tarPath} docker://${targetImage}`;
+        // Push from existing tar file
+        await provider.pushImage(tarPath, targetImageName, targetImageTag);
       } else {
         // Check if we can access Docker daemon
         try {
           await execAsync('docker version', { timeout: 5000 });
           // Export from Docker first
           tarPath = path.join(imagesDir, `${safeImageName}-export-${Date.now()}.tar`);
-          await execAsync(`docker save -o ${tarPath} ${sourceImage}`);
-          copyCommand = `skopeo copy --dest-tls-verify=false ${authArgs}docker-archive:${tarPath} docker://${targetImage}`;
-        } catch {
-          // Try direct registry to registry copy (if source is from a registry)
-          copyCommand = `skopeo copy --src-tls-verify=false --dest-tls-verify=false ${authArgs}docker://${sourceImage} docker://${targetImage}`;
+          await fs.mkdir(imagesDir, { recursive: true });
+          
+          const dockerExport = await execAsync(`docker save -o ${tarPath} ${sourceImage}`);
+          if (dockerExport.stderr) {
+            logger.warn('Docker export stderr:', dockerExport.stderr);
+          }
+          
+          // Push the exported tar
+          await provider.pushImage(tarPath, targetImageName, targetImageTag);
+          
+          // Clean up temporary tar
+          await fs.unlink(tarPath).catch(() => {});
+        } catch (dockerError) {
+          // No Docker daemon, try direct copy between registries
+          const sourceRef = sourceImage.includes('/') 
+            ? sourceImage 
+            : `docker.io/library/${sourceImage}`;
+          
+          // Use registry handler to copy image between registries
+          await provider.copyImage(
+            { 
+              registry: sourceRef.split('/')[0],
+              image: imageName, 
+              tag: imageTag || 'latest' 
+            },
+            { 
+              registry: targetRegistry.replace(/^https?:\/\//, ''),
+              image: targetImageName, 
+              tag: targetImageTag 
+            }
+          );
         }
       }
+      
+      return NextResponse.json({
+        success: true,
+        message: `Successfully exported ${sourceImage} to ${targetImage}`,
+        targetImage
+      });
     }
-
-    logger.info(`Executing export: ${copyCommand.replace(/--dest-creds="[^"]*"/, '--dest-creds="***"')}`);
-    
-    // Execute the copy command
-    const { stdout, stderr } = await execAsync(copyCommand, {
-      timeout: 300000 // 5 minutes timeout
-    });
-    
-    logger.info('Export successful:', stdout);
-    if (stderr) {
-      logger.warn('Export warnings:', stderr);
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: `Image exported to ${targetImage}`,
-      targetImage
-    });
-
-  } catch (error: any) {
+  } catch (error) {
     logger.error('Export to registry failed:', error);
-    
-    // Parse common skopeo errors
-    let errorMessage = error.message || 'Export failed';
-    if (errorMessage.includes('unauthorized')) {
-      errorMessage = 'Authentication failed. Please check repository credentials.';
-    } else if (errorMessage.includes('no such host')) {
-      errorMessage = 'Registry host not found. Please check the registry URL.';
-    } else if (errorMessage.includes('connection refused')) {
-      errorMessage = 'Connection refused. Is the registry running and accessible?';
-    }
-    
     return NextResponse.json(
-      { error: errorMessage },
+      { 
+        error: 'Export failed', 
+        details: error instanceof Error ? error.message : 'Unknown error' 
+      },
       { status: 500 }
     );
   }

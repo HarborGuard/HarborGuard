@@ -2,7 +2,7 @@
 // Centralizes all database operations and provides clean APIs for the frontend
 
 import { prisma } from '@/lib/prisma';
-import { prismaToScan, prismaToScanWithImage, prismaToScanWithFullRelations } from '@/lib/type-utils';
+import { prismaToScan, prismaToScanWithImage, prismaToScanWithFullRelations, serializeForJson } from '@/lib/type-utils';
 import type {
   Image,
   Scan,
@@ -57,7 +57,10 @@ export class DatabaseService {
       prisma.image.count()
     ]);
 
-    return { images, total };
+    // Serialize images to handle BigInt values
+    const serializedImages = images.map(image => serializeForJson(image));
+
+    return { images: serializedImages, total };
   }
 
   async getImageById(id: string): Promise<ImageWithScans | null> {
@@ -458,8 +461,7 @@ export class DatabaseService {
       where: {
         OR: [
           { name: { contains: query } },
-          { tag: { contains: query } },
-          { registry: { contains: query } },
+          { tag: { contains: query } }
         ]
       },
       take: 10,

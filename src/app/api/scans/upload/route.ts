@@ -83,10 +83,10 @@ export async function POST(request: NextRequest) {
         data: {
           name: validatedData.image.name,
           tag: validatedData.image.tag,
-          registry: validatedData.image.registry,
+          source: 'REGISTRY',
           digest: validatedData.image.digest,
           platform: validatedData.image.platform,
-          sizeBytes: validatedData.image.sizeBytes || null,
+          sizeBytes: validatedData.image.sizeBytes ? BigInt(validatedData.image.sizeBytes) : null,
         }
       })
     }

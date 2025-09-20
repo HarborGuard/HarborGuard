@@ -51,6 +51,7 @@ import {
   VisibilityState,
 } from "@tanstack/react-table"
 import { toast } from "sonner"
+import { buildRescanRequest } from "@/lib/registry/registry-utils"
 import { z } from "zod"
 
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -229,10 +230,10 @@ function createColumns(handleDeleteClick: (imageName: string) => void): ColumnDe
     },
     cell: ({ row }) => {
       const imageData = row.original.image;
-      // Handle both string and object formats
+      // Handle both string and object formats - show only image name
       const imageName = typeof imageData === 'string' 
-        ? imageData 
-        : `${(imageData as any)?.name}:${(imageData as any)?.tag}`;
+        ? imageData.split(':')[0] // Extract just the image name
+        : (imageData as any)?.name; // Use the name property directly
       const tagCount = (row.original as any)._tagCount || 1;
       const allTags = (row.original as any)._allTags || '';
       
@@ -405,71 +406,18 @@ function createColumns(handleDeleteClick: (imageName: string) => void): ColumnDe
     accessorKey: "registry",
     header: "Registry",
     cell: ({ row }) => {
-      // Use pre-computed registries from the grouping phase
-      const allRegistries = (row.original as any)._allRegistries;
-      
-      // If we have pre-computed registries, use them
-      if (allRegistries && allRegistries.length > 0) {
-        // Sort registries for consistent display
-        const sortedRegistries = allRegistries.sort((a: string, b: string) => {
-          // Put Docker Hub first, then local, then others alphabetically
-          if (a === "docker.io") return -1;
-          if (b === "docker.io") return 1;
-          if (a === "local") return -1;
-          if (b === "local") return 1;
-          return a.localeCompare(b);
-        });
-        
-        // Create badges for all unique registries
-        const badges = sortedRegistries.map((reg: string) => {
-          if (reg === "local") {
-            return (
-              <Badge key="local" variant="secondary" className="text-xs">
-                Local Docker
-              </Badge>
-            );
-          } else if (reg === "docker.io") {
-            return (
-              <Badge key="dockerhub" variant="default" className="text-xs">
-                Docker Hub
-              </Badge>
-            );
-          } else {
-            return (
-              <Badge key={reg} variant="outline" className="text-xs">
-                {reg}
-              </Badge>
-            );
-          }
-        });
-        
-        return <div className="flex flex-wrap gap-1">{badges}</div>;
-      }
-      
-      // Fallback to single registry from current row
+      // Simply use the registry from the image object
       const imageData = row.original.image;
-      const currentRegistry = typeof imageData === 'object' ? (imageData as any)?.registry : null;
-      const source = row.original.source;
-      
-      let registry = "docker.io";
-      if (source === "local") {
-        registry = "local";
-      } else if (currentRegistry) {
-        registry = currentRegistry;
-      }
+      const registry = typeof imageData === 'object' && imageData !== null 
+        ? (imageData as any).registry || "Docker Hub"
+        : "Docker Hub";
       
       return (
         <Badge 
-          variant={
-            registry === "docker.io" ? "default" : 
-            registry === "local" ? "secondary" : 
-            "outline"
-          }
+          variant={registry === "Docker Hub" ? "default" : "outline"}
           className="text-xs"
         >
-          {registry === "docker.io" ? "Docker Hub" : 
-           registry === "local" ? "Local Docker" : 
-           registry}
+          {registry}
         </Badge>
       );
     },
@@ -735,11 +683,14 @@ export function DataTable({
       // Collect all registries from grouped items
       const allRegistries = new Set<string>();
       items.forEach(item => {
+        const imageSource = typeof item.image === 'object' ? (item.image as any)?.source : null;
         const reg = typeof item.image === 'object' ? (item.image as any)?.registry : null;
         const src = item.source;
         
         if (src === "local") {
           allRegistries.add("local");
+        } else if (imageSource === "REGISTRY_PRIVATE" || src === "REGISTRY_PRIVATE") {
+          allRegistries.add("generic");
         } else if (!reg || reg === null) {
           allRegistries.add("docker.io");
         } else {
@@ -877,18 +828,24 @@ export function DataTable({
     const actualTag = tag || 'latest'
     const loadingToastId = toast.loading(`Starting ${scanSource} rescan for ${imageName}:${actualTag}...`)
     
+    // Find the row data to get registry information
+    const rowData = data.find(row => row.imageName === imageName)
+    const imageData = rowData?.image
+    const registry = typeof imageData === 'object' && imageData !== null 
+      ? (imageData as any).registry 
+      : undefined
+    
     try {
+      // Build request using utility function
+      const requestBody = buildRescanRequest(imageName, actualTag, registry, scanSource)
+      
       // Use the correct API endpoint for starting scans
       const response = await fetch('/api/scans/start', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          image: imageName,
-          tag: actualTag,
-          source: scanSource
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       if (response.ok) {

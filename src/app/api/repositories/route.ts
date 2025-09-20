@@ -1,26 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { RegistryService } from '@/lib/registry/RegistryService'
+
+const registryService = new RegistryService(prisma)
 
 export async function GET() {
   try {
-    const repositories = await prisma.repository.findMany({
-      select: {
-        id: true,
-        name: true,
-        type: true,
-        protocol: true,
-        registryUrl: true,
-        username: true,
-        lastTested: true,
-        status: true,
-        repositoryCount: true,
-        createdAt: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
-
+    const repositories = await registryService.listRepositories()
     return NextResponse.json(repositories)
   } catch (error) {
     console.error('Failed to fetch repositories:', error)
@@ -34,7 +20,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, type, registryUrl, username, password, organization, testResult } = body
+    const { name, type, registryUrl, username, password, organization, protocol, skipTlsVerify, testConnection = true } = body
 
     if (!name || !type || !username || !password) {
       return NextResponse.json(
@@ -43,55 +29,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (type === 'generic' && !registryUrl) {
-      return NextResponse.json(
-        { error: 'Registry URL is required for generic registry type' },
-        { status: 400 }
-      )
-    }
-
-    // Extract protocol from registryUrl if present
-    let protocol = 'https'
-    let cleanRegistryUrl = registryUrl || (type === 'dockerhub' ? 'docker.io' : type === 'ghcr' ? 'ghcr.io' : '')
-    
-    if (cleanRegistryUrl) {
-      if (cleanRegistryUrl.startsWith('http://')) {
-        protocol = 'http'
-        cleanRegistryUrl = cleanRegistryUrl.substring(7)
-      } else if (cleanRegistryUrl.startsWith('https://')) {
-        protocol = 'https'
-        cleanRegistryUrl = cleanRegistryUrl.substring(8)
-      }
-      // Remove trailing slash
-      cleanRegistryUrl = cleanRegistryUrl.replace(/\/$/, '')
-    }
-
-    // Determine status based on test results
-    let status: 'ACTIVE' | 'ERROR' | 'UNTESTED' = 'UNTESTED'
-    let repositoryCount: number | undefined
-    let lastTested: Date | undefined
-    
-    if (testResult) {
-      status = testResult.success ? 'ACTIVE' : 'ERROR'
-      repositoryCount = testResult.repositoryCount
-      lastTested = new Date()
-    }
-
-    // For security, we'll encrypt the password/token before storing
-    // For now, we'll store it as plain text but in production you should encrypt it
-    const repository = await prisma.repository.create({
-      data: {
-        name,
-        type: type.toUpperCase() as 'DOCKERHUB' | 'GHCR' | 'GENERIC',
-        protocol,
-        registryUrl: cleanRegistryUrl,
-        username,
-        encryptedPassword: password, // Should be encrypted
-        organization,
-        status,
-        repositoryCount,
-        lastTested,
-      },
+    const { repository, testResult } = await registryService.createRepository({
+      name,
+      type,
+      registryUrl,
+      username,
+      password,
+      organization,
+      protocol,
+      skipTlsVerify,
+      testConnection
     })
 
     return NextResponse.json({
@@ -102,11 +49,16 @@ export async function POST(request: NextRequest) {
       registryUrl: repository.registryUrl,
       username: repository.username,
       status: repository.status,
+      repositoryCount: repository.repositoryCount,
+      capabilities: repository.capabilities || null,
+      rateLimits: repository.rateLimits || null,
+      testResult
     })
   } catch (error) {
     console.error('Failed to create repository:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create repository'
     return NextResponse.json(
-      { error: 'Failed to create repository' },
+      { error: errorMessage },
       { status: 500 }
     )
   }
