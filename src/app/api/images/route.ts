@@ -10,7 +10,7 @@
  *         name: limit
  *         schema:
  *           type: integer
- *           default: 50
+ *           default: 100
  *         description: Number of images to return
  *       - in: query
  *         name: offset
