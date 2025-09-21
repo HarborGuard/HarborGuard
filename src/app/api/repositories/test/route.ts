@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { RegistryService } from '@/lib/registry/RegistryService'
 import { RegistryProviderFactory } from '@/lib/registry/providers/RegistryProviderFactory'
+import { secureLogger } from '@/lib/secure-logger'
 import type { Repository } from '@/generated/prisma'
 
 const registryService = new RegistryService(prisma)
@@ -11,7 +12,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { type, registryUrl, username, password, organization, skipTlsVerify, registryPort } = body
 
-    console.log('[Test Connection] Request received:', {
+    secureLogger.info('[Test Connection] Request received:', {
       type,
       registryUrl,
       username,
@@ -39,11 +40,11 @@ export async function POST(request: NextRequest) {
     try {
       // Create a temporary repository object for testing
       const upperType = type.toUpperCase() as any
-      
+
       // Process registry URL and protocol
       let protocol = 'https'
       let cleanRegistryUrl = registryUrl || ''
-      
+
       if (upperType === 'DOCKERHUB') {
         cleanRegistryUrl = 'docker.io'
       } else if (upperType === 'GHCR') {
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date()
       }
 
-      console.log('[Test Connection] Created temp repository:', {
+      secureLogger.info('[Test Connection] Created temp repository:', {
         type: tempRepository.type,
         registryUrl: tempRepository.registryUrl,
         protocol: tempRepository.protocol,
@@ -113,10 +114,10 @@ export async function POST(request: NextRequest) {
       console.log('[Test Connection] Creating provider for type:', upperType)
       // Test connection using provider
       const provider = RegistryProviderFactory.create(upperType, tempRepository)
-      
+
       console.log('[Test Connection] Testing connection...')
       const result = await provider.testConnection()
-      
+
       console.log('[Test Connection] Test result:', {
         success: result.success,
         repositoryCount: result.repositoryCount,

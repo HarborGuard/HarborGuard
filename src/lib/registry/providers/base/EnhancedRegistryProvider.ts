@@ -2,6 +2,7 @@ import { promisify } from 'util';
 import { exec } from 'child_process';
 import type { Repository } from '@/generated/prisma';
 import { logger } from '@/lib/logger';
+import { secureLogger } from '@/lib/secure-logger';
 import type {
   RegistryImage,
   ImageTag,
@@ -50,50 +51,59 @@ export interface SkopeoOptions {
 export abstract class EnhancedRegistryProvider {
   protected repository: Repository;
   protected config: RegistryConfig;
-  
+
+  /**
+   * Redact credentials from skopeo commands for safe logging
+   */
+  private redactSkopeoCommand(command: string): string {
+    // Redact --creds "username:password" patterns
+    return command.replace(/--creds\s+"[^"]+"/g, '--creds "***"')
+      .replace(/--creds\s+[^\s]+/g, '--creds ***');
+  }
+
   constructor(repository: Repository) {
     this.repository = repository;
     this.config = this.parseConfig(repository);
   }
-  
+
   // ===== Abstract Methods - Must be implemented by each provider =====
-  
+
   /**
    * Get authentication arguments for skopeo commands
    * Each registry has different auth mechanisms
    */
   abstract getSkopeoAuthArgs(): Promise<string>;
-  
+
   /**
    * Parse repository config into provider-specific format
    */
   protected abstract parseConfig(repository: Repository): RegistryConfig;
-  
+
   /**
    * Provider metadata
    */
   abstract getProviderName(): string;
   abstract getSupportedCapabilities(): RegistryCapability[];
   abstract getRateLimits(): RateLimit;
-  
+
   /**
    * Test connection to the registry
    */
   abstract testConnection(): Promise<ConnectionTestResult>;
-  
+
   /**
    * Get auth headers for HTTP API calls
    */
   abstract getAuthHeaders(): Promise<Record<string, string>>;
-  
+
   // ===== Registry API Operations (Provider-specific implementation) =====
-  
+
   abstract listImages(options?: ListImagesOptions): Promise<RegistryImage[]>;
   abstract getImageMetadata(namespace: string | null, imageName: string): Promise<ImageMetadata>;
   abstract getTags(namespace: string | null, imageName: string): Promise<ImageTag[]>;
-  
+
   // ===== Common Skopeo Operations (Shared implementation) =====
-  
+
   /**
    * Pull an image from the registry to local tar archive
    */
@@ -104,13 +114,13 @@ export abstract class EnhancedRegistryProvider {
     // For copy command pulling FROM registry, replace --creds with --src-creds
     const srcAuthArgs = authArgs.replace('--creds', '--src-creds');
     const tlsVerify = this.shouldVerifyTLS() ? '' : '--tls-verify=false';
-    
+
     const command = `skopeo copy ${srcAuthArgs} ${tlsVerify} docker://${imageRef} docker-archive:${destination}`;
-    
+
     logger.info(`Pulling image ${imageRef} to ${destination}`);
     await this.executeSkopeoCommand(command);
   }
-  
+
   /**
    * Push an image from local tar archive to the registry
    */
@@ -120,13 +130,13 @@ export abstract class EnhancedRegistryProvider {
     // For copy command pushing TO registry, replace --creds with --dest-creds
     const destAuthArgs = authArgs.replace('--creds', '--dest-creds');
     const tlsVerify = this.shouldVerifyTLS() ? '' : '--tls-verify=false';
-    
+
     const command = `skopeo copy ${destAuthArgs} ${tlsVerify} docker-archive:${source} docker://${imageRef}`;
-    
+
     logger.info(`Pushing image from ${source} to ${imageRef}`);
     await this.executeSkopeoCommand(command);
   }
-  
+
   /**
    * Copy an image between registries
    */
@@ -135,13 +145,13 @@ export abstract class EnhancedRegistryProvider {
     const destRef = this.formatImageReference(destination);
     const authArgs = await this.getSkopeoAuthArgs();
     const tlsVerify = this.shouldVerifyTLS() ? '' : '--tls-verify=false';
-    
+
     const command = `skopeo copy ${authArgs} ${tlsVerify} docker://${sourceRef} docker://${destRef}`;
-    
+
     logger.info(`Copying image from ${sourceRef} to ${destRef}`);
     await this.executeSkopeoCommand(command);
   }
-  
+
   /**
    * Inspect an image to get detailed metadata
    */
@@ -150,29 +160,29 @@ export abstract class EnhancedRegistryProvider {
     const imageRef = `${registry}/${image}:${tag || 'latest'}`;
     const authArgs = await this.getSkopeoAuthArgs();
     const tlsVerify = this.shouldVerifyTLS() ? '' : '--tls-verify=false';
-    
+
     const command = `skopeo inspect ${authArgs} ${tlsVerify} docker://${imageRef}`;
-    
-    console.log('[EnhancedRegistryProvider.inspectImage] Building skopeo command:', {
+
+    secureLogger.info('[EnhancedRegistryProvider.inspectImage] Building skopeo command:', {
       repositoryType: this.repository.type,
       registry,
       image,
       tag: tag || 'latest',
       imageRef,
       tlsVerify,
-      finalCommand: command.replace(/--creds "[^"]+"/, '--creds "***"')
+      finalCommand: this.redactSkopeoCommand(command)
     });
-    
+
     logger.debug(`Inspecting image ${imageRef}`);
     const { stdout } = await this.executeSkopeoCommand(command);
-    
+
     const result = JSON.parse(stdout);
-    
+
     // Normalize the response to ensure we have a digest field
     if (!result.digest && result.Digest) {
       result.digest = result.Digest;
     }
-    
+
     // Also ensure config exists with normalized fields
     if (!result.config) {
       result.config = {
@@ -181,10 +191,10 @@ export abstract class EnhancedRegistryProvider {
         size: result.Size || 0
       };
     }
-    
+
     return result;
   }
-  
+
   /**
    * Get the digest of an image
    */
@@ -193,15 +203,15 @@ export abstract class EnhancedRegistryProvider {
     const imageRef = `${registry}/${image}:${tag || 'latest'}`;
     const authArgs = await this.getSkopeoAuthArgs();
     const tlsVerify = this.shouldVerifyTLS() ? '' : '--tls-verify=false';
-    
+
     const command = `skopeo inspect ${authArgs} ${tlsVerify} --format '{{.Digest}}' docker://${imageRef}`;
-    
+
     logger.debug(`Getting digest for ${imageRef}`);
     const { stdout } = await this.executeSkopeoCommand(command);
-    
+
     return stdout.trim();
   }
-  
+
   /**
    * List tags for an image using skopeo
    */
@@ -209,77 +219,77 @@ export abstract class EnhancedRegistryProvider {
     const imageRef = this.formatImageReference({ image, tag: '' }).replace(/:\s*$/, '');
     const authArgs = await this.getSkopeoAuthArgs();
     const tlsVerify = this.shouldVerifyTLS() ? '' : '--tls-verify=false';
-    
+
     const command = `skopeo list-tags ${authArgs} ${tlsVerify} docker://${imageRef}`;
-    
+
     logger.debug(`Listing tags for ${imageRef}`);
     const { stdout } = await this.executeSkopeoCommand(command);
-    
+
     const result = JSON.parse(stdout);
     return result.Tags || [];
   }
-  
+
   // ===== Optional Operations with Default Implementations =====
-  
+
   /**
    * Search for images in the registry
    */
   async searchImages(query: string, options?: any): Promise<RegistryImage[]> {
     throw new Error(`Search not supported by ${this.getProviderName()}`);
   }
-  
+
   /**
    * Delete an image from the registry (not all registries support this)
    */
   async deleteImage(image: string, tag: string): Promise<void> {
     throw new Error(`Delete not supported by ${this.getProviderName()}`);
   }
-  
+
   /**
    * Get vulnerability scan results (registry-specific)
    */
   async getVulnerabilities(image: string, tag: string): Promise<Vulnerability[]> {
     return [];
   }
-  
+
   /**
    * Refresh authentication token (for registries with expiring tokens)
    */
   async refreshAuth(): Promise<void> {
     // Override in providers that need token refresh (ECR, GCR, etc.)
   }
-  
+
   // ===== Utility Methods =====
-  
+
   /**
    * Format registry URL for skopeo commands (removes protocol, adds port for GitLab)
    */
   protected formatRegistryForSkopeo(): string {
     let registry = this.repository.registryUrl;
-    
-    console.log('[EnhancedRegistryProvider.formatRegistryForSkopeo] Input:', {
+
+    secureLogger.info('[EnhancedRegistryProvider.formatRegistryForSkopeo] Input:', {
       repositoryType: this.repository.type,
       registryUrl: this.repository.registryUrl,
       registryPort: this.repository.registryPort
     });
-    
+
     // Remove protocol if present for docker:// format
     registry = registry.replace(/^https?:\/\//, '');
-    
+
     // For GitLab repositories, the port is already included in the registryUrl
     // (e.g., "http://24.199.119.91:5050" becomes "24.199.119.91:5050")
     // For other registries, add port if specified separately
     if (this.repository.type !== 'GITLAB' && this.repository.registryPort && !registry.includes(':')) {
       registry = `${registry}:${this.repository.registryPort}`;
     }
-    
-    console.log('[EnhancedRegistryProvider.formatRegistryForSkopeo] Output:', {
+
+    secureLogger.info('[EnhancedRegistryProvider.formatRegistryForSkopeo] Output:', {
       cleanedRegistry: registry
     });
-    
+
     return registry;
   }
-  
+
   /**
    * Handle rate limiting
    */
@@ -291,14 +301,14 @@ export abstract class EnhancedRegistryProvider {
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
-  
+
   /**
    * Log a request
    */
   protected logRequest(method: string, url: string): void {
     logger.debug(`[${this.getProviderName()}] ${method} ${url.replace(/\/\/[^@]+@/, '//***@')}`);
   }
-  
+
   /**
    * Format a date string
    */
@@ -310,7 +320,7 @@ export abstract class EnhancedRegistryProvider {
       return undefined;
     }
   }
-  
+
   /**
    * Parse an image name into namespace and name
    */
@@ -319,19 +329,19 @@ export abstract class EnhancedRegistryProvider {
     if (parts.length === 1) {
       return { namespace: null, imageName: parts[0] };
     }
-    return { 
-      namespace: parts.slice(0, -1).join('/'), 
-      imageName: parts[parts.length - 1] 
+    return {
+      namespace: parts.slice(0, -1).join('/'),
+      imageName: parts[parts.length - 1]
     };
   }
-  
+
   /**
    * Build a full image name
    */
   protected buildFullName(namespace: string | null, imageName: string): string {
     return namespace ? `${namespace}/${imageName}` : imageName;
   }
-  
+
   /**
    * Format an image reference for the registry
    */
@@ -339,7 +349,7 @@ export abstract class EnhancedRegistryProvider {
     // Use the helper method to format registry URL
     let registry = ref.registry ? ref.registry.replace(/^https?:\/\//, '') : this.formatRegistryForSkopeo();
     let imageName = ref.image;
-    
+
     console.log('[EnhancedRegistryProvider.formatImageReference] Input:', {
       repositoryType: this.repository.type,
       refRegistry: ref.registry,
@@ -348,7 +358,7 @@ export abstract class EnhancedRegistryProvider {
       refTag: ref.tag,
       computedRegistry: registry
     });
-    
+
     // If the image already starts with the registry URL, don't add it again
     if (imageName.startsWith(registry + '/')) {
       imageName = imageName.substring(registry.length + 1);
@@ -359,25 +369,25 @@ export abstract class EnhancedRegistryProvider {
         imageName = imageName.substring(1);
       }
     }
-    
+
     const parts = [registry];
-    
+
     if (ref.namespace) {
       parts.push(ref.namespace);
     }
-    
+
     parts.push(`${imageName}:${ref.tag || 'latest'}`);
-    
+
     const result = parts.join('/');
-    
+
     console.log('[EnhancedRegistryProvider.formatImageReference] Output:', {
       parts,
       result
     });
-    
+
     return result;
   }
-  
+
   /**
    * Check if TLS verification should be enabled
    */
@@ -390,7 +400,7 @@ export abstract class EnhancedRegistryProvider {
       this.repository.protocol === 'http'
     );
   }
-  
+
   /**
    * Execute a skopeo command with retry logic
    */
@@ -400,26 +410,26 @@ export abstract class EnhancedRegistryProvider {
   ): Promise<{ stdout: string; stderr: string }> {
     const maxRetries = options.retryTimes || 3;
     let lastError: Error | null = null;
-    
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        logger.debug(`Executing skopeo command (attempt ${attempt}/${maxRetries}): ${command}`);
-        
+        logger.debug(`Executing skopeo command (attempt ${attempt}/${maxRetries}): ${this.redactSkopeoCommand(command)}`);
+
         const { stdout, stderr } = await execAsync(command, {
           maxBuffer: 50 * 1024 * 1024, // 50MB buffer
           timeout: 5 * 60 * 1000, // 5 minute timeout
         });
-        
+
         return { stdout, stderr };
       } catch (error: any) {
         lastError = error;
         logger.warn(`Skopeo command failed (attempt ${attempt}/${maxRetries}):`, error.message);
-        
+
         if (attempt < maxRetries) {
           // Exponential backoff
           const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
           await new Promise(resolve => setTimeout(resolve, delay));
-          
+
           // Try to refresh auth if it might have expired
           if (this.isAuthError(error)) {
             await this.refreshAuth().catch(() => {
@@ -429,10 +439,10 @@ export abstract class EnhancedRegistryProvider {
         }
       }
     }
-    
+
     throw lastError || new Error('Skopeo command failed after all retries');
   }
-  
+
   /**
    * Check if an error is related to authentication
    */
@@ -440,7 +450,7 @@ export abstract class EnhancedRegistryProvider {
     const message = error.message || error.toString();
     return /unauthorized|401|403|forbidden|authentication|credential/i.test(message);
   }
-  
+
   /**
    * Make an authenticated HTTP request to the registry API
    */
@@ -453,22 +463,22 @@ export abstract class EnhancedRegistryProvider {
       ...options,
       headers: { ...headers, ...options?.headers }
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
       throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
-    
+
     return response;
   }
-  
+
   /**
    * Get health status of the registry
    */
-  async getHealthStatus(): Promise<{ 
-    status: 'healthy' | 'unhealthy' | 'degraded'; 
-    message: string; 
-    lastChecked: Date 
+  async getHealthStatus(): Promise<{
+    status: 'healthy' | 'unhealthy' | 'degraded';
+    message: string;
+    lastChecked: Date
   }> {
     const lastChecked = new Date();
     try {
@@ -486,7 +496,7 @@ export abstract class EnhancedRegistryProvider {
       };
     }
   }
-  
+
   /**
    * Check if registry is healthy
    */

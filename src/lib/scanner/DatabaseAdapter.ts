@@ -1,5 +1,6 @@
 import { promisify } from 'util';
 import { exec } from 'child_process';
+import { secureLogger } from '@/lib/secure-logger';
 import { prisma } from '@/lib/prisma';
 import { inspectDockerImage } from '@/lib/docker';
 import { IDatabaseAdapter, ScanReports, AggregatedData, VulnerabilityCount, ComplianceScore } from './types';
@@ -12,7 +13,7 @@ const execAsync = promisify(exec);
 
 export class DatabaseAdapter implements IDatabaseAdapter {
   private repositoryService: RepositoryService;
-  
+
   constructor() {
     this.repositoryService = RepositoryService.getInstance(prisma);
   }
@@ -21,7 +22,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     if (this.isLocalDockerScan(request)) {
       return this.initializeLocalDockerScanRecord(requestId, request);
     }
-    
+
     if (request.source === 'tar' && request.tarPath) {
       return this.initializeTarScanRecord(requestId, request);
     }
@@ -34,12 +35,12 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     if (request.source === 'local') {
       return true;
     }
-    
+
     // Legacy check: if registry is 'local', treat as local Docker scan
     if (request.registry === 'local') {
       return true;
     }
-    
+
     return false;
   }
 
@@ -49,9 +50,9 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       const imageRef = request.dockerImageId || `${request.image}:${request.tag}`;
       const imageData = await inspectDockerImage(imageRef);
       const digest = imageData.Id;
-      
+
       let image = await prisma.image.findUnique({ where: { digest } });
-      
+
       if (!image) {
         image = await prisma.image.create({
           data: {
@@ -90,7 +91,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       // For tar files, we don't need to inspect from registry
       // Create a unique digest based on the tar path and timestamp
       const digest = `sha256:tar-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-      
+
       const image = await prisma.image.create({
         data: {
           name: request.image,
@@ -124,12 +125,12 @@ export class DatabaseAdapter implements IDatabaseAdapter {
   private async initializeRegistryScanRecord(requestId: string, request: ScanRequest) {
     // Declare imageRef outside try block so it's accessible in catch block
     let imageRef = '';
-    
+
     try {
       // Get registry URL from repository service
       let registryUrl = await this.repositoryService.getRegistryUrl(request.repositoryId, request.image) || request.registry;
       let cleanImageName = request.image;
-      
+
       // Extract registry URL from image name if present
       if (request.image.includes('/')) {
         const parts = request.image.split('/');
@@ -137,7 +138,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         if (parts[0].includes(':') || parts[0].includes('.')) {
           const extractedRegistry = parts[0];
           const extractedImageName = parts.slice(1).join('/');
-          
+
           if (!registryUrl) {
             // No repository found, use the extracted registry
             registryUrl = extractedRegistry;
@@ -148,12 +149,12 @@ export class DatabaseAdapter implements IDatabaseAdapter {
           }
         }
       }
-      
+
       // If cleanImageName already starts with the registry URL, remove it to avoid duplication
       if (registryUrl && cleanImageName.startsWith(`${registryUrl}/`)) {
         cleanImageName = cleanImageName.substring(registryUrl.length + 1);
       }
-      
+
       // If we still don't have a registry URL, check if we have a registry type hint
       if (!registryUrl && request.registryType) {
         // Use registry type hint to determine the registry URL
@@ -175,7 +176,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
             break;
         }
       }
-      
+
       // If we still don't have a registry URL, we need to handle this case
       if (!registryUrl) {
         // Check if the image name itself already contains a registry
@@ -199,7 +200,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         repository = await prisma.repository.findUnique({
           where: { id: request.repositoryId }
         });
-        console.log('[DatabaseAdapter] Using repository from DB:', {
+        secureLogger.info('[DatabaseAdapter] Using repository from DB:', {
           id: repository?.id,
           type: repository?.type,
           registryUrl: repository?.registryUrl,
@@ -210,13 +211,13 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         // Try to find a repository for this image
         repository = await this.repositoryService.findForImage(request.image);
       }
-      
+
       if (!repository) {
         // Create a temporary repository based on the registry URL and type hint
         let repoType: 'DOCKERHUB' | 'GHCR' | 'GENERIC' | 'ECR' | 'GCR' = 'DOCKERHUB';
         let repoName = 'Docker Hub';
         let repoUrl = registryUrl || 'docker.io';
-        
+
         // Use registryType hint if provided
         if (request.registryType) {
           if (request.registryType === 'GITLAB') {
@@ -269,7 +270,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
             repoName = 'Generic Registry';
           }
         }
-        
+
         repository = {
           id: 'temp',
           name: repoName,
@@ -290,9 +291,9 @@ export class DatabaseAdapter implements IDatabaseAdapter {
           updatedAt: new Date()
         } as Repository;
       }
-      
+
       // Use registry handler for all operations
-      console.log('[DatabaseAdapter] Creating provider for repository type:', repository.type);
+      secureLogger.info('[DatabaseAdapter] Creating provider for repository type:', repository.type);
       const provider = RegistryProviderFactory.createFromRepository(repository);
       console.log('[DatabaseAdapter] Provider created:', provider.getProviderName());
       const inspection = await provider.inspectImage(cleanImageName, request.tag);
@@ -331,7 +332,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         create: imageData
       });
 
-        // Create repository-image relationship if repository ID is provided
+      // Create repository-image relationship if repository ID is provided
       if (request.repositoryId && image) {
         await prisma.repositoryImage.upsert({
           where: {
@@ -394,23 +395,23 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     };
 
     await this.updateScanRecord(scanId, updateData);
-    
+
     // Create or update ScanMetadata record (keeps JSONB for downloads)
     const metadataId = await this.createOrUpdateScanMetadata(scanId, reports);
-    
+
     // Save to individual scanner result tables for fast queries
     await this.saveScannerResultTables(metadataId, reports);
-    
+
     // Populate normalized finding tables
     await this.populateNormalizedFindings(scanId, reports);
-    
+
     // Calculate aggregated data
     await this.calculateAggregatedData(scanId, reports, metadataId);
   }
-  
+
   async createOrUpdateScanMetadata(scanId: string, reports: ScanReports): Promise<string> {
     const metadata = reports.metadata || {};
-    
+
     const scanMetadataData = {
       // Docker Image metadata
       dockerId: metadata.Id || null,
@@ -431,7 +432,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       dockerMetadata: metadata.Metadata || null,
       dockerLabels: metadata.Labels || metadata.Config?.Labels || null,
       dockerEnv: metadata.Env || metadata.Config?.Env || null,
-      
+
       // Scan Results
       trivyResults: reports.trivy || null,
       grypeResults: reports.grype || null,
@@ -439,19 +440,19 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       dockleResults: reports.dockle || null,
       osvResults: reports.osv || null,
       diveResults: reports.dive || null,
-      
+
       // Scanner versions
       scannerVersions: metadata.scannerVersions || null
     };
-    
+
     // Check if scan already has metadata
     const scan = await prisma.scan.findUnique({
       where: { id: scanId },
       select: { metadataId: true }
     });
-    
+
     let metadataId: string;
-    
+
     if (scan?.metadataId) {
       // Update existing metadata
       await prisma.scanMetadata.update({
@@ -465,14 +466,14 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         data: scanMetadataData
       });
       metadataId = newMetadata.id;
-      
+
       // Link to scan
       await prisma.scan.update({
         where: { id: scanId },
         data: { metadataId }
       });
     }
-    
+
     return metadataId;
   }
 
@@ -485,23 +486,23 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       if (reports.grype) {
         await this.saveGrypeResults(metadataId, reports.grype);
       }
-      
+
       if (reports.trivy) {
         await this.saveTrivyResults(metadataId, reports.trivy);
       }
-      
+
       if (reports.dive) {
         await this.saveDiveResults(metadataId, reports.dive);
       }
-      
+
       if (reports.syft) {
         await this.saveSyftResults(metadataId, reports.syft);
       }
-      
+
       if (reports.dockle) {
         await this.saveDockleResults(metadataId, reports.dockle);
       }
-      
+
       if (reports.osv) {
         await this.saveOsvResults(metadataId, reports.osv);
       }
@@ -533,9 +534,9 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         packageLanguage: match.artifact?.language || null,
         fixState: match.vulnerability?.fix?.state || null,
         fixVersions: match.vulnerability?.fix?.versions || null,
-        cvssV2Score: match.vulnerability?.cvss?.[0]?.version === '2.0' ? 
+        cvssV2Score: match.vulnerability?.cvss?.[0]?.version === '2.0' ?
           match.vulnerability.cvss[0].metrics?.baseScore : null,
-        cvssV2Vector: match.vulnerability?.cvss?.[0]?.version === '2.0' ? 
+        cvssV2Vector: match.vulnerability?.cvss?.[0]?.version === '2.0' ?
           match.vulnerability.cvss[0].vector : null,
         cvssV3Score: match.vulnerability?.cvss?.find((c: any) => c.version?.startsWith('3'))?.metrics?.baseScore || null,
         cvssV3Vector: match.vulnerability?.cvss?.find((c: any) => c.version?.startsWith('3'))?.vector || null,
@@ -631,9 +632,9 @@ export class DatabaseAdapter implements IDatabaseAdapter {
             code: secret.Code || null,
             match: secret.Match || null,
             // Handle Layer being an object with DiffID
-            layer: typeof secret.Layer === 'object' && secret.Layer ? 
-                   (secret.Layer.DiffID || secret.Layer.Digest || JSON.stringify(secret.Layer)) : 
-                   secret.Layer || null,
+            layer: typeof secret.Layer === 'object' && secret.Layer ?
+              (secret.Layer.DiffID || secret.Layer.Digest || JSON.stringify(secret.Layer)) :
+              secret.Layer || null,
           }));
 
           await prisma.trivySecret.createMany({ data: secrets });
@@ -708,7 +709,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
             cpeString = firstCpe.value;
           }
         }
-        
+
         return {
           syftResultsId: syftResult.id,
           packageId: artifact.id || '',
@@ -760,7 +761,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     });
 
     const vulnerabilities: any[] = [];
-    
+
     if (osvData.results && osvData.results.length > 0) {
       for (const result of osvData.results) {
         if (result.packages) {
@@ -803,7 +804,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     const vulnCount: VulnerabilityCount = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
     let totalCvssScore = 0;
     let cvssCount = 0;
-    
+
     // Aggregate vulnerabilities from Trivy
     if (reports.trivy?.Results) {
       for (const result of reports.trivy.Results) {
@@ -813,7 +814,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
             if (severity && vulnCount.hasOwnProperty(severity)) {
               vulnCount[severity as keyof VulnerabilityCount]++;
             }
-            
+
             if (vuln.CVSS?.redhat?.V3Score || vuln.CVSS?.nvd?.V3Score) {
               const score = vuln.CVSS.redhat?.V3Score || vuln.CVSS.nvd?.V3Score;
               totalCvssScore += score;
@@ -823,7 +824,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         }
       }
     }
-    
+
     // Aggregate vulnerabilities from Grype
     if (reports.grype?.matches) {
       for (const match of reports.grype.matches) {
@@ -832,7 +833,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         if (severity && vulnCount.hasOwnProperty(severity)) {
           vulnCount[severity as keyof VulnerabilityCount]++;
         }
-        
+
         // Get CVSS score from Grype
         if (match.vulnerability?.cvss) {
           for (const cvss of match.vulnerability.cvss) {
@@ -845,7 +846,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         }
       }
     }
-    
+
     // Aggregate vulnerabilities from OSV
     if (reports.osv?.results) {
       for (const result of reports.osv.results) {
@@ -860,7 +861,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
                       const score = parseFloat(sev.score);
                       totalCvssScore += score;
                       cvssCount++;
-                      
+
                       // Map CVSS score to severity
                       if (score >= 9.0) vulnCount.critical++;
                       else if (score >= 7.0) vulnCount.high++;
@@ -882,10 +883,10 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     }
 
     // Only set vulnerability count if we found any vulnerabilities
-    if (vulnCount.critical > 0 || vulnCount.high > 0 || vulnCount.medium > 0 || 
-        vulnCount.low > 0 || vulnCount.info > 0) {
+    if (vulnCount.critical > 0 || vulnCount.high > 0 || vulnCount.medium > 0 ||
+      vulnCount.low > 0 || vulnCount.info > 0) {
       aggregates.vulnerabilityCount = vulnCount;
-      
+
       const avgCvss = cvssCount > 0 ? totalCvssScore / cvssCount : 0;
       aggregates.riskScore = Math.min(100, Math.round(
         (vulnCount.critical * 25) +
@@ -900,7 +901,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       const { fatal, warn, info, pass } = reports.dockle.summary;
       const total = fatal + warn + info + pass;
       const complianceScore = total > 0 ? Math.round((pass / total) * 100) : 0;
-      
+
       aggregates.complianceScore = {
         dockle: {
           score: complianceScore,
@@ -919,14 +920,14 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       if (aggregates.riskScore !== undefined) {
         scanUpdateData.riskScore = aggregates.riskScore;
       }
-      
+
       if (Object.keys(scanUpdateData).length > 0) {
         await this.updateScanRecord(scanId, scanUpdateData);
       }
-      
+
       // Update ScanMetadata with aggregated data
       const metadataUpdateData: any = {};
-      
+
       if (aggregates.vulnerabilityCount) {
         metadataUpdateData.vulnerabilityCritical = aggregates.vulnerabilityCount.critical || 0;
         metadataUpdateData.vulnerabilityHigh = aggregates.vulnerabilityCount.high || 0;
@@ -934,11 +935,11 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         metadataUpdateData.vulnerabilityLow = aggregates.vulnerabilityCount.low || 0;
         metadataUpdateData.vulnerabilityInfo = aggregates.vulnerabilityCount.info || 0;
       }
-      
+
       if (aggregates.riskScore !== undefined) {
         metadataUpdateData.aggregatedRiskScore = aggregates.riskScore;
       }
-      
+
       if (aggregates.complianceScore?.dockle) {
         const dockle = aggregates.complianceScore.dockle;
         metadataUpdateData.complianceScore = dockle.score || null;
@@ -948,7 +949,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         metadataUpdateData.complianceInfo = dockle.info || null;
         metadataUpdateData.compliancePass = dockle.pass || null;
       }
-      
+
       // Only update metadata if we have a metadataId
       if (metadataId) {
         await prisma.scanMetadata.update({
@@ -966,16 +967,16 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     try {
       // Process vulnerability findings
       await this.populateVulnerabilityFindings(scanId, reports);
-      
+
       // Process package findings
       await this.populatePackageFindings(scanId, reports);
-      
+
       // Process compliance findings
       await this.populateComplianceFindings(scanId, reports);
-      
+
       // Process efficiency findings
       await this.populateEfficiencyFindings(scanId, reports);
-      
+
       // Create cross-scanner correlations
       await this.createFindingCorrelations(scanId);
     } catch (error) {
@@ -986,7 +987,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
 
   private async populateVulnerabilityFindings(scanId: string, reports: ScanReports): Promise<void> {
     const findings: any[] = [];
-    
+
     // Process Trivy results
     if (reports.trivy?.Results) {
       for (const result of reports.trivy.Results) {
@@ -1015,7 +1016,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         }
       }
     }
-    
+
     // Process Grype results
     if (reports.grype?.matches) {
       for (const match of reports.grype.matches) {
@@ -1040,7 +1041,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         });
       }
     }
-    
+
     // Process OSV results
     if (reports.osv?.results) {
       for (const result of reports.osv.results) {
@@ -1069,7 +1070,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         }
       }
     }
-    
+
     if (findings.length > 0) {
       await prisma.scanVulnerabilityFinding.createMany({ data: findings });
     }
@@ -1105,7 +1106,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
 
   private async populatePackageFindings(scanId: string, reports: ScanReports): Promise<void> {
     const findings: any[] = [];
-    
+
     // Process Syft results
     if (reports.syft?.artifacts) {
       for (const artifact of reports.syft.artifacts) {
@@ -1130,7 +1131,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         });
       }
     }
-    
+
     // Extract packages from Trivy SBOM data
     if (reports.trivy?.Results) {
       for (const result of reports.trivy.Results) {
@@ -1156,7 +1157,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         }
       }
     }
-    
+
     if (findings.length > 0) {
       await prisma.scanPackageFinding.createMany({ data: findings });
     }
@@ -1164,7 +1165,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
 
   private async populateComplianceFindings(scanId: string, reports: ScanReports): Promise<void> {
     const findings: any[] = [];
-    
+
     // Process Dockle results
     if (reports.dockle?.details) {
       for (const detail of reports.dockle.details) {
@@ -1187,7 +1188,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         }
       }
     }
-    
+
     if (findings.length > 0) {
       await prisma.scanComplianceFinding.createMany({ data: findings });
     }
@@ -1195,7 +1196,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
 
   private async populateEfficiencyFindings(scanId: string, reports: ScanReports): Promise<void> {
     const findings: any[] = [];
-    
+
     // Process Dive results
     if (reports.dive?.layer) {
       for (const layer of reports.dive.layer) {
@@ -1220,7 +1221,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         }
       }
     }
-    
+
     if (findings.length > 0) {
       await prisma.scanEfficiencyFinding.createMany({ data: findings });
     }
@@ -1232,7 +1233,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       where: { scanId },
       select: { cveId: true, source: true, severity: true }
     });
-    
+
     // Group by CVE ID
     const correlations: Record<string, { sources: Set<string>; severities: string[] }> = {};
     for (const finding of vulnFindings) {
@@ -1245,7 +1246,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       correlations[finding.cveId].sources.add(finding.source);
       correlations[finding.cveId].severities.push(finding.severity);
     }
-    
+
     // Create correlation records
     const correlationData: any[] = [];
     for (const [cveId, data] of Object.entries(correlations)) {
@@ -1260,7 +1261,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         severity: this.getHighestSeverity(data.severities)
       });
     }
-    
+
     if (correlationData.length > 0) {
       await prisma.scanFindingCorrelation.createMany({ data: correlationData });
     }
@@ -1284,7 +1285,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
 
   private mapOsvSeverity(severities: any[] | undefined): any {
     if (!severities || severities.length === 0) return 'INFO';
-    
+
     for (const sev of severities) {
       if (sev.type === 'CVSS_V3' && sev.score) {
         const score = parseFloat(sev.score);
@@ -1294,19 +1295,19 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         if (score >= 0.1) return 'LOW';
       }
     }
-    
+
     return 'INFO';
   }
 
   private extractOsvScore(severities: any[] | undefined): number | null {
     if (!severities || severities.length === 0) return null;
-    
+
     for (const sev of severities) {
       if (sev.type === 'CVSS_V3' && sev.score) {
         return parseFloat(sev.score);
       }
     }
-    
+
     return null;
   }
 
