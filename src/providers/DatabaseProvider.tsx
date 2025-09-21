@@ -328,7 +328,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: 'SET_IMAGES_LOADING', payload: true });
       
       const offset = loadMore ? state.pagination.images.offset : 0;
-      const data = await apiCall(`/api/images?limit=25&offset=${offset}`);
+      const data = await apiCall(`/api/images?limit=100&offset=${offset}`);
       
       const hasMore = offset + data.images.length < data.total;
       
@@ -349,7 +349,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       
       const offset = loadMore ? state.pagination.scans.offset : 0;
       const statusParam = status ? `&status=${status}` : '';
-      const data = await apiCall(`/api/scans?limit=25&offset=${offset}${statusParam}`);
+      const data = await apiCall(`/api/scans?limit=100&offset=${offset}${statusParam}`);
       
       const hasMore = offset + data.scans.length < data.total;
       

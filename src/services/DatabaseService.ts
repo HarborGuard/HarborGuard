@@ -35,7 +35,7 @@ export class DatabaseService {
     includeScans?: boolean;
     includeVulnerabilities?: boolean;
   }): Promise<{ images: Image[] | ImageWithScans[]; total: number }> {
-    const { limit = 25, offset = 0, includeScans = false, includeVulnerabilities = false } = options || {};
+    const { limit = 100, offset = 0, includeScans = false, includeVulnerabilities = false } = options || {};
     
     const include: any = {};
     if (includeScans) include.scans = true;
