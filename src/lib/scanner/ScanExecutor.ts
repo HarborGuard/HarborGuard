@@ -90,7 +90,7 @@ export class ScanExecutor implements IScanExecutor {
     logger.scanner(`Scanning local Docker image ${imageName}`);
 
     this.progressTracker.updateProgress(requestId, 20, 'Exporting Docker image');
-    
+
     await exportDockerImage(imageName, tarPath);
     this.progressTracker.updateProgress(requestId, 50, 'Image export completed');
 
@@ -111,8 +111,14 @@ export class ScanExecutor implements IScanExecutor {
     await this.setupDirectories(reportDir, cacheDir);
     this.progressTracker.updateProgress(requestId, 10, 'Setting up scan environment');
 
-    // Get registry URL from repository service
-    const registryUrl = await this.repositoryService.getRegistryUrl(request.repositoryId, request.image) || request.registry;
+    // Prioritize explicit registry from request over auto-detection
+    // This ensures Docker Hub tab selection is respected
+    let registryUrl = request.registry;
+
+    // Only use repository service if no explicit registry was provided
+    if (!registryUrl) {
+      registryUrl = await this.repositoryService.getRegistryUrl(request.repositoryId, request.image) || undefined;
+    }
 
     // Parse the image name to handle cases where it already includes the registry
     let cleanImageName = request.image;
@@ -124,12 +130,12 @@ export class ScanExecutor implements IScanExecutor {
         cleanImageName = cleanImageName.substring(1);
       }
     }
-    
+
     const fullImageName = registryUrl && cleanImageName ? `${registryUrl}/${cleanImageName}` : cleanImageName;
     const imageRef = `${fullImageName}:${request.tag}`;
 
     const env = this.setupEnvironmentVariables(cacheDir);
-    
+
     // Get repository - required for registry operations
     let repository: Repository | null = null;
     if (request.repositoryId) {
@@ -140,13 +146,13 @@ export class ScanExecutor implements IScanExecutor {
       // Try to find a repository for this image
       repository = await this.repositoryService.findForImage(request.image);
     }
-    
+
     if (!repository) {
       // Create a temporary repository based on the registry URL and type hint
       let repoType: 'DOCKERHUB' | 'GHCR' | 'GENERIC' | 'ECR' | 'GCR' = 'DOCKERHUB';
       let repoName = 'Docker Hub';
       let repoUrl = registryUrl || 'docker.io';
-      
+
       // Use registryType hint if provided
       if (request.registryType) {
         if (request.registryType === 'GITLAB') {
@@ -195,7 +201,7 @@ export class ScanExecutor implements IScanExecutor {
           repoName = 'Generic Registry';
         }
       }
-      
+
       repository = {
         id: 'temp',
         name: repoName,
@@ -216,7 +222,7 @@ export class ScanExecutor implements IScanExecutor {
         updatedAt: new Date()
       } as Repository;
     }
-    
+
     // Use registry handler for digest - use clean image name without registry prefix
     const provider = RegistryProviderFactory.createFromRepository(repository);
     const digest = await provider.getImageDigest(cleanImageName, request.tag);
@@ -234,10 +240,10 @@ export class ScanExecutor implements IScanExecutor {
     }
 
     this.progressTracker.updateProgress(requestId, 1, 'Starting image download');
-    
+
     // Pull image using registry handler - use clean image name
     await provider.pullImage(cleanImageName, request.tag, tarPath);
-    
+
     this.progressTracker.updateProgress(requestId, 50, 'Image download completed');
 
     const { stdout: metadataOutput } = await execAsync(
@@ -282,12 +288,12 @@ export class ScanExecutor implements IScanExecutor {
     this.progressTracker.updateProgress(requestId, 55, 'Starting security scans');
 
     const progressSteps = [65, 75, 85, 88, 90, 94];
-    
+
     // Filter scanners based on configuration
-    let enabledScanners = AVAILABLE_SCANNERS.filter(scanner => 
+    let enabledScanners = AVAILABLE_SCANNERS.filter(scanner =>
       config.enabledScanners.includes(scanner.name)
     );
-    
+
     // If scanner config is provided, further filter based on user selection
     if (scannerConfig) {
       enabledScanners = enabledScanners.filter(scanner => {
@@ -305,10 +311,10 @@ export class ScanExecutor implements IScanExecutor {
 
     const runScannerWithTimeout = async (scanner: typeof AVAILABLE_SCANNERS[0], index: number) => {
       const outputPath = path.join(reportDir, `${scanner.name}.json`);
-      
+
       try {
         logger.debug(`Starting ${scanner.name} scan`);
-        
+
         const scanPromise = scanner.scan(tarPath, outputPath, env);
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => {
@@ -317,12 +323,12 @@ export class ScanExecutor implements IScanExecutor {
         });
 
         const result = await Promise.race([scanPromise, timeoutPromise]);
-        
+
         if (result.success) {
           const progressIndex = Math.min(index, progressSteps.length - 1);
           this.progressTracker.updateProgress(
-            requestId, 
-            progressSteps[progressIndex], 
+            requestId,
+            progressSteps[progressIndex],
             `${scanner.name.charAt(0).toUpperCase() + scanner.name.slice(1)} scan completed`
           );
           logger.scanner(`${scanner.name} scan completed successfully`);
@@ -355,17 +361,17 @@ export class ScanExecutor implements IScanExecutor {
   async loadScanResults(requestId: string): Promise<ScanReports> {
     const reportDir = path.join(this.workDir, 'reports', requestId);
     const reports: ScanReports = {};
-    
+
     const reportFiles = ['trivy.json', 'grype.json', 'syft.json', 'dockle.json', 'osv.json', 'dive.json', 'metadata.json'];
-    
+
     for (const filename of reportFiles) {
       const scannerName = filename.replace('.json', '');
 
       // Check if the scanner is enabled before reading the file
       if (!config.enabledScanners.includes(scannerName)) {
-          logger.debug(`Scanner ${scannerName} not enabled, skipping file ${filename}`);
-          continue;
-      }      
+        logger.debug(`Scanner ${scannerName} not enabled, skipping file ${filename}`);
+        continue;
+      }
       const filePath = path.join(reportDir, filename);
       try {
         const content = await fs.readFile(filePath, 'utf8');
