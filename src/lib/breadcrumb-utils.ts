@@ -13,27 +13,27 @@ function capitalizeWords(str: string): string {
 export function generateBreadcrumbs(pathname: string): BreadcrumbItem[] {
   // Remove leading slash and split by '/'
   const segments = pathname.split('/').filter(Boolean);
-  
+
   if (segments.length === 0) {
     return [{ label: 'Dashboard', href: '/' }];
   }
-  
+
   const breadcrumbs: BreadcrumbItem[] = [
     { label: 'Dashboard', href: '/' }
   ];
-  
+
   let currentPath = '';
-  
+
   segments.forEach((segment, index) => {
     currentPath += `/${segment}`;
     const isLast = index === segments.length - 1;
-    
+
     // Handle special cases for better labels
     let label = segment;
-    
+
     // Decode URL encoded segments
     label = decodeURIComponent(label);
-    
+
     // Special handling for known routes
     switch (segment) {
       case 'image':
@@ -69,12 +69,12 @@ export function generateBreadcrumbs(pathname: string): BreadcrumbItem[] {
         }
         break;
     }
-    
+
     breadcrumbs.push({
       label,
-      href: isLast ? undefined : currentPath
+      href: isLast ? undefined : (segment === 'image' ? '/images' : currentPath)
     });
   });
-  
+
   return breadcrumbs;
 }
