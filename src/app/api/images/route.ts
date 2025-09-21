@@ -10,7 +10,7 @@
  *         name: limit
  *         schema:
  *           type: integer
- *           default: 100
+ *           default: 25
  *         description: Number of images to return
  *       - in: query
  *         name: offset
@@ -64,7 +64,7 @@ import { serializeForJson } from '@/lib/type-utils';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const limit = parseInt(searchParams.get('limit') || '25');
     const offset = parseInt(searchParams.get('offset') || '0');
     const includeScans = searchParams.get('includeScans') === 'true';
     const includeVulnerabilities = searchParams.get('includeVulnerabilities') === 'true';
