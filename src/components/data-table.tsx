@@ -1169,5 +1169,3 @@ export function DataTable({
     </Tabs>
   )
 }
-
-
