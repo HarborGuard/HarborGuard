@@ -379,7 +379,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       action: {
         label: "View Results",
         onClick: () => {
-          router.push(`/image/${encodeURIComponent(imageName)}/scan/${scanId}`);
+          router.push(`/image/${encodeURIComponent(imageName)}/${scanId}`);
         }
       }
     });
