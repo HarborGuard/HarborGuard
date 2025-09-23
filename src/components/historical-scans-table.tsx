@@ -127,7 +127,7 @@ export function HistoricalScansTable({ data, imageId, onScanDeleted }: Historica
 
   const handleRowClick = (scanId: string) => {
     if (imageId) {
-      router.push(`/image/${encodeURIComponent(imageId)}/scan/${scanId}`)
+      router.push(`/image/${encodeURIComponent(imageId)}/${scanId}`)
     }
   }
 
