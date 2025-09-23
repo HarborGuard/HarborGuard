@@ -15,9 +15,9 @@ export interface RepositoryWithAuth extends Repository {
  */
 export class RepositoryService {
   private static instance: RepositoryService;
-  
-  constructor(private prisma: PrismaClient) {}
-  
+
+  constructor(private prisma: PrismaClient) { }
+
   /**
    * Get singleton instance
    */
@@ -27,7 +27,7 @@ export class RepositoryService {
     }
     return RepositoryService.instance;
   }
-  
+
   /**
    * Get a repository by ID
    */
@@ -41,14 +41,14 @@ export class RepositoryService {
       return null;
     }
   }
-  
+
   /**
    * Get an active repository by ID
    */
   async getActiveById(id: string): Promise<Repository | null> {
     try {
       return await this.prisma.repository.findFirst({
-        where: { 
+        where: {
           id,
           status: 'ACTIVE'
         }
@@ -58,14 +58,14 @@ export class RepositoryService {
       return null;
     }
   }
-  
+
   /**
    * Get repository with decrypted credentials
    */
   async getWithCredentials(id: string): Promise<RepositoryWithAuth | null> {
     const repository = await this.getActiveById(id);
     if (!repository) return null;
-    
+
     // TODO: Implement proper credential decryption
     // For now, returning plain text (should be encrypted in production)
     return {
@@ -76,7 +76,7 @@ export class RepositoryService {
       } : undefined
     };
   }
-  
+
   /**
    * Get all active repositories
    */
@@ -90,14 +90,14 @@ export class RepositoryService {
       return [];
     }
   }
-  
+
   /**
    * Find repository by registry URL
    */
   async findByRegistryUrl(registryUrl: string): Promise<Repository | null> {
     try {
       return await this.prisma.repository.findFirst({
-        where: { 
+        where: {
           registryUrl,
           status: 'ACTIVE'
         }
@@ -107,7 +107,7 @@ export class RepositoryService {
       return null;
     }
   }
-  
+
   /**
    * Find repository that might contain the given image
    */
@@ -122,7 +122,7 @@ export class RepositoryService {
           if (repository) return repository;
         }
       }
-      
+
       // Check repository images for a match
       const repoImage = await this.prisma.repositoryImage.findFirst({
         where: {
@@ -134,30 +134,45 @@ export class RepositoryService {
           repository: true
         }
       });
-      
+
       if (repoImage?.repository && repoImage.repository.status === 'ACTIVE') {
         return repoImage.repository;
       }
-      
+
       // If image looks private (has namespace), try to find a matching private registry
+      // But only if we have explicit evidence it belongs to a private registry
       if (imageName.includes('/') && !imageName.startsWith('library/')) {
-        const privateRepos = await this.getAllActive();
-        // Prefer repositories that have successfully scanned this image before
-        for (const repo of privateRepos) {
-          if (repo.type === 'GENERIC' || repo.type === 'GHCR' || repo.type === 'ECR') {
-            return repo; // Return first private registry as a fallback
+        // First, check if this image has been successfully scanned from a private registry before
+        const repoImage = await this.prisma.repositoryImage.findFirst({
+          where: {
+            imageName: imageName,
+            repository: {
+              type: {
+                in: ['GENERIC', 'GHCR', 'ECR', 'GITLAB']
+              }
+            }
+          },
+          include: {
+            repository: true
           }
+        });
+
+        if (repoImage?.repository && repoImage.repository.status === 'ACTIVE') {
+          return repoImage.repository;
         }
+
+        // Don't fallback to any private registry - let the caller decide
+        // This prevents Docker Hub images from being incorrectly routed to private registries
       }
-      
+
       return null;
     } catch (error) {
       logger.error(`Failed to find repository for image ${imageName}:`, error);
       return null;
     }
   }
-  
-  
+
+
   /**
    * Get registry URL for a repository or image
    */
@@ -166,15 +181,15 @@ export class RepositoryService {
       const repository = await this.getActiveById(repositoryId);
       if (repository) return repository.registryUrl;
     }
-    
+
     if (imageName) {
       const repository = await this.findForImage(imageName);
       if (repository) return repository.registryUrl;
     }
-    
+
     return null;
   }
-  
+
   /**
    * Update repository status
    */
@@ -191,7 +206,7 @@ export class RepositoryService {
       logger.error(`Failed to update repository ${id} status:`, error);
     }
   }
-  
+
   /**
    * Update repository count
    */
@@ -205,5 +220,5 @@ export class RepositoryService {
       logger.error(`Failed to update repository ${id} count:`, error);
     }
   }
-  
+
 }
