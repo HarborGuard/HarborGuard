@@ -635,8 +635,8 @@ export default function ImageDetailsPage() {
             const baseImageName = (imageData?.name || imageName).split(':')[0];
 
             // Get the scan details to find the digest
-            const scan = imageData.scans?.find((s: any) => s.id === row.scanId);
-            const matchingImage = imageData.images?.find((img: any) => img.id === scan?.imageId);
+            const scan = imageData?.scans?.find((s: any) => s.id === row.scanId);
+            const matchingImage = imageData?.images?.find((img: any) => img.id === scan?.imageId);
 
             setExportScanData({
               imageName: baseImageName,
