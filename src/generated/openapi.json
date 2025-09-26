@@ -616,6 +616,14 @@
                   "sourceImage": {
                     "type": "string",
                     "description": "sourceImage parameter"
+                  },
+                  "scanId": {
+                    "type": "string",
+                    "description": "scanId parameter"
+                  },
+                  "digest": {
+                    "type": "string",
+                    "description": "digest parameter"
                   }
                 }
               }
