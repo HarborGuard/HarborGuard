@@ -62,7 +62,8 @@ export class GHCRProvider extends EnhancedRegistryProvider {
   async getSkopeoAuthArgs(): Promise<string> {
     // GitHub Container Registry uses PAT for authentication
     // Public repos don't require auth
-    if (!this.config.username || !this.config.token) {
+    // Check for non-empty credentials (not just falsy)
+    if (!this.config.username?.trim() || !this.config.token?.trim()) {
       return '';
     }
     const escapedUsername = this.config.username.replace(/"/g, '\\"');

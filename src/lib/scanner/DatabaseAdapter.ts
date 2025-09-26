@@ -1,14 +1,10 @@
-import { promisify } from 'util';
-import { exec } from 'child_process';
 import { prisma } from '@/lib/prisma';
 import { inspectDockerImage } from '@/lib/docker';
-import { IDatabaseAdapter, ScanReports, AggregatedData, VulnerabilityCount, ComplianceScore } from './types';
+import { IDatabaseAdapter, ScanReports, AggregatedData, VulnerabilityCount } from './types';
 import type { ScanRequest } from '@/types';
 import { RepositoryService } from '@/services/RepositoryService';
 import { RegistryProviderFactory } from '@/lib/registry/providers/RegistryProviderFactory';
 import type { Repository } from '@/generated/prisma';
-
-const execAsync = promisify(exec);
 
 export class DatabaseAdapter implements IDatabaseAdapter {
   private repositoryService: RepositoryService;
@@ -51,7 +47,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       const digest = imageData.Id;
       
       let image = await prisma.image.findUnique({ where: { digest } });
-      
+
       if (!image) {
         image = await prisma.image.create({
           data: {
@@ -61,6 +57,8 @@ export class DatabaseAdapter implements IDatabaseAdapter {
             digest,
             platform: `${imageData.Os}/${imageData.Architecture}`,
             sizeBytes: imageData.Size ? BigInt(imageData.Size) : null,
+            registryType: 'LOCAL',  // Local Docker images don't have a registry type
+            dockerImageId: request.dockerImageId,
           }
         });
       }
@@ -98,7 +96,8 @@ export class DatabaseAdapter implements IDatabaseAdapter {
           source: 'FILE_UPLOAD',
           digest,
           platform: 'linux/amd64',
-          sizeBytes: null
+          sizeBytes: null,
+          registryType: 'TAR',  // Tar files don't have a registry
         }
       });
 
@@ -183,10 +182,17 @@ export class DatabaseAdapter implements IDatabaseAdapter {
           // The image name already has a registry prefix
           imageRef = `${cleanImageName}:${request.tag}`;
         } else {
-          // No registry found - cannot proceed without knowing where to pull from
-          throw new Error(`No registry specified for image ${cleanImageName}:${request.tag}. Please provide a registry URL or repository ID.`);
+          // Default to Docker Hub for images without an explicit registry
+          // Users should provide registry URL or registryType for non-Docker Hub images
+          registryUrl = 'docker.io';
+          if (!request.registryType) {
+            request.registryType = 'DOCKERHUB';
+          }
+          console.log('[DatabaseAdapter] No registry specified, defaulting to Docker Hub. For non-Docker Hub images, please provide registry URL.');
         }
-      } else {
+      }
+
+      if (registryUrl) {
         // Construct full image reference with registry
         // Remove protocol from registry URL for docker:// format
         const cleanRegistryUrl = registryUrl.replace(/^https?:\/\//, '');
@@ -299,6 +305,26 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       const digest = inspection.digest;
       const metadata = inspection.config || {};
 
+      // Determine registry type
+      let registryTypeValue = request.registryType || null;
+      if (!registryTypeValue && repository) {
+        registryTypeValue = repository.type as "DOCKERHUB" | "GHCR" | "GITLAB" | "GENERIC" | "ECR" | "GCR";
+      }
+      if (!registryTypeValue) {
+        // Auto-detect based on registry URL
+        if (registryUrl === 'docker.io' || !registryUrl) {
+          registryTypeValue = 'DOCKERHUB';
+        } else if (registryUrl === 'ghcr.io') {
+          registryTypeValue = 'GHCR';
+        } else if (registryUrl === 'gcr.io' || registryUrl?.includes('gcr.io')) {
+          registryTypeValue = 'GCR';
+        } else if (registryUrl?.includes('amazonaws.com')) {
+          registryTypeValue = 'ECR';
+        } else if (registryUrl?.includes('gitlab')) {
+          registryTypeValue = 'GITLAB';
+        }
+      }
+
       // Prepare image data
       const imageData: any = {
         name: cleanImageName,
@@ -309,6 +335,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         sizeBytes: (metadata.size || metadata.Size) ? BigInt(metadata.size || metadata.Size) : null,
         // Save the descriptive repository name for one-off scans
         registry: repository ? repository.name : null,
+        registryType: registryTypeValue,
       };
 
       // If we have a repository ID, set it as the primary repository
@@ -325,6 +352,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
           tag: request.tag,
           // Update registry name if we have a repository
           registry: repository ? repository.name : null,
+          registryType: registryTypeValue,
           // Only update primary repository if provided
           ...(request.repositoryId && { primaryRepositoryId: request.repositoryId })
         },
@@ -512,9 +540,14 @@ export class DatabaseAdapter implements IDatabaseAdapter {
   }
 
   private async saveGrypeResults(metadataId: string, grypeData: any): Promise<void> {
-    const grypeResult = await prisma.grypeResults.create({
-      data: {
+    const grypeResult = await prisma.grypeResults.upsert({
+      where: { scanMetadataId: metadataId },
+      create: {
         scanMetadataId: metadataId,
+        matchesCount: grypeData.matches?.length || 0,
+        dbStatus: grypeData.db || null,
+      },
+      update: {
         matchesCount: grypeData.matches?.length || 0,
         dbStatus: grypeData.db || null,
       }
@@ -548,9 +581,15 @@ export class DatabaseAdapter implements IDatabaseAdapter {
   }
 
   private async saveTrivyResults(metadataId: string, trivyData: any): Promise<void> {
-    const trivyResult = await prisma.trivyResults.create({
-      data: {
+    const trivyResult = await prisma.trivyResults.upsert({
+      where: { scanMetadataId: metadataId },
+      create: {
         scanMetadataId: metadataId,
+        schemaVersion: trivyData.SchemaVersion || null,
+        artifactName: trivyData.ArtifactName || null,
+        artifactType: trivyData.ArtifactType || null,
+      },
+      update: {
         schemaVersion: trivyData.SchemaVersion || null,
         artifactName: trivyData.ArtifactName || null,
         artifactType: trivyData.ArtifactType || null,
@@ -648,9 +687,18 @@ export class DatabaseAdapter implements IDatabaseAdapter {
     const wastedBytes = BigInt(diveData.image?.inefficientBytes || 0);
     const wastedPercent = sizeBytes > 0 ? Number(wastedBytes) / Number(sizeBytes) * 100 : 0;
 
-    const diveResult = await prisma.diveResults.create({
-      data: {
+    const diveResult = await prisma.diveResults.upsert({
+      where: { scanMetadataId: metadataId },
+      create: {
         scanMetadataId: metadataId,
+        efficiencyScore,
+        sizeBytes,
+        wastedBytes,
+        wastedPercent,
+        inefficientFiles: diveData.image?.inefficientFiles || null,
+        duplicateFiles: diveData.image?.duplicateFiles || null,
+      },
+      update: {
         efficiencyScore,
         sizeBytes,
         wastedBytes,
@@ -659,6 +707,9 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         duplicateFiles: diveData.image?.duplicateFiles || null,
       }
     });
+
+    // Delete existing layers before inserting new ones
+    await prisma.diveLayer.deleteMany({ where: { diveResultsId: diveResult.id } });
 
     if (diveData.layer && diveData.layer.length > 0) {
       const layers = diveData.layer.map((layer: any, index: number) => ({
@@ -680,9 +731,20 @@ export class DatabaseAdapter implements IDatabaseAdapter {
   }
 
   private async saveSyftResults(metadataId: string, syftData: any): Promise<void> {
-    const syftResult = await prisma.syftResults.create({
-      data: {
+    const syftResult = await prisma.syftResults.upsert({
+      where: { scanMetadataId: metadataId },
+      create: {
         scanMetadataId: metadataId,
+        schemaVersion: syftData.schema?.version || null,
+        bomFormat: syftData.descriptor?.name || null,
+        specVersion: syftData.specVersion || null,
+        serialNumber: syftData.serialNumber || null,
+        packagesCount: syftData.artifacts?.length || 0,
+        filesAnalyzed: syftData.source?.target?.imageSize || 0,
+        source: syftData.source || null,
+        distro: syftData.distro || null,
+      },
+      update: {
         schemaVersion: syftData.schema?.version || null,
         bomFormat: syftData.descriptor?.name || null,
         specVersion: syftData.specVersion || null,
@@ -693,6 +755,9 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         distro: syftData.distro || null,
       }
     });
+
+    // Delete existing packages before inserting new ones
+    await prisma.syftPackage.deleteMany({ where: { syftResultsId: syftResult.id } });
 
     if (syftData.artifacts && syftData.artifacts.length > 0) {
       const packages = syftData.artifacts.map((artifact: any) => {
@@ -732,12 +797,19 @@ export class DatabaseAdapter implements IDatabaseAdapter {
   }
 
   private async saveDockleResults(metadataId: string, dockleData: any): Promise<void> {
-    const dockleResult = await prisma.dockleResults.create({
-      data: {
+    const dockleResult = await prisma.dockleResults.upsert({
+      where: { scanMetadataId: metadataId },
+      create: {
         scanMetadataId: metadataId,
+        summary: dockleData.summary || null,
+      },
+      update: {
         summary: dockleData.summary || null,
       }
     });
+
+    // Delete existing violations before inserting new ones
+    await prisma.dockleViolation.deleteMany({ where: { dockleResultsId: dockleResult.id } });
 
     if (dockleData.details && dockleData.details.length > 0) {
       const violations = dockleData.details.map((detail: any) => ({
@@ -753,14 +825,21 @@ export class DatabaseAdapter implements IDatabaseAdapter {
   }
 
   private async saveOsvResults(metadataId: string, osvData: any): Promise<void> {
-    const osvResult = await prisma.osvResults.create({
-      data: {
+    const osvResult = await prisma.osvResults.upsert({
+      where: { scanMetadataId: metadataId },
+      create: {
+        scanMetadataId: metadataId,
+      },
+      update: {
         scanMetadataId: metadataId,
       }
     });
 
+    // Delete existing vulnerabilities before inserting new ones
+    await prisma.osvVulnerability.deleteMany({ where: { osvResultsId: osvResult.id } });
+
     const vulnerabilities: any[] = [];
-    
+
     if (osvData.results && osvData.results.length > 0) {
       for (const result of osvData.results) {
         if (result.packages) {
@@ -1246,23 +1325,34 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       correlations[finding.cveId].severities.push(finding.severity);
     }
     
-    // Create correlation records
-    const correlationData: any[] = [];
+    // Create or update correlation records using upsert to handle duplicates
     for (const [cveId, data] of Object.entries(correlations)) {
       const sources = Array.from(data.sources);
-      correlationData.push({
-        scanId,
-        findingType: 'vulnerability',
-        correlationKey: cveId,
-        sources,
-        sourceCount: sources.length,
-        confidenceScore: sources.length / 3, // 3 is max number of vuln scanners
-        severity: this.getHighestSeverity(data.severities)
+
+      await prisma.scanFindingCorrelation.upsert({
+        where: {
+          scanId_findingType_correlationKey: {
+            scanId,
+            findingType: 'vulnerability',
+            correlationKey: cveId
+          }
+        },
+        create: {
+          scanId,
+          findingType: 'vulnerability',
+          correlationKey: cveId,
+          sources,
+          sourceCount: sources.length,
+          confidenceScore: sources.length / 3, // 3 is max number of vuln scanners
+          severity: this.getHighestSeverity(data.severities)
+        },
+        update: {
+          sources,
+          sourceCount: sources.length,
+          confidenceScore: sources.length / 3,
+          severity: this.getHighestSeverity(data.severities)
+        }
       });
-    }
-    
-    if (correlationData.length > 0) {
-      await prisma.scanFindingCorrelation.createMany({ data: correlationData });
     }
   }
 

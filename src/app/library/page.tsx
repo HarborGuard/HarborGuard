@@ -3,22 +3,10 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
-  IconPackage,
   IconBug,
-  IconShield,
   IconSearch,
-  IconSortAscending,
-  IconSortDescending,
-  IconAlertTriangle,
   IconExternalLink,
-  IconX,
-  IconCheck,
 } from "@tabler/icons-react";
-
-import { AppSidebar } from "@/components/app-sidebar";
-import { SiteHeader } from "@/components/site-header";
-import { Button } from "@/components/ui/button";
-import { VulnerabilityUrlMenu } from "@/components/vulnerability-url-menu";
 import { VulnerabilityDetailsModal } from "@/components/vulnerability-details-modal";
 import {
   Card,
@@ -27,16 +15,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { UnifiedTable } from "@/components/table/unified-table";
+import { ColumnDefinition, RowAction } from "@/components/table/types";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -46,7 +26,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  FullPageLoading,
   StatsLoadingSkeleton,
   TableLoadingSkeleton,
 } from "@/components/ui/loading";
@@ -389,244 +368,23 @@ export default function LibraryHomePage() {
                 </div>
 
                 {/* Table */}
-                <div className="border rounded-lg">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>
-                          <Button
-                            variant="ghost"
-                            className="h-auto p-0 font-medium"
-                            onClick={() => handleSort("cveId")}
-                          >
-                            CVE ID
-                            {sortField === "cveId" &&
-                              (sortOrder === "asc" ? (
-                                <IconSortAscending className="ml-1 h-4 w-4" />
-                              ) : (
-                                <IconSortDescending className="ml-1 h-4 w-4" />
-                              ))}
-                          </Button>
-                        </TableHead>
-                        <TableHead>
-                          <Button
-                            variant="ghost"
-                            className="h-auto p-0 font-medium"
-                            onClick={() => handleSort("severity")}
-                          >
-                            Severity
-                            {sortField === "severity" &&
-                              (sortOrder === "asc" ? (
-                                <IconSortAscending className="ml-1 h-4 w-4" />
-                              ) : (
-                                <IconSortDescending className="ml-1 h-4 w-4" />
-                              ))}
-                          </Button>
-                        </TableHead>
-                        <TableHead>Actions</TableHead>
-                        <TableHead>
-                          <Button
-                            variant="ghost"
-                            className="h-auto p-0 font-medium"
-                            onClick={() => handleSort("cvssScore")}
-                          >
-                            CVSS Score
-                            {sortField === "cvssScore" &&
-                              (sortOrder === "asc" ? (
-                                <IconSortAscending className="ml-1 h-4 w-4" />
-                              ) : (
-                                <IconSortDescending className="ml-1 h-4 w-4" />
-                              ))}
-                          </Button>
-                        </TableHead>
-                        <TableHead>
-                          <Button
-                            variant="ghost"
-                            className="h-auto p-0 font-medium"
-                            onClick={() => handleSort("packageName")}
-                          >
-                            Package
-                            {sortField === "packageName" &&
-                              (sortOrder === "asc" ? (
-                                <IconSortAscending className="ml-1 h-4 w-4" />
-                              ) : (
-                                <IconSortDescending className="ml-1 h-4 w-4" />
-                              ))}
-                          </Button>
-                        </TableHead>
-                        <TableHead>
-                          <Button
-                            variant="ghost"
-                            className="h-auto p-0 font-medium"
-                            onClick={() => handleSort("affectedImages")}
-                          >
-                            Affected Images
-                            {sortField === "affectedImages" &&
-                              (sortOrder === "asc" ? (
-                                <IconSortAscending className="ml-1 h-4 w-4" />
-                              ) : (
-                                <IconSortDescending className="ml-1 h-4 w-4" />
-                              ))}
-                          </Button>
-                        </TableHead>
-                        <TableHead>
-                          <Button
-                            variant="ghost"
-                            className="h-auto p-0 font-medium"
-                            onClick={() => handleSort("falsePositives")}
-                          >
-                            False Positives
-                            {sortField === "falsePositives" &&
-                              (sortOrder === "asc" ? (
-                                <IconSortAscending className="ml-1 h-4 w-4" />
-                              ) : (
-                                <IconSortDescending className="ml-1 h-4 w-4" />
-                              ))}
-                          </Button>
-                        </TableHead>
-                        <TableHead>Description</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sortedVulnerabilities.map((vuln) => (
-                        <TableRow
-                          key={vuln.cveId}
-                          className="hover:bg-muted/50 cursor-pointer"
-                          onClick={() => handleVulnerabilityClick(vuln)}
-                        >
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <IconBug className="h-4 w-4 text-muted-foreground" />
-                              <span className="font-medium font-mono text-sm">
-                                {vuln.cveId}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={getSeverityColor(vuln.severity)}
-                            >
-                              {vuln.severity}
-                            </Badge>
-                          </TableCell>
-
-                          <TableCell onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center gap-2">
-                              <VulnerabilityUrlMenu
-                                vulnerabilityId={vuln.cveId}
-                                references={vuln.references || []}
-                              />
-                              {vuln.fixedVersion && (
-                                <Badge variant="default" className="text-xs">
-                                  <IconShield className="w-3 h-3 mr-1" />
-                                  Fix: {vuln.fixedVersion}
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                !vuln.cvssScore
-                                  ? "outline"
-                                  : vuln.cvssScore >= 9.0
-                                  ? "destructive"
-                                  : vuln.cvssScore >= 7.0
-                                  ? "secondary"
-                                  : "outline"
-                              }
-                            >
-                              {vuln.cvssScore
-                                ? vuln.cvssScore.toFixed(1)
-                                : "N/A"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <span className="font-mono text-sm">
-                              {vuln.packageName || "N/A"}
-                            </span>
-                          </TableCell>
-                          <TableCell onClick={(e) => e.stopPropagation()}>
-                            <div className="flex gap-1 flex-wrap max-w-xs">
-                              {vuln.affectedImages
-                                .slice(0, 3)
-                                .map((image, idx) => (
-                                  <Badge
-                                    key={`${vuln.cveId}-${image.imageName}-${idx}`}
-                                    variant={
-                                      image.isFalsePositive
-                                        ? "secondary"
-                                        : "outline"
-                                    }
-                                    className="text-xs cursor-pointer hover:opacity-80"
-                                    onClick={() => {
-                                      const imageName = image.imageName.split(':')[0];
-                                      router.push(`/image/${encodeURIComponent(imageName)}`);
-                                    }}
-                                  >
-                                    {image.isFalsePositive && (
-                                      <IconX className="w-3 h-3 mr-1" />
-                                    )}
-                                    {image.imageName}
-                                  </Badge>
-                                ))}
-                              {vuln.affectedImages.length > 3 && (
-                                <Badge variant="outline" className="text-xs">
-                                  +{vuln.affectedImages.length - 3} more
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell onClick={(e) => e.stopPropagation()}>
-                            {vuln.falsePositiveImages.length > 0 ? (
-                              <div className="flex gap-1 flex-wrap max-w-xs">
-                                {vuln.falsePositiveImages
-                                  .slice(0, 2)
-                                  .map((imageName, idx) => (
-                                    <Badge
-                                      key={`fp-${vuln.cveId}-${imageName}-${idx}`}
-                                      variant="secondary"
-                                      className="text-xs cursor-pointer hover:opacity-80"
-                                      onClick={() => {
-                                        const imageNameOnly = imageName.split(':')[0];
-                                        router.push(`/image/${encodeURIComponent(imageNameOnly)}`);
-                                      }}
-                                    >
-                                      <IconX className="w-3 h-3 mr-1" />
-                                      {imageName}
-                                    </Badge>
-                                  ))}
-                                {vuln.falsePositiveImages.length > 2 && (
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-xs"
-                                  >
-                                    +{vuln.falsePositiveImages.length - 2} more
-                                  </Badge>
-                                )}
-                              </div>
-                            ) : (
-                              <Badge variant="outline" className="text-xs">
-                                <IconCheck className="w-3 h-3 mr-1" />
-                                None
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="max-w-xs">
-                              <p
-                                className="text-sm text-muted-foreground truncate"
-                                title={vuln.description}
-                              >
-                                {vuln.description || "No description available"}
-                              </p>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                <UnifiedTable
+                  data={vulnerabilities}
+                  columns={getLibraryTableColumns()}
+                  features={{
+                    sorting: true,
+                    filtering: false,
+                    pagination: true,
+                    search: false,
+                    columnVisibility: true,
+                  }}
+                  onRowClick={handleVulnerabilityClick}
+                  rowActions={getRowActions()}
+                  initialSorting={[
+                    { id: sortField === 'severity' ? 'severity' : 'cveId', desc: sortOrder === 'desc' }
+                  ]}
+                  className=""
+                />
 
                 {vulnerabilities.length === 0 && !loading && (
                   <div className="text-center py-8 text-muted-foreground">
@@ -652,4 +410,90 @@ export default function LibraryHomePage() {
       />
     </div>
   );
+
+  // Table column definitions
+  function getLibraryTableColumns(): ColumnDefinition<VulnerabilityData>[] {
+    return [
+      {
+        key: 'cveId',
+        header: 'CVE ID',
+        type: 'cve-link',
+        sortable: true,
+      },
+      {
+        key: 'severity',
+        header: 'Severity',
+        type: 'badge',
+        sortable: true,
+      },
+      {
+        key: 'cvssScore',
+        header: 'CVSS Score',
+        type: 'badge',
+        sortable: true,
+        accessorFn: (row: VulnerabilityData) => row.cvssScore ? row.cvssScore.toFixed(1) : 'N/A',
+      },
+      {
+        key: 'packageName',
+        header: 'Package',
+        type: 'text',
+        sortable: true,
+      },
+      {
+        key: 'affectedImages',
+        header: 'Affected Images',
+        type: 'interactive-badge',
+        sortable: true,
+        cellProps: {
+          onClick: (row: VulnerabilityData, value: any) => {
+            const firstImage = row.affectedImages[0];
+            if (firstImage) {
+              const imageName = firstImage.imageName.split(':')[0];
+              router.push(`/image/${encodeURIComponent(imageName)}`);
+            }
+          },
+          label: (value: any) => value?.length > 0 ? `${value.length} images` : 'None',
+        },
+        accessorFn: (row: VulnerabilityData) => row.affectedImages,
+      },
+      {
+        key: 'falsePositiveImages',
+        header: 'False Positives',
+        type: 'interactive-badge',
+        sortable: true,
+        cellProps: {
+          onClick: (row: VulnerabilityData, value: any) => {
+            const firstFp = row.falsePositiveImages[0];
+            if (firstFp) {
+              const imageName = firstFp.split(':')[0];
+              router.push(`/image/${encodeURIComponent(imageName)}`);
+            }
+          },
+          label: (value: any) => value?.length > 0 ? `${value.length} FPs` : 'None',
+          variant: (value: any) => value?.length > 0 ? 'secondary' : 'outline',
+        },
+        accessorFn: (row: VulnerabilityData) => row.falsePositiveImages,
+      },
+      {
+        key: 'description',
+        header: 'Description',
+        type: 'text',
+      },
+    ];
+  }
+
+  // Row actions
+  function getRowActions(): RowAction<VulnerabilityData>[] {
+    return [
+      {
+        label: 'View Details',
+        icon: <IconExternalLink className="h-4 w-4 mr-1" />,
+        action: (row) => {
+          window.open(`https://nvd.nist.gov/vuln/detail/${row.cveId}`, '_blank');
+        },
+        variant: 'outline',
+      },
+    ];
+  }
+
 }
