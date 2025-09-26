@@ -31,6 +31,8 @@ interface ExportImageDialogProps {
   imageTag: string;
   patchedTarPath?: string;
   patchOperationId?: string;
+  scanId?: string;
+  digest?: string;
 }
 
 export function ExportImageDialogEnhanced({
@@ -39,7 +41,9 @@ export function ExportImageDialogEnhanced({
   imageName,
   imageTag,
   patchedTarPath,
-  patchOperationId
+  patchOperationId,
+  scanId,
+  digest
 }: ExportImageDialogProps) {
   const [loading, setLoading] = useState(false);
   const [repositories, setRepositories] = useState<Repository[]>([]);
@@ -56,8 +60,22 @@ export function ExportImageDialogEnhanced({
   // Load repositories and check Docker when dialog opens
   useEffect(() => {
     if (open) {
-      setTargetImageName(imageName);
-      setTargetImageTag(imageTag);
+      // Split imageName in case it contains a tag
+      const [baseImageName, embeddedTag] = imageName.split(':');
+      setTargetImageName(baseImageName);
+
+      // Extract tag from imageTag if it contains a colon, otherwise use it as-is
+      let finalTag = 'latest';
+      if (imageTag) {
+        // If imageTag contains a colon, take the part after it, otherwise use the whole imageTag
+        const tagParts = imageTag.split(':');
+        finalTag = tagParts.length > 1 ? tagParts[1] : imageTag;
+      } else if (embeddedTag) {
+        // If no imageTag but imageName had a tag embedded, use that
+        finalTag = embeddedTag;
+      }
+
+      setTargetImageTag(finalTag);
       checkDockerAvailability();
     }
   }, [open, imageName, imageTag]);
@@ -173,7 +191,9 @@ export function ExportImageDialogEnhanced({
             tarPath: patchedTarPath,
             imageName: targetImageName,
             imageTag: targetImageTag,
-            sourceImage: `${imageName}:${imageTag}`
+            sourceImage: imageTag ? `${imageName.split(':')[0]}:${imageTag}` : imageName,
+            scanId: scanId,
+            digest: digest
           })
         });
         
@@ -217,7 +237,7 @@ export function ExportImageDialogEnhanced({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sourceImage: `${imageName}:${imageTag}`,
+          sourceImage: imageTag ? `${imageName.split(':')[0]}:${imageTag}` : imageName,
           targetRegistry,
           targetImageName,
           targetImageTag,

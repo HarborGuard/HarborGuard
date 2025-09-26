@@ -17,11 +17,17 @@ declare global {
 
 const globalJobs = globalThis.scannerJobs || (globalThis.scannerJobs = new Map<string, ScanJob>());
 
+// Store the listener function globally so we can remove it later
+declare global {
+  var __harborguard_scan_listener: ((queuedScan: any) => void) | undefined;
+}
+
 export class ScannerService {
   private progressTracker: ProgressTracker;
   private databaseAdapter: DatabaseAdapter;
   private scanExecutor: ScanExecutor;
   private instanceId: string;
+  private scanStartedListener?: (queuedScan: any) => void;
 
   constructor() {
     this.instanceId = Math.random().toString(36).substring(2, 8);
@@ -30,13 +36,20 @@ export class ScannerService {
     this.scanExecutor = new ScanExecutor({
       updateProgress: this.progressTracker.updateProgress.bind(this.progressTracker)
     });
-    
+
     // Set up queue event listeners
     this.setupQueueListeners();
-    
+
     if (process.env.NODE_ENV !== 'test') {
       console.log(`[ScannerService] Created new instance ${this.instanceId}`);
     }
+  }
+
+  static getInstance(): ScannerService {
+    if (!globalThis.__harborguard_scanner_service) {
+      globalThis.__harborguard_scanner_service = new ScannerService();
+    }
+    return globalThis.__harborguard_scanner_service;
   }
 
   async startScan(
@@ -82,10 +95,16 @@ export class ScannerService {
   }
 
   private setupQueueListeners(): void {
-    // Listen for scan-started events from the queue
-    scanQueue.on('scan-started', async (queuedScan) => {
+    // Remove any existing global listener first
+    if (globalThis.__harborguard_scan_listener) {
+      scanQueue.off('scan-started', globalThis.__harborguard_scan_listener);
+      logger.debug(`[ScannerService] Removed existing scan-started listener`);
+    }
+
+    // Create new listener
+    this.scanStartedListener = async (queuedScan) => {
       logger.info(`[ScannerService] Processing queued scan ${queuedScan.requestId}`);
-      
+
       const job = globalJobs.get(queuedScan.requestId);
       if (job) {
         job.status = 'RUNNING';
@@ -94,9 +113,9 @@ export class ScannerService {
 
       // Execute the scan
       this.executeScan(
-        queuedScan.requestId, 
-        queuedScan.request, 
-        queuedScan.scanId, 
+        queuedScan.requestId,
+        queuedScan.request,
+        queuedScan.scanId,
         queuedScan.imageId
       ).catch(error => {
         logger.error(`Scan ${queuedScan.requestId} failed:`, error);
@@ -104,7 +123,11 @@ export class ScannerService {
         this.updateJobStatus(queuedScan.requestId, 'FAILED', undefined, errorMessage);
         scanQueue.completeScan(queuedScan.requestId, errorMessage);
       });
-    });
+    };
+
+    // Store globally and add as listener
+    globalThis.__harborguard_scan_listener = this.scanStartedListener;
+    scanQueue.on('scan-started', this.scanStartedListener);
   }
 
   private generateRequestId(): string {
@@ -346,11 +369,4 @@ export class ScannerService {
 }
 
 // Create singleton scanner service
-function getScannerService(): ScannerService {
-  if (!globalThis.__harborguard_scanner_service) {
-    globalThis.__harborguard_scanner_service = new ScannerService();
-  }
-  return globalThis.__harborguard_scanner_service;
-}
-
-export const scannerService = getScannerService();
+export const scannerService = ScannerService.getInstance();

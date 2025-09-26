@@ -171,13 +171,13 @@ function getConfig(): AppConfig {
     
     // Only log once during first load
     if (process.env.NODE_ENV !== 'test') {
-      console.log('[CONFIG] Configuration loaded successfully');
-      console.log('[CONFIG] Max concurrent scans:', config.maxConcurrentScans);
-      console.log('[CONFIG] Scan timeout:', config.scanTimeoutMinutes, 'minutes');
-      console.log('[CONFIG] Enabled scanners:', config.enabledScanners.join(', '));
-      console.log('[CONFIG] Log level:', config.logLevel);
-      console.log('[CONFIG] Port:', config.port);
-      console.log('[CONFIG] Health checks:', config.healthCheckEnabled ? 'enabled' : 'disabled');
+      // console.log('[CONFIG] Configuration loaded successfully');
+      // console.log('[CONFIG] Max concurrent scans:', config.maxConcurrentScans);
+      // console.log('[CONFIG] Scan timeout:', config.scanTimeoutMinutes, 'minutes');
+      // console.log('[CONFIG] Enabled scanners:', config.enabledScanners.join(', '));
+      // console.log('[CONFIG] Log level:', config.logLevel);
+      // console.log('[CONFIG] Port:', config.port);
+      // console.log('[CONFIG] Health checks:', config.healthCheckEnabled ? 'enabled' : 'disabled');
       
       if (config.teamsWebhookUrl || config.slackWebhookUrl) {
         console.log('[CONFIG] Notifications enabled');

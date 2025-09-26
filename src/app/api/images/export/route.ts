@@ -8,7 +8,7 @@ const execAsync = promisify(exec);
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { tarPath, imageName, imageTag, sourceImage } = body;
+    const { tarPath, imageName, imageTag, sourceImage, scanId, digest } = body;
     
     if (!imageName || !imageTag) {
       return NextResponse.json(
@@ -17,27 +17,75 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // If no tar path provided but sourceImage is, we're exporting an existing image
+    // If no tar path provided but we have scanId, use the scan's tar file
+    if (!tarPath && scanId) {
+      // Use flat structure (scanId.tar in images directory)
+      const scanTarPath = `/workspace/images/${scanId}.tar`;
+
+      try {
+        await execAsync(`test -f ${scanTarPath}`);
+        const loadResult = await execAsync(`docker load -i ${scanTarPath}`);
+        logger.info(`Loaded image from scan tar: ${scanTarPath}`);
+        logger.info(`Docker load output: ${loadResult.stdout}`);
+
+        // The loaded image may have a different name, so we need to tag it
+        const imageIdMatch = loadResult.stdout.match(/Loaded image(?: ID)?:\s*(.+)/);
+        if (imageIdMatch && imageIdMatch[1]) {
+          const loadedImage = imageIdMatch[1].trim();
+          if (loadedImage !== `${imageName}:${imageTag}`) {
+            await execAsync(`docker tag ${loadedImage} ${imageName}:${imageTag}`);
+            logger.info(`Tagged ${loadedImage} as ${imageName}:${imageTag}`);
+          }
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: `Image ${imageName}:${imageTag} loaded into Docker from scan`
+        });
+      } catch (error: any) {
+        logger.warn(`Scan tar file not found: ${scanTarPath}`);
+      }
+    }
+
+    // If no tar path provided but sourceImage is, try to find it in Docker first
     if (!tarPath && sourceImage) {
       try {
-        // Check if the image exists in Docker
-        await execAsync(`docker image inspect ${sourceImage}`);
-        
-        // Tag the existing image with the new name
-        if (sourceImage !== `${imageName}:${imageTag}`) {
-          await execAsync(`docker tag ${sourceImage} ${imageName}:${imageTag}`);
-          logger.info(`Tagged ${sourceImage} as ${imageName}:${imageTag}`);
+        // Validate and clean up the sourceImage format
+        // Remove any duplicate structure like "image:image:tag"
+        let cleanSourceImage = sourceImage;
+
+        // Check for malformed references (e.g., "moby/buildkit:moby/buildkit:tag")
+        const parts = sourceImage.split(':');
+        if (parts.length > 2) {
+          // Handle case where image name is duplicated
+          const possibleDuplicate = parts[0] + ':' + parts[1];
+          if (sourceImage.includes(possibleDuplicate + ':')) {
+            // This is likely a duplicate, use the second occurrence
+            cleanSourceImage = parts[1] + ':' + parts[2];
+            logger.warn(`Detected malformed image reference: ${sourceImage}, cleaned to: ${cleanSourceImage}`);
+          }
         }
-        
+
+        // Check if the image exists in Docker
+        await execAsync(`docker image inspect ${cleanSourceImage}`);
+
+        // Tag the existing image with the new name
+        if (cleanSourceImage !== `${imageName}:${imageTag}`) {
+          await execAsync(`docker tag ${cleanSourceImage} ${imageName}:${imageTag}`);
+          logger.info(`Tagged ${cleanSourceImage} as ${imageName}:${imageTag}`);
+        }
+
         return NextResponse.json({
           success: true,
           message: `Image ${imageName}:${imageTag} is ready in Docker`
         });
       } catch (error: any) {
-        logger.error(`Failed to tag existing image: ${error.message}`);
+        logger.error(`Image not found in Docker: ${error.message}`);
+        // If we have scanId/digest, we should have handled it above
+        // Otherwise return error
         return NextResponse.json(
-          { error: 'Failed to tag image', message: error.message },
-          { status: 500 }
+          { error: 'Image not found in Docker and no scan tar available', message: error.message },
+          { status: 404 }
         );
       }
     }

@@ -27,6 +27,8 @@ export async function GET(
         id: true,
         name: true,
         tag: true,
+        registry: true,
+        registryType: true,
         source: true,
         digest: true,
         sizeBytes: true,
@@ -74,8 +76,11 @@ export async function GET(
           id: true,
           name: true,
           tag: true,
+          registry: true,
+          registryType: true,
           source: true,
-          digest: true
+          digest: true,
+          sizeBytes: true
         }
       }
     }
@@ -99,8 +104,11 @@ export async function GET(
             id: true,
             name: true,
             tag: true,
+            registry: true,
+            registryType: true,
             source: true,
-            digest: true
+            digest: true,
+            sizeBytes: true
           }
         }
       }

@@ -224,15 +224,35 @@ export function buildRescanRequest(
 ): Record<string, any> {
   const request: Record<string, any> = {
     image: imageName,
-    tag: tag || 'latest',
-    source: source || 'registry'
+    tag: tag || 'latest'
   };
-  
-  if (registry) {
-    const registryType = detectRegistryType(registry);
-    request.registry = normalizeRegistryUrl(registry, registryType);
-    request.registryType = registryType;
+
+  // Handle source - map 'LOCAL_DOCKER' to 'local' for the API
+  if (source === 'LOCAL_DOCKER' || source === 'local') {
+    request.source = 'local';
+  } else if (source === 'TAR') {
+    request.source = 'tar';
+  } else {
+    // For registry sources, include registry information
+    request.source = 'registry';
+
+    if (registry) {
+      const registryType = detectRegistryType(registry);
+      request.registry = normalizeRegistryUrl(registry, registryType);
+      request.registryType = registryType;
+    } else {
+      // If no registry provided but source is REGISTRY, try to detect from image name
+      if (imageName.includes('/')) {
+        const parts = imageName.split('/');
+        if (parts[0].includes('.')) {
+          // Looks like a registry URL
+          const registryType = detectRegistryType(parts[0]);
+          request.registry = normalizeRegistryUrl(parts[0], registryType);
+          request.registryType = registryType;
+        }
+      }
+    }
   }
-  
+
   return request;
 }
