@@ -49,12 +49,16 @@ export class OSVScanner implements IScannerBase {
         }
       }
       
-      // Clean up the temporary SBOM file
+      // Clean up the temporary SBOM file if it exists
       try {
+        await fs.access(osvSbomPath);
         await fs.unlink(osvSbomPath);
+        console.log('OSV scanner: Cleaned up temporary SBOM file');
       } catch (cleanupError) {
-        console.warn('OSV scanner: Failed to cleanup temporary SBOM file:', cleanupError);
-        // Don't fail the scan for cleanup errors
+        // File doesn't exist or couldn't be deleted - not a problem
+        if ((cleanupError as any).code !== 'ENOENT') {
+          console.warn('OSV scanner: Failed to cleanup temporary SBOM file:', cleanupError);
+        }
       }
       
       console.log('OSV scanner: Scan completed successfully');

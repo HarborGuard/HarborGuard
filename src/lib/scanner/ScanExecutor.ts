@@ -81,9 +81,8 @@ export class ScanExecutor implements IScanExecutor {
     this.progressTracker.updateProgress(requestId, 10, 'Setting up scan environment');
 
     const imageName = request.dockerImageId || `${request.image}:${request.tag}`;
-    // Replace both slashes and colons to create a safe filename
-    const safeImageName = request.image.replace(/[/:]/g, '_');
-    const tarPath = path.join(imageDir, `${safeImageName}-${requestId}.tar`);
+    // Use scanId for tar file naming - each scan gets its own tar file
+    const tarPath = path.join(imageDir, `${scanId}.tar`);
 
     const env = this.setupEnvironmentVariables(cacheDir);
 
@@ -217,28 +216,26 @@ export class ScanExecutor implements IScanExecutor {
       } as Repository;
     }
     
-    // Use registry handler for digest - use clean image name without registry prefix
+    // Use registry handler for digest
     const provider = RegistryProviderFactory.createFromRepository(repository);
     const digest = await provider.getImageDigest(cleanImageName, request.tag);
-    const imageHash = digest.replace('sha256:', '');
-    // Replace both slashes and colons to create a safe filename
-    const safeImageName = cleanImageName.replace(/[/:]/g, '_');
-    const tarPath = path.join(imageDir, `${safeImageName}-${imageHash}.tar`);
+
+    // Use scanId for tar file naming - each scan gets its own tar file
+    const tarPath = path.join(imageDir, `${scanId}.tar`);
 
     logger.scanner(`Scanning ${imageRef} (${digest})`);
 
-    // Check if tar file already exists and remove it
-    if (await fs.access(tarPath).then(() => true).catch(() => false)) {
-      logger.scanner(`Removing existing tar file: ${tarPath}`);
-      await fs.unlink(tarPath);
-    }
-
+    // Always pull fresh image from source for each scan
     this.progressTracker.updateProgress(requestId, 1, 'Starting image download');
-    
-    // Pull image using registry handler - use clean image name
-    await provider.pullImage(cleanImageName, request.tag, tarPath);
-    
-    this.progressTracker.updateProgress(requestId, 50, 'Image download completed');
+
+    try {
+      await provider.pullImage(cleanImageName, request.tag, tarPath);
+      this.progressTracker.updateProgress(requestId, 50, 'Image download completed');
+    } catch (pullError) {
+      // If pull fails, we should fail the scan - don't use stale images
+      logger.error(`Failed to pull image ${imageRef}:`, pullError);
+      throw new Error(`Failed to pull image ${imageRef}: ${pullError instanceof Error ? pullError.message : String(pullError)}`);
+    }
 
     const { stdout: metadataOutput } = await execAsync(
       `skopeo inspect docker-archive:${tarPath}`,

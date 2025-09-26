@@ -7,19 +7,10 @@ import { useCveClassifications } from "@/hooks/useCveClassifications";
 import { aggregateVulnerabilitiesWithClassifications } from "@/lib/scan-aggregations";
 import {
   IconCalendarClock,
-  IconDownload,
   IconShield,
   IconTag,
-  IconCpu,
-  IconClock,
-  IconUser,
-  IconTerminal,
-  IconFolder,
-  IconSettings,
 } from "@tabler/icons-react";
 
-import { AppSidebar } from "@/components/app-sidebar";
-import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -29,23 +20,26 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Separator } from "@/components/ui/separator";
-import { HistoricalScansTable } from "@/components/historical-scans-table";
+import { UnifiedTable } from "@/components/table/unified-table";
+import { ColumnDefinition, ContextMenuItem } from "@/components/table/types";
 import { ImagePageSkeleton } from "@/components/image-loading";
+import { toast } from "sonner";
+import { IconDownload, IconUpload, IconTrash } from "@tabler/icons-react";
+import { ExportImageDialogEnhanced } from "@/components/export-image-dialog-enhanced";
 
 export default function ImageDetailsPage() {
   const params = useParams();
   const rawImageName = params.name as string;
   const imageName = decodeURIComponent(rawImageName); // Decode the URL-encoded name
+
+  // State for export dialog
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportScanData, setExportScanData] = useState<{
+    imageName: string;
+    tag: string;
+    scanId?: string;
+    digest?: string;
+  }>({ imageName: "", tag: "" });
 
   // Use DatabaseProvider instead of local state
   const {
@@ -74,7 +68,12 @@ export default function ImageDetailsPage() {
     )[0];
 
     const tags = [...new Set(scansForImages.map((scan) => scan.tag).filter(Boolean))];
-    const registries: string[] = [];
+
+    // Get unique registries from all images
+    const registries = [...new Set(imagesByName
+      .map((img) => img.registry || img.registryType)
+      .filter(Boolean)
+    )];
 
     return {
       name: imageName,
@@ -299,6 +298,11 @@ export default function ImageDetailsPage() {
           return null;
         }
 
+        // Find the corresponding image to get registry info
+        const matchingImage = imageData.images.find(img => img.id === scan.imageId);
+        const registryInfo = matchingImage?.registry || matchingImage?.registryType ||
+                            scan.image?.registry || scan.image?.registryType || 'Unknown';
+
         return {
           id: Math.abs(
             scan.id
@@ -310,8 +314,8 @@ export default function ImageDetailsPage() {
           ),
           scanId: scan.id, // Real scan ID for navigation
           scanDate: scan.startedAt,
-          version: `${scan.image.name}:${scan.tag || 'latest'}`, // Show specific tag for each scan
-          registry: scan.image.registry || 'docker.io', // Include registry information
+          version: `${scan.image?.name || imageName}:${scan.tag || 'latest'}`, // Show specific tag for each scan
+          registry: registryInfo, // Include registry information from image
           source: scan.source || 'registry', // Include scan source
           riskScore: scan.riskScore || 0,
           severities: (() => {
@@ -504,20 +508,171 @@ export default function ImageDetailsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <HistoricalScansTable
+            <UnifiedTable
               data={historicalScans.filter(Boolean) as any}
-              imageId={imageData.name}
-              onScanDeleted={() => {
-                refreshScans();
-                // Also refresh consolidated classifications after deletion
-                setTimeout(() => {
-                  window.location.reload();
-                }, 500);
+              columns={getHistoricalScansColumns()}
+              features={{
+                sorting: true,
+                filtering: false,
+                pagination: true,
+                contextMenu: true,
               }}
+              onRowClick={handleScanClick}
+              contextMenuItems={getScanContextMenuItems}
             />
           </CardContent>
         </Card>
       </div>
+
+      {/* Export Dialog */}
+      <ExportImageDialogEnhanced
+        open={exportDialogOpen}
+        onOpenChange={(open) => {
+          setExportDialogOpen(open);
+          if (!open) {
+            setExportScanData({ imageName: "", tag: "", scanId: undefined, digest: undefined });
+          }
+        }}
+        imageName={exportScanData.imageName}
+        imageTag={exportScanData.tag}
+        scanId={exportScanData.scanId}
+        digest={exportScanData.digest}
+        patchedTarPath=""
+        patchOperationId=""
+      />
     </div>
   );
+
+  // Table column definitions
+  function getHistoricalScansColumns(): ColumnDefinition<any>[] {
+    return [
+      {
+        key: 'scanDate',
+        header: 'Scan Date',
+        type: 'scan-date',
+        sortable: true,
+      },
+      {
+        key: 'version',
+        header: 'Version',
+        type: 'badge',
+      },
+      {
+        key: 'registry',
+        header: 'Registry',
+        type: 'registry',
+      },
+      {
+        key: 'riskScore',
+        header: 'Risk Score',
+        type: 'badge',
+        sortable: true,
+      },
+      {
+        key: 'severities',
+        header: 'Findings',
+        type: 'toggle-group',
+      },
+      {
+        key: 'compliance.dockle',
+        header: 'Compliance',
+        type: 'badge',
+        accessorFn: (row: any) => row.compliance?.dockle || 'N/A',
+      },
+      {
+        key: 'scanDuration',
+        header: 'Duration',
+        type: 'duration',
+      },
+    ];
+  }
+
+  // Handle scan row click
+  function handleScanClick(row: any) {
+    if (imageData?.name && row.scanId) {
+      window.location.href = `/image/${encodeURIComponent(imageData.name)}/${row.scanId}`;
+    }
+  }
+
+  // Context menu items for scans
+  function getScanContextMenuItems(row: any): ContextMenuItem<any>[] {
+    return [
+      {
+        label: 'Download Reports',
+        icon: <IconDownload className="mr-2 h-4 w-4" />,
+        action: async () => {
+          if (!imageData?.name || !row.scanId) return;
+
+          try {
+            const response = await fetch(`/api/image/${encodeURIComponent(imageData.name)}/scan/${row.scanId}/download`);
+            if (!response.ok) throw new Error('Download failed');
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${imageData.name.replace('/', '_')}_${row.scanId}_reports.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+          } catch (error) {
+            toast.error('Failed to download scan reports');
+          }
+        },
+      },
+      {
+        label: 'Export Image',
+        icon: <IconUpload className="mr-2 h-4 w-4" />,
+        action: () => {
+          // Use setTimeout to ensure the context menu closes before opening the dialog
+          setTimeout(() => {
+            // row.version contains "imageName:tag", need to extract just the tag
+            const versionParts = (row.version || 'latest').split(':');
+            const extractedTag = versionParts.length > 1 ? versionParts[versionParts.length - 1] : versionParts[0];
+
+            // Ensure we're using the base image name without any tags
+            const baseImageName = (imageData?.name || imageName).split(':')[0];
+
+            // Get the scan details to find the digest
+            const scan = imageData.scans?.find((s: any) => s.id === row.scanId);
+            const matchingImage = imageData.images?.find((img: any) => img.id === scan?.imageId);
+
+            setExportScanData({
+              imageName: baseImageName,
+              tag: extractedTag,  // Just the tag part, not the full version string
+              scanId: row.scanId,
+              digest: matchingImage?.digest
+            });
+            setExportDialogOpen(true);
+          }, 0);
+        },
+      },
+      {
+        label: 'Delete Scan',
+        separator: true,
+        icon: <IconTrash className="mr-2 h-4 w-4" />,
+        action: async () => {
+          if (!row.scanId) return;
+
+          if (confirm('Are you sure you want to delete this scan?')) {
+            try {
+              const response = await fetch(`/api/scans/${row.scanId}`, {
+                method: 'DELETE',
+              });
+
+              if (!response.ok) throw new Error('Failed to delete scan');
+
+              toast.success('Scan deleted successfully');
+              refreshScans();
+              setTimeout(() => window.location.reload(), 500);
+            } catch (error) {
+              toast.error('Failed to delete scan');
+            }
+          }
+        },
+        variant: 'destructive',
+      },
+    ];
+  }
 }

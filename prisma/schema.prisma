@@ -14,6 +14,8 @@ model Image {
   name                     String
   tag                      String
   registry                 String?
+  registryType             String?              // Type of registry: DOCKERHUB, GHCR, ECR, GCR, etc
+  dockerImageId            String?              // Docker image ID for local images
   source                   ImageSource          @default(REGISTRY)
   digest                   String               @unique
   platform                 String?

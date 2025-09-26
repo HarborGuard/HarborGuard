@@ -1843,6 +1843,43 @@
         }
       }
     },
+    "/api/scans/rescan": {
+      "post": {
+        "summary": "POST /api/scans/rescan",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scanId": {
+                    "type": "string",
+                    "description": "scanId parameter"
+                  },
+                  "imageId": {
+                    "type": "string",
+                    "description": "imageId parameter"
+                  },
+                  "tag": {
+                    "type": "string",
+                    "description": "tag parameter"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/scans": {
       "get": {
         "summary": "GET /api/scans",
