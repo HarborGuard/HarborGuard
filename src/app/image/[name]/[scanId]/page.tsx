@@ -9,7 +9,6 @@ import {
   IconShield,
   IconSettings,
   IconDownload,
-  IconExternalLink,
   IconInfoCircle,
   IconClock,
   IconStack,
@@ -21,9 +20,7 @@ import {
   IconX,
 } from "@tabler/icons-react";
 
-import { AppSidebar } from "@/components/app-sidebar";
 import { ScanDetailsNormalized } from "@/components/scan/ScanDetailsNormalized";
-import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { VulnerabilityUrlMenu } from "@/components/vulnerability-url-menu";
 import { VulnerabilityDetailsModal } from "@/components/vulnerability-details-modal";
@@ -36,7 +33,6 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScanDetailsSkeleton } from "@/components/image-loading";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import {
   Table,
   TableBody,
@@ -70,7 +66,6 @@ import {
   DiveReport,
 } from "@/types";
 import { CveClassificationDialog } from "@/components/cve-classification-dialog";
-import { useCveClassifications } from "@/hooks/useCveClassifications";
 import { PatchAnalysis } from "@/components/patch-analysis";
 
 export default function ScanResultsPage() {
@@ -793,14 +788,6 @@ export default function ScanResultsPage() {
   }
 
   if (error || !scanData) {
-    const breadcrumbs = [
-      { label: "Dashboard", href: "/" },
-      {
-        label: decodedImageName,
-        href: `/image/${encodeURIComponent(decodedImageName)}`,
-      },
-      { label: `Scan ${scanId}` },
-    ];
 
     return (
       <div className="flex-1 overflow-auto">

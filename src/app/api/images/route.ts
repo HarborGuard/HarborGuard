@@ -58,7 +58,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { DatabaseService } from '@/services/DatabaseService';
+import { prisma } from '@/lib/prisma';
 import { serializeForJson } from '@/lib/type-utils';
 
 export async function GET(request: NextRequest) {
@@ -69,14 +69,19 @@ export async function GET(request: NextRequest) {
     const includeScans = searchParams.get('includeScans') === 'true';
     const includeVulnerabilities = searchParams.get('includeVulnerabilities') === 'true';
 
-    const db = new DatabaseService();
-    
-    const { images, total } = await db.getImages({
-      limit,
-      offset,
-      includeScans,
-      includeVulnerabilities
-    });
+    const [images, total] = await Promise.all([
+      prisma.image.findMany({
+        take: limit,
+        skip: offset,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          scans: includeScans ? {
+            orderBy: { createdAt: 'desc' }
+          } : false
+        }
+      }),
+      prisma.image.count()
+    ]);
 
     return NextResponse.json(serializeForJson({
       images,

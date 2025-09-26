@@ -55,12 +55,16 @@ export class DockerHubProvider extends EnhancedRegistryProvider {
   
   async getSkopeoAuthArgs(): Promise<string> {
     // Docker Hub supports both username/password and token auth
-    if (this.config.username && this.config.password) {
+    // Check for non-empty credentials (not just truthy, which would include empty strings)
+    if (this.config.username?.trim() && this.config.password?.trim()) {
       // Escape credentials for shell command
       const escapedUsername = this.config.username.replace(/"/g, '\\"');
       const escapedPassword = this.config.password.replace(/"/g, '\\"');
       return `--creds "${escapedUsername}:${escapedPassword}"`;
     }
+    // For public Docker Hub access without credentials, we should not pass any auth
+    // This avoids the "unauthorized" error when accessing public images
+    // Note: This may hit rate limits for anonymous access
     return '';
   }
   

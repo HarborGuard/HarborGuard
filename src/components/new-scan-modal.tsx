@@ -12,9 +12,9 @@ import {
   IconServer,
 } from "@tabler/icons-react"
 
-import { Badge } from "components/components/ui/badge"
-import { Button } from "components/components/ui/button"
-import { Checkbox } from "components/components/ui/checkbox"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogClose,
@@ -24,24 +24,24 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "components/components/ui/dialog"
-import { Input } from "components/components/ui/input"
-import { Label } from "components/components/ui/label"
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "components/components/ui/select"
-import { Separator } from "components/components/ui/separator"
-import { Progress } from "components/components/ui/progress"
+} from "@/components/ui/select"
+import { Separator } from "@/components/ui/separator"
+import { Progress } from "@/components/ui/progress"
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from "components/components/ui/tabs"
+} from "@/components/ui/tabs"
 import { toast } from "sonner"
 import { buildScanRequest, parseImageString as parseImage } from "@/lib/registry/registry-utils"
 import { useApp } from "@/contexts/AppContext"
