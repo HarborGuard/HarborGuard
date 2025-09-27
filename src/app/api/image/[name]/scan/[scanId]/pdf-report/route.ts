@@ -297,7 +297,7 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
             </tr>
           </thead>
           <tbody>
-            ${trivyVulns.slice(0, 20).map((vuln: any) => `
+            ${trivyVulns.map((vuln: any) => `
               <tr>
                 <td>${vuln.PkgName || '-'}</td>
                 <td>${vuln.VulnerabilityID || '-'}</td>
@@ -305,7 +305,7 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
                 <td>${vuln.FixedVersion || 'Not available'}</td>
               </tr>
             `).join('')}
-            ${grypeVulns.slice(0, 20).map((match: any) => `
+            ${grypeVulns.map((match: any) => `
               <tr>
                 <td>${match.artifact?.name || '-'}</td>
                 <td>${match.vulnerability?.id || '-'}</td>
@@ -315,11 +315,6 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
             `).join('')}
           </tbody>
         </table>
-        ${trivyVulns.length + grypeVulns.length > 20 ? `
-          <p style="text-align: center; color: #6B7280; margin-top: 15px;">
-            Showing first 20 of ${trivyVulns.length + grypeVulns.length} vulnerabilities
-          </p>
-        ` : ''}
       ` : `
         <div class="no-issues">
           ✓ No security vulnerabilities detected
@@ -337,7 +332,7 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
             </tr>
           </thead>
           <tbody>
-            ${dockleIssues.slice(0, 10).map((issue: any) => `
+            ${dockleIssues.map((issue: any) => `
               <tr>
                 <td>${issue.code || '-'}</td>
                 <td>${issue.title || '-'}</td>
@@ -346,11 +341,6 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
             `).join('')}
           </tbody>
         </table>
-        ${dockleIssues.length > 10 ? `
-          <p style="text-align: center; color: #6B7280; margin-top: 15px;">
-            Showing first 10 of ${dockleIssues.length} issues
-          </p>
-        ` : ''}
       ` : ''}
 
       <div class="footer">
