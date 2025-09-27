@@ -537,7 +537,7 @@ export default function ScanResultsPage() {
     { label: "Dashboard", href: "/" },
     {
       label: decodedImageName,
-      href: `/image/${encodeURIComponent(decodedImageName)}`,
+      href: `/images/${encodeURIComponent(decodedImageName)}`,
     },
     { label: `Scan ${scanData?.requestId}` },
   ];
@@ -808,7 +808,7 @@ export default function ScanResultsPage() {
                 may have been removed.
               </p>
               <Button asChild>
-                <a href={`/image/${encodeURIComponent(decodedImageName)}`}>
+                <a href={`/images/${encodeURIComponent(decodedImageName)}`}>
                   Go Back to Image
                 </a>
               </Button>

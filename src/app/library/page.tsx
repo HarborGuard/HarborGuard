@@ -449,7 +449,7 @@ export default function LibraryHomePage() {
             const firstImage = row.affectedImages[0];
             if (firstImage) {
               const imageName = firstImage.imageName.split(':')[0];
-              router.push(`/image/${encodeURIComponent(imageName)}`);
+              router.push(`/images/${encodeURIComponent(imageName)}`);
             }
           },
           label: (value: any) => value?.length > 0 ? `${value.length} images` : 'None',
@@ -466,7 +466,7 @@ export default function LibraryHomePage() {
             const firstFp = row.falsePositiveImages[0];
             if (firstFp) {
               const imageName = firstFp.split(':')[0];
-              router.push(`/image/${encodeURIComponent(imageName)}`);
+              router.push(`/images/${encodeURIComponent(imageName)}`);
             }
           },
           label: (value: any) => value?.length > 0 ? `${value.length} FPs` : 'None',
