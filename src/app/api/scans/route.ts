@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get('limit') || '25'), 100) // Cap at 100
     const offset = parseInt(searchParams.get('offset') || '0')
     const includeReports = searchParams.get('includeReports') === 'true'
+    const fields = searchParams.get('fields')?.split(',').filter(Boolean) // Support ?fields=id,status,vulnerabilityCount
     
     const where: any = {}
     
@@ -21,34 +22,109 @@ export async function GET(request: NextRequest) {
       where.imageId = imageId
     }
     
-    // Selective field loading - always include metadata for vulnerability counts
-    const selectFields = includeReports ? undefined : {
-      id: true,
-      requestId: true,
-      imageId: true,
-      tag: true,
-      startedAt: true,
-      finishedAt: true,
-      status: true,
-      errorMessage: true,
-      riskScore: true,
-      reportsDir: true,
-      createdAt: true,
-      updatedAt: true,
-      source: true,
-      metadata: true, // Include ScanMetadata via foreign key
-      image: {
-        select: {
-          id: true,
-          name: true,
-          tag: true,
-          source: true,
-          digest: true,
-          sizeBytes: true,
-          platform: true,
-          primaryRepositoryId: true,
-          createdAt: true,
-          updatedAt: true
+    // Build select fields based on request
+    let selectFields: any = undefined;
+
+    // If specific fields are requested, build minimal select
+    if (fields && fields.length > 0) {
+      selectFields = {
+        id: true, // Always include ID
+      };
+
+      // Map requested fields to database fields
+      fields.forEach(field => {
+        switch(field) {
+          case 'status':
+          case 'requestId':
+          case 'imageId':
+          case 'tag':
+          case 'startedAt':
+          case 'finishedAt':
+          case 'errorMessage':
+          case 'riskScore':
+          case 'reportsDir':
+          case 'createdAt':
+          case 'updatedAt':
+          case 'source':
+            selectFields[field] = true;
+            break;
+          case 'vulnerabilityCount':
+            // Include minimal metadata for counts
+            selectFields.metadata = {
+              select: {
+                vulnerabilityCritical: true,
+                vulnerabilityHigh: true,
+                vulnerabilityMedium: true,
+                vulnerabilityLow: true,
+                vulnerabilityInfo: true,
+              }
+            };
+            break;
+          case 'image':
+            selectFields.image = {
+              select: {
+                id: true,
+                name: true,
+                tag: true,
+                digest: true,
+              }
+            };
+            break;
+          case 'compliance':
+            if (!selectFields.metadata) {
+              selectFields.metadata = { select: {} };
+            }
+            selectFields.metadata.select.complianceGrade = true;
+            selectFields.metadata.select.complianceScore = true;
+            break;
+        }
+      });
+    }
+    // Default selective field loading - only include vulnerability counts, not full metadata
+    else if (!includeReports) {
+      selectFields = {
+        id: true,
+        requestId: true,
+        imageId: true,
+        tag: true,
+        startedAt: true,
+        finishedAt: true,
+        status: true,
+        errorMessage: true,
+        riskScore: true,
+        reportsDir: true,
+        createdAt: true,
+        updatedAt: true,
+        source: true,
+        metadata: {
+          select: {
+            id: true,
+            vulnerabilityCritical: true,
+            vulnerabilityHigh: true,
+            vulnerabilityMedium: true,
+            vulnerabilityLow: true,
+            vulnerabilityInfo: true,
+            complianceGrade: true,
+            complianceScore: true,
+            aggregatedRiskScore: true,
+            dockerSize: true,
+            // Explicitly exclude large scanner result fields
+            // NOT including: trivyResults, grypeResults, syftResults, diveResults, osvResults, dockleResults
+          }
+        },
+        image: {
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+            source: true,
+            digest: true,
+            sizeBytes: true,
+            platform: true,
+            primaryRepositoryId: true,
+            createdAt: true,
+            updatedAt: true
+          }
         }
       }
     }
@@ -66,9 +142,33 @@ export async function GET(request: NextRequest) {
     if (selectFields) {
       scanQuery.select = selectFields
     } else {
+      // Even with includeReports, don't include full scanner results - those should be fetched separately
       scanQuery.include = {
         image: true,
-        metadata: true
+        metadata: {
+          select: {
+            id: true,
+            vulnerabilityCritical: true,
+            vulnerabilityHigh: true,
+            vulnerabilityMedium: true,
+            vulnerabilityLow: true,
+            vulnerabilityInfo: true,
+            complianceGrade: true,
+            complianceScore: true,
+            complianceFatal: true,
+            complianceWarn: true,
+            complianceInfo: true,
+            compliancePass: true,
+            aggregatedRiskScore: true,
+            dockerSize: true,
+            dockerOs: true,
+            dockerArchitecture: true,
+            dockerCreated: true,
+            dockerAuthor: true,
+            scannerVersions: true,
+            // Still excluding massive fields: trivyResults, grypeResults, syftResults, diveResults, osvResults
+          }
+        }
       }
     }
     
