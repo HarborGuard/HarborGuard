@@ -83,47 +83,48 @@ export async function GET(request: NextRequest) {
     // Default selective field loading - only include vulnerability counts, not full metadata
     else if (!includeReports) {
       selectFields = {
-      id: true,
-      requestId: true,
-      imageId: true,
-      tag: true,
-      startedAt: true,
-      finishedAt: true,
-      status: true,
-      errorMessage: true,
-      riskScore: true,
-      reportsDir: true,
-      createdAt: true,
-      updatedAt: true,
-      source: true,
-      metadata: {
-        select: {
-          id: true,
-          vulnerabilityCritical: true,
-          vulnerabilityHigh: true,
-          vulnerabilityMedium: true,
-          vulnerabilityLow: true,
-          vulnerabilityInfo: true,
-          complianceGrade: true,
-          complianceScore: true,
-          aggregatedRiskScore: true,
-          dockerSize: true,
-          // Explicitly exclude large scanner result fields
-          // NOT including: trivyResults, grypeResults, syftResults, diveResults, osvResults, dockleResults
-        }
-      },
-      image: {
-        select: {
-          id: true,
-          name: true,
-          tag: true,
-          source: true,
-          digest: true,
-          sizeBytes: true,
-          platform: true,
-          primaryRepositoryId: true,
-          createdAt: true,
-          updatedAt: true
+        id: true,
+        requestId: true,
+        imageId: true,
+        tag: true,
+        startedAt: true,
+        finishedAt: true,
+        status: true,
+        errorMessage: true,
+        riskScore: true,
+        reportsDir: true,
+        createdAt: true,
+        updatedAt: true,
+        source: true,
+        metadata: {
+          select: {
+            id: true,
+            vulnerabilityCritical: true,
+            vulnerabilityHigh: true,
+            vulnerabilityMedium: true,
+            vulnerabilityLow: true,
+            vulnerabilityInfo: true,
+            complianceGrade: true,
+            complianceScore: true,
+            aggregatedRiskScore: true,
+            dockerSize: true,
+            // Explicitly exclude large scanner result fields
+            // NOT including: trivyResults, grypeResults, syftResults, diveResults, osvResults, dockleResults
+          }
+        },
+        image: {
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+            source: true,
+            digest: true,
+            sizeBytes: true,
+            platform: true,
+            primaryRepositoryId: true,
+            createdAt: true,
+            updatedAt: true
+          }
         }
       }
     }
