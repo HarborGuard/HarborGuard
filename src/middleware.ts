@@ -8,7 +8,7 @@ const LOGGED_ROUTES = [
   '/repository',
   '/scan-setup',
   '/audit-logs',
-  '/image/',
+  '/images/',
   '/bulk-scan/',
   '/library/',
   '/schedules/',

@@ -303,7 +303,7 @@ export default function Page() {
 
   // Handle row click
   function handleRowClick(row: any) {
-    router.push(`/image/${encodeURIComponent(row.imageName)}`)
+    router.push(`/images/${encodeURIComponent(row.imageName)}`)
   }
 
   // Get context menu items
