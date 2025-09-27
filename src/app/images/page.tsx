@@ -182,7 +182,7 @@ export default function ImageRepositoryPage() {
   }
 
   function handleRowClick(row: any) {
-    router.push(`/image/${encodeURIComponent(row.imageName)}`)
+    router.push(`/images/${encodeURIComponent(row.imageName)}`)
   }
 
   function getContextMenuItems(row: any): ContextMenuItem<any>[] {
