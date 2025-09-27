@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { serializeForJson } from '@/lib/type-utils';
 
 export async function GET(
   request: NextRequest,
@@ -30,7 +31,7 @@ export async function GET(
       totalVulnerabilities: patchOperation.vulnerabilitiesCount,
       patchedSuccessfully: patchOperation.patchedCount,
       patchesFailed: patchOperation.failedCount,
-      successRate: patchOperation.vulnerabilitiesCount > 0 
+      successRate: patchOperation.vulnerabilitiesCount > 0
         ? (patchOperation.patchedCount / patchOperation.vulnerabilitiesCount * 100).toFixed(1)
         : 0,
       duration: patchOperation.completedAt && patchOperation.startedAt
@@ -38,10 +39,10 @@ export async function GET(
         : null
     };
 
-    return NextResponse.json({
+    return NextResponse.json(serializeForJson({
       patchOperation,
       summary
-    });
+    }));
 
   } catch (error) {
     console.error('Failed to fetch patch operation status:', error);
