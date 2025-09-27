@@ -18,6 +18,7 @@ import {
   IconChevronDown,
   IconMessage,
   IconX,
+  IconFileTypePdf,
 } from "@tabler/icons-react";
 
 import { ScanDetailsNormalized } from "@/components/scan/ScanDetailsNormalized";
@@ -837,6 +838,30 @@ export default function ScanResultsPage() {
     }
   };
 
+  const handleGeneratePdfReport = async () => {
+    try {
+      const response = await fetch(
+        `/api/image/${encodeURIComponent(
+          decodedImageName
+        )}/scan/${scanId}/pdf-report`
+      );
+      if (!response.ok) {
+        throw new Error("PDF generation failed");
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${decodedImageName.replace("/", "_")}_${scanId}_report.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+    }
+  };
+
   const handleDownloadZip = async () => {
     try {
       const response = await fetch(
@@ -908,11 +933,19 @@ export default function ScanResultsPage() {
               </CardTitle>
               <div className="flex items-center gap-2">
                 <Button
+                  onClick={handleGeneratePdfReport}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <IconFileTypePdf className="h-4 w-4" />
+                  Generate Report
+                </Button>
+                <Button
                   onClick={handleDownloadZip}
                   className="flex items-center gap-2"
                 >
                   <IconDownload className="h-4 w-4" />
-                  Export Report
+                  Export Data
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
