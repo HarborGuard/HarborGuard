@@ -1633,6 +1633,30 @@
         ]
       }
     },
+    "/api/scans/{id}/scanner-results": {
+      "get": {
+        "summary": "GET /api/scans/{id}/scanner-results",
+        "tags": [
+          "Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ]
+      }
+    },
     "/api/scans/aggregated": {
       "get": {
         "summary": "GET /api/scans/aggregated",
