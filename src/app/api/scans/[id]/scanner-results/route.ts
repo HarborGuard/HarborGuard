@@ -3,10 +3,10 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const scanId = params.id;
+    const { id: scanId } = await params;
 
     // Fetch only the scanner results for a specific scan
     const scanMetadata = await prisma.scanMetadata.findFirst({
