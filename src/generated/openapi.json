@@ -357,6 +357,39 @@
         ]
       }
     },
+    "/api/image/{name}/scan/{scanId}/pdf-report": {
+      "get": {
+        "summary": "GET /api/image/{name}/scan/{scanId}/pdf-report",
+        "tags": [
+          "Image"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "name parameter"
+          },
+          {
+            "name": "scanId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "scanId parameter"
+          }
+        ]
+      }
+    },
     "/api/images/{id}/cve-classifications/{cveId}": {
       "get": {
         "summary": "GET /api/images/{id}/cve-classifications/{cveId}",
