@@ -590,7 +590,7 @@ export default function ImageDetailsPage() {
   // Handle scan row click
   function handleScanClick(row: any) {
     if (imageData?.name && row.scanId) {
-      window.location.href = `/image/${encodeURIComponent(imageData.name)}/${row.scanId}`;
+      window.location.href = `/images/${encodeURIComponent(imageData.name)}/${row.scanId}`;
     }
   }
 

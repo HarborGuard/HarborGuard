@@ -31,8 +31,8 @@ const data = {
       icon: IconDashboard,
     },
     {
-      title: "Image",
-      url: "/image",
+      title: "Images",
+      url: "/images",
       icon: IconDatabase,
     },
     {
