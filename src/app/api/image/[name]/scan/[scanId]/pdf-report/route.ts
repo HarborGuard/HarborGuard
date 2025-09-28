@@ -114,50 +114,83 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
         .metadata-value {
           color: #1F2937;
         }
-        .summary-cards {
+        .vulnerability-bar {
+          margin: 30px 0;
+        }
+        .bar-container {
           display: flex;
-          gap: 15px;
-          margin: 20px 0;
-          flex-wrap: wrap;
-        }
-        .summary-card {
-          flex: 1;
-          min-width: 120px;
-          background: white;
-          border: 2px solid #E5E7EB;
+          width: 100%;
+          height: 60px;
           border-radius: 8px;
-          padding: 15px;
-          text-align: center;
+          overflow: hidden;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .summary-card.critical {
-          border-color: #DC2626;
-          background: #FEF2F2;
-        }
-        .summary-card.high {
-          border-color: #EA580C;
-          background: #FFF7ED;
-        }
-        .summary-card.medium {
-          border-color: #F59E0B;
-          background: #FFFBEB;
-        }
-        .summary-card.low {
-          border-color: #3B82F6;
-          background: #EFF6FF;
-        }
-        .summary-card.info {
-          border-color: #6B7280;
-          background: #F9FAFB;
-        }
-        .summary-number {
-          font-size: 32px;
+        .bar-segment {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
           font-weight: bold;
-          margin: 5px 0;
+          min-width: 0;
+          transition: all 0.3s ease;
         }
-        .summary-label {
-          font-size: 14px;
+        .bar-segment.critical {
+          background: #DC2626;
+        }
+        .bar-segment.high {
+          background: #EA580C;
+        }
+        .bar-segment.medium {
+          background: #F59E0B;
+        }
+        .bar-segment.low {
+          background: #3B82F6;
+        }
+        .bar-segment.info {
+          background: #6B7280;
+        }
+        .bar-segment.none {
+          background: #10B981;
+          flex: 1;
+        }
+        .segment-content {
+          text-align: center;
+          padding: 5px 10px;
+        }
+        .segment-number {
+          font-size: 20px;
+          font-weight: bold;
+        }
+        .segment-label {
+          font-size: 11px;
           text-transform: uppercase;
-          font-weight: 600;
+          opacity: 0.9;
+        }
+        .bar-legend {
+          display: flex;
+          justify-content: space-around;
+          margin-top: 15px;
+          flex-wrap: wrap;
+          gap: 15px;
+        }
+        .legend-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .legend-color {
+          width: 16px;
+          height: 16px;
+          border-radius: 3px;
+        }
+        .legend-text {
+          font-size: 14px;
+          color: #4B5563;
+        }
+        .legend-count {
+          font-weight: bold;
+          color: #1F2937;
         }
         .vulnerability-table {
           width: 100%;
@@ -278,26 +311,79 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
 
       <h2>Executive Summary</h2>
 
-      <div class="summary-cards">
-        <div class="summary-card critical">
-          <div class="summary-label">Critical</div>
-          <div class="summary-number">${vulnSummary.critical}</div>
+      <div class="vulnerability-bar">
+        <div class="bar-container">
+          ${vulnSummary.total > 0 ? `
+            ${vulnSummary.critical > 0 ? `
+              <div class="bar-segment critical" style="flex: ${vulnSummary.critical}">
+                <div class="segment-content">
+                  <div class="segment-number">${vulnSummary.critical}</div>
+                  <div class="segment-label">Critical</div>
+                </div>
+              </div>
+            ` : ''}
+            ${vulnSummary.high > 0 ? `
+              <div class="bar-segment high" style="flex: ${vulnSummary.high}">
+                <div class="segment-content">
+                  <div class="segment-number">${vulnSummary.high}</div>
+                  <div class="segment-label">High</div>
+                </div>
+              </div>
+            ` : ''}
+            ${vulnSummary.medium > 0 ? `
+              <div class="bar-segment medium" style="flex: ${vulnSummary.medium}">
+                <div class="segment-content">
+                  <div class="segment-number">${vulnSummary.medium}</div>
+                  <div class="segment-label">Medium</div>
+                </div>
+              </div>
+            ` : ''}
+            ${vulnSummary.low > 0 ? `
+              <div class="bar-segment low" style="flex: ${vulnSummary.low}">
+                <div class="segment-content">
+                  <div class="segment-number">${vulnSummary.low}</div>
+                  <div class="segment-label">Low</div>
+                </div>
+              </div>
+            ` : ''}
+            ${vulnSummary.info > 0 ? `
+              <div class="bar-segment info" style="flex: ${vulnSummary.info}">
+                <div class="segment-content">
+                  <div class="segment-number">${vulnSummary.info}</div>
+                  <div class="segment-label">Info</div>
+                </div>
+              </div>
+            ` : ''}
+          ` : `
+            <div class="bar-segment none">
+              <div class="segment-content">
+                <div class="segment-number">✓</div>
+                <div class="segment-label">No Vulnerabilities</div>
+              </div>
+            </div>
+          `}
         </div>
-        <div class="summary-card high">
-          <div class="summary-label">High</div>
-          <div class="summary-number">${vulnSummary.high}</div>
-        </div>
-        <div class="summary-card medium">
-          <div class="summary-label">Medium</div>
-          <div class="summary-number">${vulnSummary.medium}</div>
-        </div>
-        <div class="summary-card low">
-          <div class="summary-label">Low</div>
-          <div class="summary-number">${vulnSummary.low}</div>
-        </div>
-        <div class="summary-card info">
-          <div class="summary-label">Info</div>
-          <div class="summary-number">${vulnSummary.info}</div>
+        <div class="bar-legend">
+          <div class="legend-item">
+            <div class="legend-color" style="background: #DC2626;"></div>
+            <span class="legend-text">Critical: <span class="legend-count">${vulnSummary.critical}</span></span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background: #EA580C;"></div>
+            <span class="legend-text">High: <span class="legend-count">${vulnSummary.high}</span></span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background: #F59E0B;"></div>
+            <span class="legend-text">Medium: <span class="legend-count">${vulnSummary.medium}</span></span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background: #3B82F6;"></div>
+            <span class="legend-text">Low: <span class="legend-count">${vulnSummary.low}</span></span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background: #6B7280;"></div>
+            <span class="legend-text">Info: <span class="legend-count">${vulnSummary.info}</span></span>
+          </div>
         </div>
       </div>
 
