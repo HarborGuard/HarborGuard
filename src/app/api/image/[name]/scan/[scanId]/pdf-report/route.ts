@@ -9,6 +9,43 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
   const grypeVulns = metadata?.grypeResults?.matches || []
   const dockleIssues = metadata?.dockleResults?.details || []
 
+  // Merge and normalize all vulnerabilities
+  const allVulns = [
+    ...trivyVulns.map((vuln: any) => ({
+      package: vuln.PkgName || '-',
+      vulnerability: vuln.VulnerabilityID || '-',
+      severity: vuln.Severity || 'UNKNOWN',
+      fixedVersion: vuln.FixedVersion || 'Not available',
+      source: 'Trivy'
+    })),
+    ...grypeVulns.map((match: any) => ({
+      package: match.artifact?.name || '-',
+      vulnerability: match.vulnerability?.id || '-',
+      severity: match.vulnerability?.severity || 'UNKNOWN',
+      fixedVersion: match.vulnerability?.fix?.versions?.[0] || 'Not available',
+      source: 'Grype'
+    }))
+  ]
+
+  // Sort vulnerabilities by severity
+  const severityOrder: { [key: string]: number } = {
+    'CRITICAL': 1,
+    'HIGH': 2,
+    'MEDIUM': 3,
+    'LOW': 4,
+    'NEGLIGIBLE': 5,
+    'INFO': 5,
+    'UNKNOWN': 6
+  }
+
+  allVulns.sort((a, b) => {
+    const aOrder = severityOrder[a.severity.toUpperCase()] || 6
+    const bOrder = severityOrder[b.severity.toUpperCase()] || 6
+    if (aOrder !== bOrder) return aOrder - bOrder
+    // Secondary sort by vulnerability ID
+    return a.vulnerability.localeCompare(b.vulnerability)
+  })
+
   const vulnSummary = {
     critical: metadata?.vulnerabilityCritical || 0,
     high: metadata?.vulnerabilityHigh || 0,
@@ -285,8 +322,8 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
 
       <h2>Vulnerability Details</h2>
 
-      ${trivyVulns.length > 0 || grypeVulns.length > 0 ? `
-        <h3>Security Vulnerabilities</h3>
+      ${allVulns.length > 0 ? `
+        <h3>Security Vulnerabilities (${allVulns.length} total)</h3>
         <table class="vulnerability-table">
           <thead>
             <tr>
@@ -294,23 +331,17 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
               <th>Vulnerability</th>
               <th>Severity</th>
               <th>Fixed Version</th>
+              <th>Source</th>
             </tr>
           </thead>
           <tbody>
-            ${trivyVulns.map((vuln: any) => `
+            ${allVulns.map((vuln: any) => `
               <tr>
-                <td>${vuln.PkgName || '-'}</td>
-                <td>${vuln.VulnerabilityID || '-'}</td>
-                <td><span class="severity-badge severity-${vuln.Severity?.toLowerCase()}">${vuln.Severity || '-'}</span></td>
-                <td>${vuln.FixedVersion || 'Not available'}</td>
-              </tr>
-            `).join('')}
-            ${grypeVulns.map((match: any) => `
-              <tr>
-                <td>${match.artifact?.name || '-'}</td>
-                <td>${match.vulnerability?.id || '-'}</td>
-                <td><span class="severity-badge severity-${match.vulnerability?.severity?.toLowerCase()}">${match.vulnerability?.severity || '-'}</span></td>
-                <td>${match.vulnerability?.fix?.versions?.[0] || 'Not available'}</td>
+                <td>${vuln.package}</td>
+                <td>${vuln.vulnerability}</td>
+                <td><span class="severity-badge severity-${vuln.severity.toLowerCase()}">${vuln.severity}</span></td>
+                <td>${vuln.fixedVersion}</td>
+                <td style="color: #6B7280; font-size: 12px;">${vuln.source}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -355,7 +386,7 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
 }
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ name: string; scanId: string }> }
 ) {
   let browser
