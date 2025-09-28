@@ -25,7 +25,7 @@ ARG DIVE_VERSION=0.13.1
 # Install Prisma CLI only (minimal size)
 RUN npm install -g prisma@6.14.0 --no-save
 
-# Install PostgreSQL 16, Buildah, and other dependencies
+# Install PostgreSQL 16, Buildah, Chromium for Puppeteer, and other dependencies
 RUN apk add --no-cache \
     postgresql16 \
     postgresql16-client \
@@ -34,6 +34,7 @@ RUN apk add --no-cache \
     bash tzdata su-exec \
     buildah podman fuse-overlayfs shadow-uidmap slirp4netns \
     crun iptables ip6tables \
+    chromium nss freetype freetype-dev harfbuzz ttf-freefont \
   && set -eux \
   # Debug: Show target architecture
   && echo "Building for architecture: ${TARGETARCH:-not set}" \
@@ -89,7 +90,9 @@ ENV TRIVY_CACHE_DIR=/workspace/cache/trivy \
     BUILDAH_ISOLATION=chroot \
     STORAGE_DRIVER=overlay \
     STORAGE_OPTS="overlay.mount_program=/usr/bin/fuse-overlayfs" \
-    BUILDAH_FORMAT=docker
+    BUILDAH_FORMAT=docker \
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 RUN mkdir -p /workspace && chown node:node /workspace
 RUN mkdir -p /workspace/cache/trivy/db /workspace/cache/grype /workspace/cache/syft /workspace/cache/dockle && \
