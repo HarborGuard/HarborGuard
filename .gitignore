@@ -46,3 +46,6 @@ next-env.d.ts
 
 # PostgreSQL data directory
 /var/lib/postgresql/data
+
+# Puppeteer cache
+.cache/
