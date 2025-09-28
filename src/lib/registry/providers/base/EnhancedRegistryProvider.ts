@@ -150,9 +150,10 @@ export abstract class EnhancedRegistryProvider {
     const imageRef = `${registry}/${image}:${tag || 'latest'}`;
     const authArgs = await this.getSkopeoAuthArgs();
     const tlsVerify = this.shouldVerifyTLS() ? '' : '--tls-verify=false';
-    
+
+    // First get the main inspection data
     const command = `skopeo inspect ${authArgs} ${tlsVerify} docker://${imageRef}`;
-    
+
     console.log('[EnhancedRegistryProvider.inspectImage] Building skopeo command:', {
       repositoryType: this.repository.type,
       registry,
@@ -162,26 +163,84 @@ export abstract class EnhancedRegistryProvider {
       tlsVerify,
       finalCommand: command.replace(/--creds "[^"]+"/, '--creds "***"')
     });
-    
+
     logger.debug(`Inspecting image ${imageRef}`);
     const { stdout } = await this.executeSkopeoCommand(command);
-    
     const result = JSON.parse(stdout);
-    
+
+    // Now get the raw manifest to extract layer sizes
+    let totalSize = 0;
+    try {
+      const rawCommand = `skopeo inspect --raw ${authArgs} ${tlsVerify} docker://${imageRef}`;
+      const { stdout: rawStdout } = await this.executeSkopeoCommand(rawCommand);
+      const manifest = JSON.parse(rawStdout);
+
+      // Handle different manifest formats
+      if (manifest.layers && Array.isArray(manifest.layers)) {
+        // OCI/Docker v2 manifest with layer sizes
+        totalSize = manifest.layers.reduce((sum: number, layer: any) => {
+          return sum + (layer.size || 0);
+        }, 0);
+        // Add config blob size if present
+        if (manifest.config && manifest.config.size) {
+          totalSize += manifest.config.size;
+        }
+      } else if (manifest.fsLayers && Array.isArray(manifest.fsLayers)) {
+        // Docker v1 manifest - estimate based on layer count
+        totalSize = manifest.fsLayers.length * 10 * 1024 * 1024; // 10MB per layer estimate
+      } else if (manifest.manifests && Array.isArray(manifest.manifests)) {
+        // Multi-platform manifest - use size from first platform
+        const firstManifest = manifest.manifests[0];
+        if (firstManifest && firstManifest.size) {
+          // This is the manifest size, not image size, but better than nothing
+          totalSize = firstManifest.size * 100; // Rough estimate
+        }
+      }
+    } catch (error) {
+      console.log('[EnhancedRegistryProvider] Failed to get raw manifest for size calculation:', error);
+      // Fall back to layer count estimate
+      if (result.Layers && Array.isArray(result.Layers)) {
+        totalSize = result.Layers.length * 10 * 1024 * 1024; // 10MB per layer estimate
+      }
+    }
+
+    // If we still don't have a size and have LayersData, use that
+    if (!totalSize && result.LayersData && Array.isArray(result.LayersData)) {
+      totalSize = result.LayersData.reduce((sum: number, layer: any) => {
+        return sum + (layer.Size || 0);
+      }, 0);
+    }
+
     // Normalize the response to ensure we have a digest field
     if (!result.digest && result.Digest) {
       result.digest = result.Digest;
     }
-    
+
+    // Set the calculated size
+    result.size = totalSize || result.Size || 0;
+
     // Also ensure config exists with normalized fields
     if (!result.config) {
       result.config = {
         os: result.Os || 'unknown',
         architecture: result.Architecture || 'unknown',
-        size: result.Size || 0
+        Size: totalSize || result.Size || 0,  // Capital S for compatibility
+        size: totalSize || result.Size || 0   // Lowercase for interface
       };
+    } else {
+      // Ensure config has size fields
+      result.config.Size = result.config.Size || totalSize || result.Size || 0;
+      result.config.size = result.config.size || totalSize || result.Size || 0;
     }
-    
+
+    console.log('[EnhancedRegistryProvider.inspectImage] Image inspection result:', {
+      image,
+      tag,
+      calculatedSize: totalSize,
+      resultSize: result.size,
+      configSize: result.config?.Size
+    });
+
     return result;
   }
   
