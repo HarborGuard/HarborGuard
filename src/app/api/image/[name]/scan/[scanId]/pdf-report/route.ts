@@ -59,6 +59,10 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
            (metadata?.vulnerabilityInfo || 0)
   }
 
+  // Calculate patchable vs not patchable
+  const patchableCount = allVulns.filter(v => v.fixedVersion !== 'Not available' && v.fixedVersion !== '-').length
+  const notPatchableCount = allVulns.length - patchableCount
+
   const html = `
     <!DOCTYPE html>
     <html>
@@ -268,6 +272,62 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
           font-size: 24px;
           font-weight: bold;
         }
+        .patch-status-bar {
+          margin: 30px 0;
+        }
+        .patch-status-title {
+          font-weight: 600;
+          color: #4B5563;
+          margin-bottom: 10px;
+          font-size: 16px;
+        }
+        .patch-bar-container {
+          display: flex;
+          width: 100%;
+          height: 40px;
+          border-radius: 8px;
+          overflow: hidden;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          background: #F3F4F6;
+        }
+        .patch-segment {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-weight: bold;
+          font-size: 14px;
+          transition: all 0.3s ease;
+        }
+        .patch-segment.patchable {
+          background: #10B981;
+        }
+        .patch-segment.not-patchable {
+          background: #6B7280;
+        }
+        .patch-segment.none {
+          background: #E5E7EB;
+          color: #6B7280;
+          flex: 1;
+        }
+        .patch-status-legend {
+          display: flex;
+          justify-content: center;
+          gap: 30px;
+          margin-top: 10px;
+        }
+        .patch-legend-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 14px;
+          color: #4B5563;
+        }
+        .patch-legend-dot {
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+        }
         .footer {
           margin-top: 50px;
           padding-top: 20px;
@@ -425,6 +485,41 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
           </div>
         </div>
         ` : ''}
+      </div>
+
+      <div class="patch-status-bar">
+        <div class="patch-status-title">Patch Availability Status</div>
+        <div class="patch-bar-container">
+          ${allVulns.length > 0 ? `
+            ${patchableCount > 0 ? `
+              <div class="patch-segment patchable" style="flex: ${patchableCount}">
+                ${patchableCount} Patchable
+              </div>
+            ` : ''}
+            ${notPatchableCount > 0 ? `
+              <div class="patch-segment not-patchable" style="flex: ${notPatchableCount}">
+                ${notPatchableCount} Not Patchable
+              </div>
+            ` : ''}
+          ` : `
+            <div class="patch-segment none">
+              No vulnerabilities to patch
+            </div>
+          `}
+        </div>
+        <div class="patch-status-legend">
+          <div class="patch-legend-item">
+            <div class="patch-legend-dot" style="background: #10B981;"></div>
+            <span>Patchable (${patchableCount})</span>
+          </div>
+          <div class="patch-legend-item">
+            <div class="patch-legend-dot" style="background: #6B7280;"></div>
+            <span>Not Patchable (${notPatchableCount})</span>
+          </div>
+          <div class="patch-legend-item">
+            <strong>Total CVEs: ${allVulns.length}</strong>
+          </div>
+        </div>
       </div>
 
       <div class="page-break">
