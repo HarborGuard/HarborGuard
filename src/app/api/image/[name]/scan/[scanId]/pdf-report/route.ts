@@ -162,11 +162,6 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
           font-size: 20px;
           font-weight: bold;
         }
-        .segment-label {
-          font-size: 11px;
-          text-transform: uppercase;
-          opacity: 0.9;
-        }
         .bar-legend {
           display: flex;
           justify-content: space-around;
@@ -277,6 +272,10 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
           margin: 20px;
           size: A4;
         }
+        .page-break {
+          page-break-before: always;
+          padding-top: 20px;
+        }
       </style>
     </head>
     <body>
@@ -318,7 +317,6 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
               <div class="bar-segment critical" style="flex: ${vulnSummary.critical}">
                 <div class="segment-content">
                   <div class="segment-number">${vulnSummary.critical}</div>
-                  <div class="segment-label">Critical</div>
                 </div>
               </div>
             ` : ''}
@@ -326,7 +324,6 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
               <div class="bar-segment high" style="flex: ${vulnSummary.high}">
                 <div class="segment-content">
                   <div class="segment-number">${vulnSummary.high}</div>
-                  <div class="segment-label">High</div>
                 </div>
               </div>
             ` : ''}
@@ -334,7 +331,6 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
               <div class="bar-segment medium" style="flex: ${vulnSummary.medium}">
                 <div class="segment-content">
                   <div class="segment-number">${vulnSummary.medium}</div>
-                  <div class="segment-label">Medium</div>
                 </div>
               </div>
             ` : ''}
@@ -342,7 +338,6 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
               <div class="bar-segment low" style="flex: ${vulnSummary.low}">
                 <div class="segment-content">
                   <div class="segment-number">${vulnSummary.low}</div>
-                  <div class="segment-label">Low</div>
                 </div>
               </div>
             ` : ''}
@@ -350,7 +345,6 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
               <div class="bar-segment info" style="flex: ${vulnSummary.info}">
                 <div class="segment-content">
                   <div class="segment-number">${vulnSummary.info}</div>
-                  <div class="segment-label">Info</div>
                 </div>
               </div>
             ` : ''}
@@ -358,7 +352,6 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
             <div class="bar-segment none">
               <div class="segment-content">
                 <div class="segment-number">✓</div>
-                <div class="segment-label">No Vulnerabilities</div>
               </div>
             </div>
           `}
@@ -406,10 +399,11 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
         ` : ''}
       </div>
 
-      <h2>Vulnerability Details</h2>
+      <div class="page-break">
+        <h2>Vulnerability Details</h2>
 
-      ${allVulns.length > 0 ? `
-        <h3>Security Vulnerabilities (${allVulns.length} total)</h3>
+        ${allVulns.length > 0 ? `
+          <h3>Security Vulnerabilities (${allVulns.length} total)</h3>
         <table class="vulnerability-table">
           <thead>
             <tr>
@@ -438,27 +432,28 @@ function generateHtmlReport(scan: any, decodedImageName: string): string {
         </div>
       `}
 
-      ${dockleIssues.length > 0 ? `
-        <h3>Best Practice Issues</h3>
-        <table class="vulnerability-table">
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Issue</th>
-              <th>Level</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${dockleIssues.map((issue: any) => `
+        ${dockleIssues.length > 0 ? `
+          <h3>Best Practice Issues</h3>
+          <table class="vulnerability-table">
+            <thead>
               <tr>
-                <td>${issue.code || '-'}</td>
-                <td>${issue.title || '-'}</td>
-                <td><span class="severity-badge severity-${issue.level === 'FATAL' ? 'critical' : issue.level === 'WARN' ? 'medium' : 'info'}">${issue.level || '-'}</span></td>
+                <th>Code</th>
+                <th>Issue</th>
+                <th>Level</th>
               </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      ` : ''}
+            </thead>
+            <tbody>
+              ${dockleIssues.map((issue: any) => `
+                <tr>
+                  <td>${issue.code || '-'}</td>
+                  <td>${issue.title || '-'}</td>
+                  <td><span class="severity-badge severity-${issue.level === 'FATAL' ? 'critical' : issue.level === 'WARN' ? 'medium' : 'info'}">${issue.level || '-'}</span></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        ` : ''}
+      </div>
 
       <div class="footer">
         <p>Generated by HarborGuard Security Scanner</p>
