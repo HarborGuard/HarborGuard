@@ -326,13 +326,27 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       }
 
       // Prepare image data
+      // Try to get size from multiple possible locations
+      let imageSize = 0;
+      if (inspection.size) {
+        imageSize = inspection.size;
+      } else if (metadata.size) {
+        imageSize = metadata.size;
+      } else if (metadata.Size) {
+        imageSize = metadata.Size;
+      } else if (inspection.config?.size) {
+        imageSize = inspection.config.size;
+      } else if (inspection.config?.Size) {
+        imageSize = inspection.config.Size;
+      }
+
       const imageData: any = {
         name: cleanImageName,
         tag: request.tag,
         source: registryUrl && registryUrl !== 'docker.io' ? 'REGISTRY_PRIVATE' : 'REGISTRY',
         digest,
         platform: metadata.os ? `${metadata.os}/${metadata.architecture || 'unknown'}` : `${metadata.Os || 'unknown'}/${metadata.Architecture || 'unknown'}`,
-        sizeBytes: (metadata.size || metadata.Size) ? BigInt(metadata.size || metadata.Size) : null,
+        sizeBytes: imageSize ? BigInt(imageSize) : null,
         // Save the descriptive repository name for one-off scans
         registry: repository ? repository.name : null,
         registryType: registryTypeValue,
@@ -353,6 +367,8 @@ export class DatabaseAdapter implements IDatabaseAdapter {
           // Update registry name if we have a repository
           registry: repository ? repository.name : null,
           registryType: registryTypeValue,
+          // Update size if we have it (in case it was missing before)
+          ...(imageSize && { sizeBytes: BigInt(imageSize) }),
           // Only update primary repository if provided
           ...(request.repositoryId && { primaryRepositoryId: request.repositoryId })
         },
