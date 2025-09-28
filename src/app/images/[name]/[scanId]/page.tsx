@@ -19,6 +19,7 @@ import {
   IconMessage,
   IconX,
   IconFileTypePdf,
+  IconFileSpreadsheet,
 } from "@tabler/icons-react";
 
 import { ScanDetailsNormalized } from "@/components/scan/ScanDetailsNormalized";
@@ -862,6 +863,30 @@ export default function ScanResultsPage() {
     }
   };
 
+  const handleGenerateXlsxReport = async () => {
+    try {
+      const response = await fetch(
+        `/api/image/${encodeURIComponent(
+          decodedImageName
+        )}/scan/${scanId}/xlsx-report`
+      );
+      if (!response.ok) {
+        throw new Error("XLSX generation failed");
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${decodedImageName.replace("/", "_")}_${scanId}_report.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("XLSX generation failed:", error);
+    }
+  };
+
   const handleDownloadZip = async () => {
     try {
       const response = await fetch(
@@ -932,14 +957,25 @@ export default function ScanResultsPage() {
                 Scan Summary
               </CardTitle>
               <div className="flex items-center gap-2">
-                <Button
-                  onClick={handleGeneratePdfReport}
-                  variant="outline"
-                  className="flex items-center gap-2"
-                >
-                  <IconFileTypePdf className="h-4 w-4" />
-                  Generate Report
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="flex items-center gap-2">
+                      <IconFileTypePdf className="h-4 w-4" />
+                      Generate Report
+                      <IconChevronDown className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleGeneratePdfReport}>
+                      <IconFileTypePdf className="h-4 w-4 mr-2" />
+                      Export as PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleGenerateXlsxReport}>
+                      <IconFileSpreadsheet className="h-4 w-4 mr-2" />
+                      Export as XLSX (Multi-page)
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <Button
                   onClick={handleDownloadZip}
                   className="flex items-center gap-2"
