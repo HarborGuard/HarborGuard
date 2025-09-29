@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       requestId: scan.requestId,
       scanId: scan.scanId,
       imageId: scan.imageId,
-      imageName: scan.imageName || scan.imageId,
+      imageName: `${scan.request.image}:${scan.request.tag}`,
       status: 'QUEUED',
       queuePosition: scannerService.getQueuePosition(scan.requestId),
       estimatedWaitTime: scannerService.getEstimatedWaitTime(scan.requestId)
