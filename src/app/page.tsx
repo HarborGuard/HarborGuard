@@ -7,15 +7,14 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useScanning } from "@/providers/ScanningProvider";
 import { DeleteImageDialog } from "@/components/delete-image-dialog";
-import { IconRefresh, IconTrash, IconChevronRight } from "@tabler/icons-react";
+import { IconRefresh, IconTrash } from "@tabler/icons-react";
 import * as React from "react";
 import { SectionCards } from "@/components/section-cards";
-import { ScanJobsMonitor } from "@/components/scan-jobs-monitor";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useScans } from "@/hooks/useScans";
 
 export default function Page() {
-  const { scans, stats, loading, dataReceived, dataReady, error } = useScans();
+  const { scans, stats, loading, dataReady, error } = useScans();
   const router = useRouter();
   const { addScanJob } = useScanning();
 
@@ -63,19 +62,6 @@ export default function Page() {
         />
         {showSkeleton ? (
           <>
-            {/* ScanJobsMonitor Skeleton */}
-            <div className="bg-card rounded-lg border shadow-xs p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Skeleton className="h-5 w-5" />
-                <Skeleton className="h-6 w-24" />
-              </div>
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-              </div>
-            </div>
-
             {/* VulnerabilityScatterplot Skeleton */}
             <div className="bg-card rounded-lg border shadow-xs p-6">
               <div className="mb-4">
@@ -119,7 +105,6 @@ export default function Page() {
           </>
         ) : (
           <>
-            <ScanJobsMonitor />
             <VulnerabilityScatterplot />
             <UnifiedTable
               data={processScansForTable(scans)}
