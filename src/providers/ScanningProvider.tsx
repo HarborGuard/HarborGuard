@@ -1,25 +1,30 @@
 "use client"
 
-import React, { createContext, useContext, useEffect, useReducer, useCallback, useRef } from 'react';
-import { SSEClient, ConnectionStatus, ScanProgressEvent } from '@/lib/sse-client';
+import React, { createContext, useContext, useEffect, useReducer, useCallback, useRef, useMemo } from 'react';
+import { useSSE } from '@/hooks/useSSE';
+import { ScanProgressEvent } from '@/lib/scanner/types';
+import { ConnectionStatus } from '@/lib/sse-manager';
 
 export interface ScanJob {
   requestId: string;
   scanId: string;
   imageId: string;
   imageName?: string;
-  status: 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
+  status: 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'QUEUED';
   progress: number;
   step?: string;
   error?: string;
   startTime: string;
   lastUpdate: string;
+  queuePosition?: number;
+  estimatedWaitTime?: number;
 }
 
 interface ScanningState {
   jobs: Map<string, ScanJob>;
   queuedScans: ScanJob[];
-  sseClients: Map<string, SSEClient>;
+  lastFetchTime: number;
+  isPolling: boolean;
 }
 
 type ScanningAction =
@@ -29,30 +34,15 @@ type ScanningAction =
   | { type: 'SET_JOBS'; payload: ScanJob[] }
   | { type: 'SET_QUEUED_SCANS'; payload: ScanJob[] }
   | { type: 'CLEAR_COMPLETED_JOBS' }
-  | { type: 'AUTO_CLEANUP_COMPLETED' }
-  | { type: 'ADD_SSE_CLIENT'; payload: { requestId: string; client: SSEClient } }
-  | { type: 'REMOVE_SSE_CLIENT'; payload: string };
+  | { type: 'AUTO_CLEANUP' }
+  | { type: 'SET_POLLING'; payload: boolean };
 
 function scanningReducer(state: ScanningState, action: ScanningAction): ScanningState {
   switch (action.type) {
-    case 'ADD_SSE_CLIENT':
-      const newClients = new Map(state.sseClients);
-      newClients.set(action.payload.requestId, action.payload.client);
-      return { ...state, sseClients: newClients };
-
-    case 'REMOVE_SSE_CLIENT':
-      const filteredClients = new Map(state.sseClients);
-      const client = filteredClients.get(action.payload);
-      if (client) {
-        client.disconnect();
-        filteredClients.delete(action.payload);
-      }
-      return { ...state, sseClients: filteredClients };
-
-    case 'UPDATE_SCAN_PROGRESS':
+    case 'UPDATE_SCAN_PROGRESS': {
       const event = action.payload;
       const existingJob = state.jobs.get(event.requestId);
-      
+
       const updatedJob: ScanJob = {
         requestId: event.requestId,
         scanId: event.scanId,
@@ -67,21 +57,12 @@ function scanningReducer(state: ScanningState, action: ScanningAction): Scanning
       };
 
       const newJobs = new Map(state.jobs);
-      
-      // For successful scans, remove them after a brief delay to allow UI to update
-      if (event.status === 'SUCCESS') {
-        newJobs.set(event.requestId, updatedJob);
-        // Set timeout to remove successful scan after 3 seconds
-        setTimeout(() => {
-          // This will be handled by the AUTO_CLEANUP_COMPLETED action
-        }, 3000);
-      } else {
-        newJobs.set(event.requestId, updatedJob);
-      }
+      newJobs.set(event.requestId, updatedJob);
 
       return { ...state, jobs: newJobs };
+    }
 
-    case 'ADD_SCAN_JOB':
+    case 'ADD_SCAN_JOB': {
       const newJob: ScanJob = {
         ...action.payload,
         startTime: new Date().toISOString(),
@@ -92,23 +73,26 @@ function scanningReducer(state: ScanningState, action: ScanningAction): Scanning
       updatedJobs.set(newJob.requestId, newJob);
 
       return { ...state, jobs: updatedJobs };
+    }
 
-    case 'REMOVE_SCAN_JOB':
+    case 'REMOVE_SCAN_JOB': {
       const filteredJobs = new Map(state.jobs);
       filteredJobs.delete(action.payload);
       return { ...state, jobs: filteredJobs };
+    }
 
-    case 'SET_JOBS':
+    case 'SET_JOBS': {
       const jobsMap = new Map<string, ScanJob>();
       action.payload.forEach(job => {
         jobsMap.set(job.requestId, job);
       });
-      return { ...state, jobs: jobsMap };
+      return { ...state, jobs: jobsMap, lastFetchTime: Date.now() };
+    }
 
     case 'SET_QUEUED_SCANS':
       return { ...state, queuedScans: action.payload };
 
-    case 'CLEAR_COMPLETED_JOBS':
+    case 'CLEAR_COMPLETED_JOBS': {
       const activeJobs = new Map<string, ScanJob>();
       state.jobs.forEach((job, requestId) => {
         if (job.status === 'RUNNING') {
@@ -116,29 +100,38 @@ function scanningReducer(state: ScanningState, action: ScanningAction): Scanning
         }
       });
       return { ...state, jobs: activeJobs };
+    }
 
-    case 'AUTO_CLEANUP_COMPLETED':
+    case 'AUTO_CLEANUP': {
       const currentTime = Date.now();
       const cleanedJobs = new Map<string, ScanJob>();
-      
+
       state.jobs.forEach((job, requestId) => {
-        // Keep running jobs
+        // Keep running jobs always
         if (job.status === 'RUNNING') {
           cleanedJobs.set(requestId, job);
-        } else if (job.status === 'SUCCESS') {
-          // Remove successful jobs immediately
-          return;
-        } else if (job.status === 'FAILED' || job.status === 'CANCELLED') {
-          // Keep failed/cancelled jobs for 30 seconds
+        }
+        // Remove successful jobs after 5 seconds
+        else if (job.status === 'SUCCESS') {
           const jobTime = new Date(job.lastUpdate).getTime();
-          const timeDiff = currentTime - jobTime;
-          if (timeDiff < 30000) {
+          if (currentTime - jobTime < 5000) {
+            cleanedJobs.set(requestId, job);
+          }
+        }
+        // Keep failed/cancelled jobs for 30 seconds
+        else if (job.status === 'FAILED' || job.status === 'CANCELLED') {
+          const jobTime = new Date(job.lastUpdate).getTime();
+          if (currentTime - jobTime < 30000) {
             cleanedJobs.set(requestId, job);
           }
         }
       });
-      
+
       return { ...state, jobs: cleanedJobs };
+    }
+
+    case 'SET_POLLING':
+      return { ...state, isPolling: action.payload };
 
     default:
       return state;
@@ -146,18 +139,25 @@ function scanningReducer(state: ScanningState, action: ScanningAction): Scanning
 }
 
 interface ScanningContextType {
+  // State
   jobs: ScanJob[];
   runningJobs: ScanJob[];
   completedJobs: ScanJob[];
   queuedScans: ScanJob[];
-  subscribeTo: (requestId: string) => void;
-  unsubscribeFrom: (requestId: string) => void;
+
+  // Actions
   addScanJob: (job: Omit<ScanJob, 'startTime' | 'lastUpdate'>) => void;
   removeScanJob: (requestId: string) => void;
   refreshJobs: () => Promise<void>;
   clearCompletedJobs: () => void;
+
+  // Utilities
   getJobByRequestId: (requestId: string) => ScanJob | undefined;
   setOnScanComplete: (callback: (job: ScanJob) => void) => void;
+
+  // SSE Management
+  subscribeTo: (requestId: string) => void;
+  unsubscribeFrom: (requestId: string) => void;
 }
 
 const ScanningContext = createContext<ScanningContextType | undefined>(undefined);
@@ -166,11 +166,39 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(scanningReducer, {
     jobs: new Map(),
     queuedScans: [],
-    sseClients: new Map()
+    lastFetchTime: 0,
+    isPolling: false,
   });
 
   const onScanCompleteRef = useRef<((job: ScanJob) => void) | null>(null);
   const previousJobsRef = useRef<Map<string, ScanJob>>(new Map());
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Use SSE hook with handlers
+  const { connect, disconnect, getActiveConnections } = useSSE({
+    onProgress: useCallback((requestId: string, data: ScanProgressEvent) => {
+      dispatch({ type: 'UPDATE_SCAN_PROGRESS', payload: data });
+    }, []),
+    onStatusChange: useCallback((requestId: string, status: ConnectionStatus) => {
+      // Log status changes in development
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[SSE] ${requestId}: ${status}`);
+      }
+    }, []),
+    onError: useCallback((requestId: string, error: string) => {
+      console.error(`[SSE Error] ${requestId}: ${error}`);
+    }, []),
+  });
+
+  // Subscribe to SSE for a scan
+  const subscribeTo = useCallback((requestId: string) => {
+    connect(requestId);
+  }, [connect]);
+
+  // Unsubscribe from SSE for a scan
+  const unsubscribeFrom = useCallback((requestId: string) => {
+    disconnect(requestId);
+  }, [disconnect]);
 
   // Monitor for scan completions
   useEffect(() => {
@@ -181,52 +209,26 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
     currentJobs.forEach((job, requestId) => {
       const previousJob = previousJobs.get(requestId);
       if (job.status === 'SUCCESS' && previousJob && previousJob.status !== 'SUCCESS') {
-        // This job just completed successfully
+        // Job just completed successfully
         if (onScanCompleteRef.current) {
           onScanCompleteRef.current(job);
         }
+        // Disconnect SSE for completed job after a small delay
+        setTimeout(() => {
+          disconnect(requestId);
+        }, 2000);
+      } else if ((job.status === 'FAILED' || job.status === 'CANCELLED') &&
+                 previousJob && previousJob.status === 'RUNNING') {
+        // Job failed or was cancelled - disconnect SSE
+        disconnect(requestId);
       }
     });
 
     // Update previous jobs reference
     previousJobsRef.current = new Map(currentJobs);
-  }, [state.jobs]);
+  }, [state.jobs, disconnect]);
 
-  // Cleanup SSE clients on unmount
-  useEffect(() => {
-    return () => {
-      // Disconnect all SSE clients on unmount
-      state.sseClients.forEach(client => client.disconnect());
-    };
-  }, [state.sseClients]);
-
-  const subscribeTo = useCallback((requestId: string) => {
-    // Don't create duplicate SSE clients
-    if (state.sseClients.has(requestId)) {
-      return;
-    }
-
-    const sseClient = new SSEClient(requestId);
-    
-    // Set up progress listener
-    sseClient.onProgress((data) => {
-      dispatch({ type: 'UPDATE_SCAN_PROGRESS', payload: data });
-    });
-
-    // Set up error listener
-    sseClient.onError((error) => {
-      console.error(`SSE error for scan ${requestId}:`, error);
-    });
-
-    // Connect and add to state
-    sseClient.connect();
-    dispatch({ type: 'ADD_SSE_CLIENT', payload: { requestId, client: sseClient } });
-  }, []); // Remove state.sseClients dependency - the check inside will handle duplicates
-
-  const unsubscribeFrom = useCallback((requestId: string) => {
-    dispatch({ type: 'REMOVE_SSE_CLIENT', payload: requestId });
-  }, []);
-
+  // Fetch jobs from API
   const refreshJobs = useCallback(async () => {
     try {
       const response = await fetch('/api/scans/jobs');
@@ -246,116 +248,139 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
           lastUpdate: new Date().toISOString()
         }));
 
-        const runningJobsCount = jobs.filter(j => j.status === 'RUNNING').length;
-
-        // Only log when there are changes or running jobs
-        if (runningJobsCount > 0 || queuedScans.length > 0) {
-          console.log(`Scan jobs: ${jobs.length} total, ${runningJobsCount} running, ${queuedScans.length} queued`);
-        }
-
         dispatch({ type: 'SET_JOBS', payload: jobs });
         dispatch({ type: 'SET_QUEUED_SCANS', payload: queuedScans });
-        
+
         // Subscribe to all running jobs
         const runningJobs = jobs.filter(job => job.status === 'RUNNING');
-        if (runningJobs.length > 0) {
-          runningJobs.forEach(job => {
+        const activeConnections = getActiveConnections();
+
+        runningJobs.forEach(job => {
+          // Only subscribe if not already connected
+          if (!activeConnections.includes(job.requestId)) {
             subscribeTo(job.requestId);
-          });
-        }
+          }
+        });
+
+        // Disconnect from any jobs that are no longer running
+        activeConnections.forEach(requestId => {
+          const job = jobs.find(j => j.requestId === requestId);
+          if (!job || job.status !== 'RUNNING') {
+            disconnect(requestId);
+          }
+        });
       }
     } catch (error) {
       console.error('Error fetching scan jobs:', error);
     }
-  }, []); // Remove subscribeTo dependency to prevent infinite re-renders
+  }, [subscribeTo, disconnect, getActiveConnections]);
 
+  // Add scan job
   const addScanJob = useCallback((job: Omit<ScanJob, 'startTime' | 'lastUpdate'>) => {
     dispatch({ type: 'ADD_SCAN_JOB', payload: job });
-    
-    // Automatically subscribe to this job's progress via SSE
-    subscribeTo(job.requestId);
+
+    // Automatically subscribe to this job's progress
+    if (job.status === 'RUNNING') {
+      subscribeTo(job.requestId);
+    }
   }, [subscribeTo]);
 
+  // Remove scan job
   const removeScanJob = useCallback((requestId: string) => {
     unsubscribeFrom(requestId);
     dispatch({ type: 'REMOVE_SCAN_JOB', payload: requestId });
   }, [unsubscribeFrom]);
 
+  // Clear completed jobs
   const clearCompletedJobs = useCallback(() => {
     dispatch({ type: 'CLEAR_COMPLETED_JOBS' });
   }, []);
 
+  // Get job by request ID
   const getJobByRequestId = useCallback((requestId: string) => {
     return state.jobs.get(requestId);
   }, [state.jobs]);
 
+  // Set scan complete callback
   const setOnScanComplete = useCallback((callback: (job: ScanJob) => void) => {
     onScanCompleteRef.current = callback;
   }, []);
 
-  // Auto-refresh jobs periodically - adaptive polling based on active scans
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const pollingFrequencyRef = useRef<number>(30000); // Default to 30 seconds
-  
-  useEffect(() => {
-    // Initial fetch
-    refreshJobs();
-    
-    // Set up initial polling at 30 second intervals
-    intervalRef.current = setInterval(refreshJobs, 30000);
-    
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [refreshJobs]);
-  
-  // Separate effect to adjust polling frequency based on running jobs
+  // Adaptive polling based on active scans
   useEffect(() => {
     const hasRunningJobs = Array.from(state.jobs.values()).some(job => job.status === 'RUNNING');
-    const newFrequency = hasRunningJobs ? 3000 : 30000; // 3 seconds if active scans, 30 seconds otherwise
-    
-    // Only update if frequency needs to change
-    if (newFrequency !== pollingFrequencyRef.current) {
-      pollingFrequencyRef.current = newFrequency;
-      
-      // Clear existing interval and start with new frequency
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-      intervalRef.current = setInterval(refreshJobs, newFrequency);
+    const hasQueuedJobs = state.queuedScans.length > 0;
+    const shouldPoll = hasRunningJobs || hasQueuedJobs;
+
+    // Clear existing interval
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
     }
-  }, [state.jobs, refreshJobs]);
+
+    if (shouldPoll) {
+      // Fast polling when active scans
+      pollingIntervalRef.current = setInterval(refreshJobs, 3000);
+      dispatch({ type: 'SET_POLLING', payload: true });
+    } else {
+      // Slow polling when idle
+      pollingIntervalRef.current = setInterval(refreshJobs, 30000);
+      dispatch({ type: 'SET_POLLING', payload: false });
+    }
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, [state.jobs, state.queuedScans, refreshJobs]);
+
+  // Initial fetch
+  useEffect(() => {
+    refreshJobs();
+  }, [refreshJobs]);
 
   // Auto-cleanup completed jobs
   useEffect(() => {
     const cleanupInterval = setInterval(() => {
-      dispatch({ type: 'AUTO_CLEANUP_COMPLETED' });
-    }, 10000); // Check every 10 seconds
+      dispatch({ type: 'AUTO_CLEANUP' });
+    }, 5000); // Check every 5 seconds
 
     return () => clearInterval(cleanupInterval);
   }, []);
 
-  // Convert Map to arrays for easier consumption
-  const jobs = Array.from(state.jobs.values());
-  const runningJobs = jobs.filter(job => job.status === 'RUNNING');
-  const completedJobs = jobs.filter(job => job.status !== 'RUNNING');
+  // Memoized derived state
+  const jobs = useMemo(() => Array.from(state.jobs.values()), [state.jobs]);
+  const runningJobs = useMemo(() => jobs.filter(job => job.status === 'RUNNING'), [jobs]);
+  const completedJobs = useMemo(() => jobs.filter(job => job.status !== 'RUNNING'), [jobs]);
 
-  const contextValue: ScanningContextType = {
+  const contextValue: ScanningContextType = useMemo(() => ({
     jobs,
     runningJobs,
     completedJobs,
     queuedScans: state.queuedScans,
-    subscribeTo,
-    unsubscribeFrom,
     addScanJob,
     removeScanJob,
     refreshJobs,
     clearCompletedJobs,
     getJobByRequestId,
-    setOnScanComplete
-  };
+    setOnScanComplete,
+    subscribeTo,
+    unsubscribeFrom,
+  }), [
+    jobs,
+    runningJobs,
+    completedJobs,
+    state.queuedScans,
+    addScanJob,
+    removeScanJob,
+    refreshJobs,
+    clearCompletedJobs,
+    getJobByRequestId,
+    setOnScanComplete,
+    subscribeTo,
+    unsubscribeFrom,
+  ]);
 
   return (
     <ScanningContext.Provider value={contextValue}>
