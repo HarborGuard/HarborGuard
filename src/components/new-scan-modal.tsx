@@ -306,18 +306,33 @@ export function NewScanModal({ children }: NewScanModalProps) {
         })
 
         const data = await response.json()
-        
+
         if (!response.ok) {
           throw new Error(data.error || 'Failed to start bulk scan')
         }
 
+        // Add scan jobs to ScanningProvider for SSE tracking
+        if (data.data.scanJobs && Array.isArray(data.data.scanJobs)) {
+          data.data.scanJobs.forEach((job: any) => {
+            addScanJob({
+              requestId: job.requestId,
+              scanId: job.scanId,
+              imageId: job.imageId || '',
+              imageName: job.imageName,
+              status: 'RUNNING',
+              progress: 0,
+              step: 'Initializing...'
+            })
+          })
+        }
+
         toast.success(`Started scanning ${data.data.totalImages} local images`)
         setIsOpen(false)
-        
+
         // Reset states
         setScanAllLocalImages(false)
         setLocalImageCount(0)
-        
+
         await refreshData()
         resetProgress()
       } catch (error) {
