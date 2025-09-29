@@ -60,7 +60,7 @@ export default function RootLayout({
                   {children}
                 </SidebarInset>
               </SidebarProvider>
-              <Toaster />
+              <Toaster position="top-right" />
             </ScanningProvider>
           </DatabaseProvider>
         </AppProvider>
