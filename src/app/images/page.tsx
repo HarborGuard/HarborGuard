@@ -8,7 +8,6 @@ import { useScanning } from "@/providers/ScanningProvider";
 import { DeleteImageDialog } from "@/components/delete-image-dialog";
 import { IconRefresh, IconTrash } from "@tabler/icons-react";
 import * as React from "react";
-import { ScanJobsMonitor } from "@/components/scan-jobs-monitor";
 import { useScans } from "@/hooks/useScans";
 import { useApp } from "@/contexts/AppContext";
 import { FullPageLoading } from "@/components/ui/loading";
@@ -36,7 +35,6 @@ export default function ImageRepositoryPage() {
     <div className="flex flex-1 flex-col">
       <div className="@container/main flex flex-1 flex-col gap-2 overflow-auto">
         <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-          <ScanJobsMonitor />
           <UnifiedTable
             data={processScansForTable(scans)}
             columns={getTableColumns()}

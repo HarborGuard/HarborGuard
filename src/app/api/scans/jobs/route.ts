@@ -6,10 +6,16 @@ import { logger } from '@/lib/logger'
 export async function GET(request: NextRequest) {
   try {
     const jobs = scannerService.getAllJobs()
-    
-    // If no jobs, return early to avoid unnecessary database queries
-    if (jobs.length === 0) {
-      return NextResponse.json({ jobs: [] })
+    const queuedScans = scannerService.getQueuedScans()
+    const queueStats = scannerService.getQueueStats()
+
+    // If no jobs and no queued scans, return early
+    if (jobs.length === 0 && queuedScans.length === 0) {
+      return NextResponse.json({
+        jobs: [],
+        queuedScans: [],
+        queueStats: queueStats
+      })
     }
     
     // Batch query all images at once instead of individual queries
@@ -38,10 +44,23 @@ export async function GET(request: NextRequest) {
       }
     })
     
-    logger.debug(`Retrieved ${jobs.length} scan jobs with ${images.length} image details`)
-    
+    // Process queued scans if any
+    const queuedScansWithInfo = queuedScans.map(scan => ({
+      requestId: scan.requestId,
+      scanId: scan.scanId,
+      imageId: scan.imageId,
+      imageName: `${scan.request.image}:${scan.request.tag}`,
+      status: 'QUEUED',
+      queuePosition: scannerService.getQueuePosition(scan.requestId),
+      estimatedWaitTime: scannerService.getEstimatedWaitTime(scan.requestId)
+    }))
+
+    logger.debug(`Retrieved ${jobs.length} running jobs, ${queuedScans.length} queued jobs with ${images.length} image details`)
+
     return NextResponse.json({
-      jobs: jobsWithImageInfo
+      jobs: jobsWithImageInfo,
+      queuedScans: queuedScansWithInfo,
+      queueStats: queueStats
     })
     
   } catch (error) {
