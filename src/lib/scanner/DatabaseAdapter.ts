@@ -46,22 +46,27 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       const imageData = await inspectDockerImage(imageRef);
       const digest = imageData.Id;
       
-      let image = await prisma.image.findUnique({ where: { digest } });
-
-      if (!image) {
-        image = await prisma.image.create({
-          data: {
-            name: request.image,
-            tag: request.tag,
-            source: 'LOCAL_DOCKER',
-            digest,
-            platform: `${imageData.Os}/${imageData.Architecture}`,
-            sizeBytes: imageData.Size ? BigInt(imageData.Size) : null,
-            registryType: 'LOCAL',  // Local Docker images don't have a registry type
-            dockerImageId: request.dockerImageId,
-          }
-        });
-      }
+      // Use upsert to handle existing images
+      const image = await prisma.image.upsert({
+        where: { digest },
+        update: {
+          // Update these fields if the image already exists
+          name: request.image,
+          tag: request.tag,
+          dockerImageId: request.dockerImageId,
+        },
+        create: {
+          // Create new image if it doesn't exist
+          name: request.image,
+          tag: request.tag,
+          source: 'LOCAL_DOCKER',
+          digest,
+          platform: `${imageData.Os}/${imageData.Architecture}`,
+          sizeBytes: imageData.Size ? BigInt(imageData.Size) : null,
+          registryType: 'LOCAL',  // Local Docker images don't have a registry type
+          dockerImageId: request.dockerImageId,
+        }
+      });
 
       const scan = await prisma.scan.create({
         data: {

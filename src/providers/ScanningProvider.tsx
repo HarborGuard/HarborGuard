@@ -18,6 +18,7 @@ export interface ScanJob {
 
 interface ScanningState {
   jobs: Map<string, ScanJob>;
+  queuedScans: ScanJob[];
   sseClients: Map<string, SSEClient>;
 }
 
@@ -26,6 +27,7 @@ type ScanningAction =
   | { type: 'ADD_SCAN_JOB'; payload: Omit<ScanJob, 'startTime' | 'lastUpdate'> }
   | { type: 'REMOVE_SCAN_JOB'; payload: string }
   | { type: 'SET_JOBS'; payload: ScanJob[] }
+  | { type: 'SET_QUEUED_SCANS'; payload: ScanJob[] }
   | { type: 'CLEAR_COMPLETED_JOBS' }
   | { type: 'AUTO_CLEANUP_COMPLETED' }
   | { type: 'ADD_SSE_CLIENT'; payload: { requestId: string; client: SSEClient } }
@@ -103,6 +105,9 @@ function scanningReducer(state: ScanningState, action: ScanningAction): Scanning
       });
       return { ...state, jobs: jobsMap };
 
+    case 'SET_QUEUED_SCANS':
+      return { ...state, queuedScans: action.payload };
+
     case 'CLEAR_COMPLETED_JOBS':
       const activeJobs = new Map<string, ScanJob>();
       state.jobs.forEach((job, requestId) => {
@@ -144,6 +149,7 @@ interface ScanningContextType {
   jobs: ScanJob[];
   runningJobs: ScanJob[];
   completedJobs: ScanJob[];
+  queuedScans: ScanJob[];
   subscribeTo: (requestId: string) => void;
   unsubscribeFrom: (requestId: string) => void;
   addScanJob: (job: Omit<ScanJob, 'startTime' | 'lastUpdate'>) => void;
@@ -159,6 +165,7 @@ const ScanningContext = createContext<ScanningContextType | undefined>(undefined
 export function ScanningProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(scanningReducer, {
     jobs: new Map(),
+    queuedScans: [],
     sseClients: new Map()
   });
 
@@ -230,15 +237,24 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
           startTime: job.startTime || new Date().toISOString(),
           lastUpdate: new Date().toISOString()
         }));
-        
+
+        const queuedScans: ScanJob[] = (data.queuedScans || []).map((scan: any) => ({
+          ...scan,
+          status: 'QUEUED' as const,
+          progress: 0,
+          startTime: new Date().toISOString(),
+          lastUpdate: new Date().toISOString()
+        }));
+
         const runningJobsCount = jobs.filter(j => j.status === 'RUNNING').length;
-        
+
         // Only log when there are changes or running jobs
-        if (runningJobsCount > 0) {
-          console.log(`Scan jobs: ${jobs.length} total, ${runningJobsCount} running`);
+        if (runningJobsCount > 0 || queuedScans.length > 0) {
+          console.log(`Scan jobs: ${jobs.length} total, ${runningJobsCount} running, ${queuedScans.length} queued`);
         }
-        
+
         dispatch({ type: 'SET_JOBS', payload: jobs });
+        dispatch({ type: 'SET_QUEUED_SCANS', payload: queuedScans });
         
         // Subscribe to all running jobs
         const runningJobs = jobs.filter(job => job.status === 'RUNNING');
@@ -330,6 +346,7 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
     jobs,
     runningJobs,
     completedJobs,
+    queuedScans: state.queuedScans,
     subscribeTo,
     unsubscribeFrom,
     addScanJob,

@@ -42,9 +42,10 @@ export async function POST(request: NextRequest) {
     
     // Start scans for each image
     const scanIds: string[] = [];
+    const scanJobs: Array<{ scanId: string; requestId: string; imageName: string; imageId: string }> = [];
     let successful = 0;
     let failed = 0;
-    
+
     // Process images with concurrency control (max 3 concurrent scans)
     const maxConcurrent = 3;
     
@@ -88,9 +89,9 @@ export async function POST(request: NextRequest) {
             dockerImageId: image.id,
           };
           
-          // Start the scan
-          const { scanId } = await scannerService.startScan(scanRequest);
-          
+          // Start the scan - get both requestId and scanId
+          const { requestId, scanId } = await scannerService.startScan(scanRequest);
+
           // Link scan to batch
           await prisma.bulkScanItem.create({
             data: {
@@ -100,14 +101,14 @@ export async function POST(request: NextRequest) {
               status: 'RUNNING'
             }
           });
-          
+
           // Monitor scan completion in background
           monitorScanCompletion(batchId, scanId, dbImage.id);
-          
+
           successful++;
           scanIds.push(scanId);
-          
-          return scanId;
+
+          return { scanId, requestId, imageName: `${image.repository}:${image.tag}`, imageId: dbImage.id };
         } catch (error) {
           logger.error(`Failed to start scan for ${image.repository}:${image.tag}`, error);
           
@@ -145,7 +146,14 @@ export async function POST(request: NextRequest) {
       });
       
       const chunkResults = await Promise.all(chunkPromises);
-      
+
+      // Collect successful scan jobs
+      chunkResults.forEach(result => {
+        if (result && result.scanId) {
+          scanJobs.push(result);
+        }
+      });
+
       // Small delay between chunks
       if (i + maxConcurrent < localImages.length) {
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -177,6 +185,7 @@ export async function POST(request: NextRequest) {
         batchId,
         totalImages: localImages.length,
         scanIds: scanIds.filter(id => id !== null),
+        scanJobs, // Include scan job details with requestIds
         successful,
         failed
       }

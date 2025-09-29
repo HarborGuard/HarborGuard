@@ -5,6 +5,7 @@ import { AppProvider } from "@/contexts/AppContext";
 import { ScanningProvider } from "@/providers/ScanningProvider";
 import { DatabaseProvider } from "@/providers/DatabaseProvider";
 import { ScanCompletionSync } from "@/components/ScanCompletionSync";
+import { GlobalScanMonitor } from "@/components/global-scan-monitor";
 import { Toaster } from "@/components/ui/sonner";
 import {
   SidebarInset,
@@ -44,6 +45,7 @@ export default function RootLayout({
           <DatabaseProvider>
             <ScanningProvider>
               <ScanCompletionSync />
+              <GlobalScanMonitor />
               <SidebarProvider
                 style={
                   {
@@ -58,7 +60,7 @@ export default function RootLayout({
                   {children}
                 </SidebarInset>
               </SidebarProvider>
-              <Toaster />
+              <Toaster position="top-right" />
             </ScanningProvider>
           </DatabaseProvider>
         </AppProvider>
