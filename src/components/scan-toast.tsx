@@ -40,7 +40,7 @@ export function ScanToast({
     <button
       onClick={onClick}
       className={cn(
-        "flex items-center gap-2 px-4 py-2",
+        "min-w-75 flex items-center gap-2 px-4 py-2",
         "bg-background border rounded-lg shadow-lg",
         "hover:bg-accent transition-colors",
         "cursor-pointer select-none",
