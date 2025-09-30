@@ -116,24 +116,28 @@ export class PatchExecutorTarUnshare {
       
       // Update status to patching
       await this.updatePatchOperationStatus(patchOperation.id, 'PATCHING');
-      
+
       // Generate patch commands
       const patchCommands = this.generatePatchCommands(patchableVulns);
-      
+
       // Choose script based on environment
       // In development: NODE_ENV is 'development' OR we're not in a Docker container
-      const isDevelopment = process.env.NODE_ENV === 'development' || 
+      const isDevelopment = process.env.NODE_ENV === 'development' ||
                            (!process.env.NODE_ENV && !existsSync('/.dockerenv'));
       const scriptName = isDevelopment ? 'buildah-patch-dev.sh' : 'buildah-patch-container.sh';
       const scriptPath = path.join(process.cwd(), 'scripts', scriptName);
       const dryRunFlag = request.dryRun ? 'true' : 'false';
-      
+
       logger.info(`Executing patch script with ${patchableVulns.length} vulnerabilities`);
-      
+
+      // Write patch commands to a temporary file to avoid quote escaping issues
+      const commandsFile = path.join(patchWorkDir, 'patch-commands.sh');
+      await fs.writeFile(commandsFile, patchCommands, 'utf8');
+
       try {
         const { stdout, stderr } = await execAsync(
-          `bash ${scriptPath} "${originalTarPath}" '${patchCommands}' "${patchedTarPath}" ${dryRunFlag}`,
-          { 
+          `bash ${scriptPath} "${originalTarPath}" "${commandsFile}" "${patchedTarPath}" ${dryRunFlag}`,
+          {
             maxBuffer: 10 * 1024 * 1024 // 10MB buffer for large outputs
           }
         );
@@ -269,25 +273,26 @@ export class PatchExecutorTarUnshare {
       }
       grouped.get(vuln.packageManager)!.push(vuln);
     }
-    
+
     const commands: string[] = [];
-    
+
     for (const [packageManager, vulns] of grouped) {
       if (packageManager === 'apt') {
         // First ensure gpg and apt-utils are available
+        // Use sh -c to check and install if needed
         commands.push('chroot $mountpoint sh -c "which gpgv || (apt-get update && apt-get install -y --no-install-recommends gnupg apt-utils)"');
-        
+
         // Update package lists
         commands.push('chroot $mountpoint apt-get update');
-        
+
         // Install fixed versions - try exact version first, then fall back to upgrade
         // Group packages to handle version availability issues
         const packageNames = vulns.map(v => v.packageName).join(' ');
-        
+
         // Try to upgrade packages to their latest available versions
         // This is more reliable than specifying exact versions that may not exist
         commands.push(`chroot $mountpoint apt-get install -y --only-upgrade ${packageNames} || chroot $mountpoint apt-get install -y ${packageNames}`);
-        
+
         // Clean apt cache
         commands.push('chroot $mountpoint apt-get clean');
         commands.push('chroot $mountpoint rm -rf /var/lib/apt/lists/*');
