@@ -5,14 +5,17 @@
 set -e
 
 TAR_PATH=$1
-PATCH_COMMANDS=$2
+PATCH_COMMANDS_FILE=$2
 OUTPUT_TAR=$3
 DRY_RUN=${4:-false}
 
-if [ -z "$TAR_PATH" ] || [ -z "$OUTPUT_TAR" ]; then
-  echo "Usage: $0 TAR_PATH PATCH_COMMANDS OUTPUT_TAR [DRY_RUN]"
+if [ -z "$TAR_PATH" ] || [ -z "$PATCH_COMMANDS_FILE" ] || [ -z "$OUTPUT_TAR" ]; then
+  echo "Usage: $0 TAR_PATH PATCH_COMMANDS_FILE OUTPUT_TAR [DRY_RUN]"
   exit 1
 fi
+
+# Read patch commands from file
+PATCH_COMMANDS=$(cat "$PATCH_COMMANDS_FILE")
 
 echo "=== Starting patch operation (development mode with buildah unshare) ==="
 

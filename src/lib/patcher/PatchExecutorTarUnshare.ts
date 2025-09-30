@@ -131,9 +131,13 @@ export class PatchExecutorTarUnshare {
       logger.info(`Executing patch script with ${patchableVulns.length} vulnerabilities`);
       
       try {
+        // Write patch commands to a temp file to avoid quote escaping issues
+        const patchCommandsFile = path.join(patchWorkDir, 'patch-commands.txt');
+        await fs.writeFile(patchCommandsFile, patchCommands);
+
         const { stdout, stderr } = await execAsync(
-          `bash ${scriptPath} "${originalTarPath}" '${patchCommands}' "${patchedTarPath}" ${dryRunFlag}`,
-          { 
+          `bash ${scriptPath} "${originalTarPath}" "${patchCommandsFile}" "${patchedTarPath}" ${dryRunFlag}`,
+          {
             maxBuffer: 10 * 1024 * 1024 // 10MB buffer for large outputs
           }
         );
@@ -325,7 +329,12 @@ export class PatchExecutorTarUnshare {
   }
 
   private async getImageTar(image: any, requestId: string): Promise<string> {
-    const safeImageName = image.name.replace(/[/:]/g, '_');
+    // Build the full image name including registry if present
+    const fullImageName = image.registry && image.registry !== 'local'
+      ? `${image.registry}/${image.name}`
+      : image.name;
+    const safeImageName = fullImageName.replace(/[/:]/g, '_');
+
     // First try to find tar file with image digest hash (from scanning)
     const imageHash = image.digest ? image.digest.replace('sha256:', '') : '';
     const scanTarPath = imageHash ? path.join(this.workDir, 'images', `${safeImageName}-${imageHash}.tar`) : '';
@@ -390,14 +399,15 @@ export class PatchExecutorTarUnshare {
     if (image.source === 'LOCAL_DOCKER' || image.registry === 'local') {
       logger.info(`Exporting local Docker image ${image.name}:${image.tag} to tar`);
       await execAsync(`docker save -o ${tarPath} ${image.name}:${image.tag}`);
-      
+
       const stats = await fs.stat(tarPath);
       logger.info(`Exported tar file: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
     } else {
       // Download from registry using skopeo
-      const fullImageName = image.registry ? `${image.registry}/${image.name}` : image.name;
+      // Use the same fullImageName constructed above
       const imageRef = `${fullImageName}:${image.tag}`;
-      
+      logger.info(`Downloading image ${imageRef} from registry`);
+
       await execAsync(
         `skopeo copy --src-tls-verify=false docker://${imageRef} docker-archive:${tarPath}`
       );
