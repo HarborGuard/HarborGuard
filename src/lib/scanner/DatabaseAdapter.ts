@@ -352,8 +352,9 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         digest,
         platform: metadata.os ? `${metadata.os}/${metadata.architecture || 'unknown'}` : `${metadata.Os || 'unknown'}/${metadata.Architecture || 'unknown'}`,
         sizeBytes: imageSize ? BigInt(imageSize) : null,
-        // Save the descriptive repository name for one-off scans
-        registry: repository ? repository.name : null,
+        // Save the actual registry URL for proper image references
+        // For generic registries, store the URL, not the descriptive name
+        registry: repository ? repository.registryUrl : null,
         registryType: registryTypeValue,
       };
 
@@ -369,8 +370,8 @@ export class DatabaseAdapter implements IDatabaseAdapter {
           // Always update these fields in case they've changed
           name: cleanImageName,
           tag: request.tag,
-          // Update registry name if we have a repository
-          registry: repository ? repository.name : null,
+          // Update registry URL for proper image references
+          registry: repository ? repository.registryUrl : null,
           registryType: registryTypeValue,
           // Update size if we have it (in case it was missing before)
           ...(imageSize && { sizeBytes: BigInt(imageSize) }),

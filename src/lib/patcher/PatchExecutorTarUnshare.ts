@@ -330,9 +330,17 @@ export class PatchExecutorTarUnshare {
 
   private async getImageTar(image: any, requestId: string): Promise<string> {
     // Build the full image name including registry if present
-    const fullImageName = image.registry && image.registry !== 'local'
-      ? `${image.registry}/${image.name}`
-      : image.name;
+    let fullImageName = image.name;
+
+    // Check if we have a registry URL in the registry field
+    if (image.registry && image.registry !== 'local' && image.registry !== 'docker.io') {
+      // Registry field contains the actual URL (e.g., "localhost:5000")
+      fullImageName = `${image.registry}/${image.name}`;
+    } else if (image.name.includes('/') && (image.name.split('/')[0].includes(':') || image.name.split('/')[0].includes('.'))) {
+      // Image name already has registry prefix (e.g., "localhost:5000/nginx")
+      fullImageName = image.name;
+    }
+
     const safeImageName = fullImageName.replace(/[/:]/g, '_');
 
     // First try to find tar file with image digest hash (from scanning)
