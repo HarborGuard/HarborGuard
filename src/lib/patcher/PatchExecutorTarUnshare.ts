@@ -180,8 +180,26 @@ export class PatchExecutorTarUnshare {
         }
         
         logger.info('Patch operation completed successfully');
+
+        // Debug output
+        logger.info('=== Patch Execution Summary ===');
+        logger.info(`  Total vulnerabilities selected: ${patchableVulns.length}`);
+        logger.info(`  Package manager used: ${patchableVulns[0]?.packageManager || 'unknown'}`);
+        logger.info(`  Commands executed: ${commandLines.filter(cmd => cmd.trim()).length}`);
+        logger.info(`  Patch mode: ${request.dryRun ? 'DRY RUN' : 'APPLIED'}`);
+        if (request.selectedVulnerabilityIds && request.selectedVulnerabilityIds.length > 0) {
+          logger.info(`  Selective patching: YES (${request.selectedVulnerabilityIds.length} specific CVE(s))`);
+          logger.info(`  Strategy: Version-specific installation to fix ONLY selected vulnerabilities`);
+        } else {
+          logger.info(`  Selective patching: NO (fixing all patchable vulnerabilities)`);
+        }
+        logger.info('================================');
       } catch (error) {
         logger.error('Patch script failed:', error);
+        logger.error('=== Patch Execution Failed ===');
+        logger.error(`  Failed to patch ${patchableVulns.length} vulnerabilities`);
+        logger.error(`  Error details: ${error instanceof Error ? error.message : String(error)}`);
+        logger.error('===============================');
         await this.updatePatchOperationStatus(patchOperation.id, 'FAILED', {
           failedCount: patchableVulns.length,
           completedAt: new Date()
@@ -277,6 +295,30 @@ export class PatchExecutorTarUnshare {
         patchedImageId: patchedImageId,
         completedAt: new Date()
       });
+
+      // Final summary logging
+      logger.info('=== FINAL PATCH SUMMARY ===');
+      logger.info(`Operation ID: ${patchOperation.id}`);
+      logger.info(`Source Image: ${image.name}:${image.tag}`);
+      if (patchedImageId) {
+        logger.info(`Patched Image ID: ${patchedImageId}`);
+      }
+      logger.info(`Vulnerabilities Requested: ${request.selectedVulnerabilityIds?.length || 'ALL'}`);
+      logger.info(`Vulnerabilities Patched: ${successCount}`);
+      logger.info(`Patch Status: ${request.dryRun ? 'DRY RUN - No changes applied' : 'APPLIED - Image patched'}`);
+
+      if (patchableVulns.length > 0) {
+        logger.info('Patched CVEs:');
+        for (const vuln of patchableVulns) {
+          logger.info(`  ✓ ${vuln.cveId} - ${vuln.packageName} upgraded to ${vuln.fixedVersion}`);
+        }
+      }
+
+      if (request.selectedVulnerabilityIds && request.selectedVulnerabilityIds.length > 0) {
+        logger.info('IMPORTANT: Only the selected CVEs above were patched.');
+        logger.info('Other vulnerabilities in the same packages remain unpatched as requested.');
+      }
+      logger.info('============================');
 
       // Save patch report
       await this.savePatchReport(scan.requestId, patchOperation.id, patchableVulns, request.dryRun);
