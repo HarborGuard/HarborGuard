@@ -428,6 +428,11 @@ export class PatchExecutorTarUnshare {
   }
 
   private async getImageTar(image: any, requestId: string): Promise<string> {
+    logger.info(`Getting tar file for image: ${image.name}:${image.tag}`);
+    logger.info(`  Image source: ${image.source}`);
+    logger.info(`  Image registry: ${image.registry}`);
+    logger.info(`  Image digest: ${image.digest}`);
+
     const safeImageName = image.name.replace(/[/:]/g, '_');
     // First try to find tar file with image digest hash (from scanning)
     const imageHash = image.digest ? image.digest.replace('sha256:', '') : '';
@@ -489,18 +494,34 @@ export class PatchExecutorTarUnshare {
     // If no tar file found, we'll need to download/export it
     const tarPath = requestTarPath;
 
-    // Export from Docker if local source
-    if (image.source === 'LOCAL_DOCKER' || image.registry === 'local') {
+    // Export from Docker if local source or when using docker run
+    // Check for various conditions that indicate local Docker source
+    const isLocalDocker = image.source === 'LOCAL_DOCKER' ||
+                         image.registry === 'local' ||
+                         image.registry === 'Generic Registry' ||
+                         image.registry === 'docker' ||
+                         !image.registry;
+
+    if (isLocalDocker) {
       logger.info(`Exporting local Docker image ${image.name}:${image.tag} to tar`);
-      await execAsync(`docker save -o ${tarPath} ${image.name}:${image.tag}`);
-      
+
+      // For local Docker images, use docker save directly
+      try {
+        await execAsync(`docker save -o ${tarPath} ${image.name}:${image.tag}`);
+      } catch (error) {
+        // If the image name fails, try with just the image name (without tag)
+        logger.info(`Retrying with image ID or alternative format`);
+        await execAsync(`docker save -o ${tarPath} ${image.name}`);
+      }
+
       const stats = await fs.stat(tarPath);
       logger.info(`Exported tar file: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
     } else {
       // Download from registry using skopeo
       const fullImageName = image.registry ? `${image.registry}/${image.name}` : image.name;
       const imageRef = `${fullImageName}:${image.tag}`;
-      
+
+      logger.info(`Downloading from registry: ${imageRef}`);
       await execAsync(
         `skopeo copy --src-tls-verify=false docker://${imageRef} docker-archive:${tarPath}`
       );
