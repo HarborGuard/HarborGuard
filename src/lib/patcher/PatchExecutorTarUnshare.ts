@@ -74,14 +74,23 @@ export class PatchExecutorTarUnshare {
       let patchableVulns = await this.analyzePatchableVulnerabilities(
         scan.vulnerabilityFindings
       );
-      
+
+      logger.info(`Found ${patchableVulns.length} patchable vulnerabilities out of ${scan.vulnerabilityFindings.length} total`);
+
       // Filter by selected vulnerability IDs if provided
       if (request.selectedVulnerabilityIds && request.selectedVulnerabilityIds.length > 0) {
-        patchableVulns = patchableVulns.filter(vuln => 
+        patchableVulns = patchableVulns.filter(vuln =>
           request.selectedVulnerabilityIds!.includes(vuln.id)
         );
         logger.info(`Filtered to ${patchableVulns.length} selected vulnerabilities from ${request.selectedVulnerabilityIds.length} requested`);
       }
+
+      // Log details of vulnerabilities to be patched
+      logger.info('=== Vulnerabilities to be patched ===');
+      for (const vuln of patchableVulns) {
+        logger.info(`  • ${vuln.cveId}: ${vuln.packageName} ${vuln.currentVersion} → ${vuln.fixedVersion} (${vuln.packageManager})`);
+      }
+      logger.info('=====================================');
 
       if (patchableVulns.length === 0) {
         logger.info('No patchable vulnerabilities found');
@@ -119,6 +128,16 @@ export class PatchExecutorTarUnshare {
 
       // Generate patch commands
       const patchCommands = this.generatePatchCommands(patchableVulns);
+
+      // Log the generated commands
+      logger.info('=== Generated patch commands ===');
+      const commandLines = patchCommands.split('\n');
+      commandLines.forEach((cmd, index) => {
+        if (cmd.trim()) {
+          logger.info(`  ${index + 1}. ${cmd}`);
+        }
+      });
+      logger.info('=================================');
 
       // Choose script based on environment
       // In development: NODE_ENV is 'development' OR we're not in a Docker container
@@ -274,6 +293,11 @@ export class PatchExecutorTarUnshare {
       grouped.get(vuln.packageManager)!.push(vuln);
     }
 
+    logger.info(`Grouped vulnerabilities by package manager: ${Array.from(grouped.keys()).join(', ')}`);
+    for (const [pm, vulns] of grouped) {
+      logger.info(`  ${pm}: ${vulns.length} vulnerabilities`);
+    }
+
     const commands: string[] = [];
 
     for (const [packageManager, vulns] of grouped) {
@@ -288,7 +312,9 @@ export class PatchExecutorTarUnshare {
 
         // Install fixed versions - try exact version first, then fall back to upgrade
         // Process each package individually for better error handling
+        logger.info(`  Generating APT commands for ${vulns.length} packages:`);
         for (const vuln of vulns) {
+          logger.info(`    - ${vuln.packageName}: ${vuln.currentVersion} → ${vuln.fixedVersion}`);
           // Try to upgrade the specific package
           commands.push(`chroot $mountpoint apt-get install -y --only-upgrade ${vuln.packageName} || chroot $mountpoint apt-get install -y ${vuln.packageName}`);
         }
@@ -298,18 +324,25 @@ export class PatchExecutorTarUnshare {
         commands.push('chroot $mountpoint rm -rf /var/lib/apt/lists/*');
         
       } else if (packageManager === 'apk') {
+        logger.info(`  Generating APK commands for ${vulns.length} packages:`);
+
         // Update apk cache
         commands.push('chroot $mountpoint apk update');
-        
+
         // For Alpine, we need to upgrade both libssl3 and libcrypto3 together as they're linked
         const packages = new Set(vulns.map(v => v.packageName));
-        
+
+        for (const vuln of vulns) {
+          logger.info(`    - ${vuln.packageName}: ${vuln.currentVersion} → ${vuln.fixedVersion}`);
+        }
+
         // If libssl3 is being patched, also include libcrypto3 and vice versa
         if (packages.has('libssl3') || packages.has('libcrypto3')) {
           packages.add('libssl3');
           packages.add('libcrypto3');
+          logger.info(`    Note: Adding linked packages libssl3 and libcrypto3`);
         }
-        
+
         const packageList = Array.from(packages).join(' ');
         commands.push(`chroot $mountpoint apk upgrade ${packageList}`);
         
@@ -317,6 +350,12 @@ export class PatchExecutorTarUnshare {
         commands.push('chroot $mountpoint rm -rf /var/cache/apk/*');
         
       } else if (packageManager === 'yum') {
+        logger.info(`  Generating YUM commands for ${vulns.length} packages:`);
+
+        for (const vuln of vulns) {
+          logger.info(`    - ${vuln.packageName}: ${vuln.currentVersion} → ${vuln.fixedVersion}`);
+        }
+
         // Update packages
         const packages = vulns.map(v => `${v.packageName}-${v.fixedVersion}`).join(' ');
         commands.push(`chroot $mountpoint yum update -y ${packages}`);
