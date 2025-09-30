@@ -134,10 +134,19 @@ export class PatchExecutorTarUnshare {
       const commandLines = patchCommands.split('\n');
       commandLines.forEach((cmd, index) => {
         if (cmd.trim()) {
-          logger.info(`  ${index + 1}. ${cmd}`);
+          // Highlight version-specific installations
+          if (cmd.includes('apt-get install') && cmd.includes('=')) {
+            logger.info(`  ${index + 1}. ${cmd} [VERSION-SPECIFIC]`);
+          } else {
+            logger.info(`  ${index + 1}. ${cmd}`);
+          }
         }
       });
       logger.info('=================================');
+
+      if (request.selectedVulnerabilityIds && request.selectedVulnerabilityIds.length > 0) {
+        logger.info(`NOTE: Installing specific versions to patch ONLY the selected ${request.selectedVulnerabilityIds.length} CVE(s)`);
+      }
 
       // Choose script based on environment
       // In development: NODE_ENV is 'development' OR we're not in a Docker container
@@ -310,13 +319,15 @@ export class PatchExecutorTarUnshare {
         // Update package lists
         commands.push('chroot $mountpoint apt-get update');
 
-        // Install fixed versions - try exact version first, then fall back to upgrade
+        // Install fixed versions - install specific versions to fix only selected CVEs
         // Process each package individually for better error handling
         logger.info(`  Generating APT commands for ${vulns.length} packages:`);
         for (const vuln of vulns) {
           logger.info(`    - ${vuln.packageName}: ${vuln.currentVersion} → ${vuln.fixedVersion}`);
-          // Try to upgrade the specific package
-          commands.push(`chroot $mountpoint apt-get install -y --only-upgrade ${vuln.packageName} || chroot $mountpoint apt-get install -y ${vuln.packageName}`);
+          // Install the specific fixed version, not the latest
+          // First try with the exact version, then fall back to a more general approach
+          const versionedPackage = `${vuln.packageName}=${vuln.fixedVersion}`;
+          commands.push(`chroot $mountpoint apt-get install -y ${versionedPackage} || chroot $mountpoint apt-get install -y --only-upgrade ${vuln.packageName}=${vuln.fixedVersion}* || chroot $mountpoint apt-get install -y --only-upgrade ${vuln.packageName}`);
         }
 
         // Clean apt cache
@@ -343,8 +354,11 @@ export class PatchExecutorTarUnshare {
           logger.info(`    Note: Adding linked packages libssl3 and libcrypto3`);
         }
 
-        const packageList = Array.from(packages).join(' ');
-        commands.push(`chroot $mountpoint apk upgrade ${packageList}`);
+        // Install specific versions for APK
+        for (const vuln of vulns) {
+          const versionedPackage = `${vuln.packageName}=${vuln.fixedVersion}`;
+          commands.push(`chroot $mountpoint apk add --no-cache ${versionedPackage} || chroot $mountpoint apk upgrade ${vuln.packageName}`);
+        }
         
         // Clean cache
         commands.push('chroot $mountpoint rm -rf /var/cache/apk/*');
@@ -356,9 +370,11 @@ export class PatchExecutorTarUnshare {
           logger.info(`    - ${vuln.packageName}: ${vuln.currentVersion} → ${vuln.fixedVersion}`);
         }
 
-        // Update packages
-        const packages = vulns.map(v => `${v.packageName}-${v.fixedVersion}`).join(' ');
-        commands.push(`chroot $mountpoint yum update -y ${packages}`);
+        // Install specific versions for YUM
+        for (const vuln of vulns) {
+          const versionedPackage = `${vuln.packageName}-${vuln.fixedVersion}`;
+          commands.push(`chroot $mountpoint yum install -y ${versionedPackage} || chroot $mountpoint yum update -y ${vuln.packageName}`);
+        }
         
         // Clean cache
         commands.push('chroot $mountpoint yum clean all');
