@@ -46,17 +46,31 @@ if [ "$DRY_RUN" = "false" ]; then
   # Copy the commands file to a temp location accessible inside unshare
   cp "$COMMANDS_FILE" /tmp/patch-commands-\$\$.sh
 
+  # Debug: Show patch context
+  echo "=== DEBUG: Patch Context ==="
+  echo "  Container: \$container"
+  echo "  Mountpoint: \$mountpoint"
+  echo "  Commands file: /tmp/patch-commands-\$\$.sh"
+  echo "  Number of commands: \$(wc -l < /tmp/patch-commands-\$\$.sh)"
+  echo "============================="
+
   # Execute each command from the file
+  cmd_count=0
   while IFS= read -r cmd || [ -n "\$cmd" ]; do
     if [ -n "\$cmd" ]; then
+      cmd_count=\$((cmd_count + 1))
       # Replace mountpoint placeholder
       actual_cmd="\${cmd//\\\$mountpoint/\$mountpoint}"
-      echo "Executing: \$actual_cmd"
-      eval "\$actual_cmd" || {
-        echo "Warning: Command failed, continuing: \$actual_cmd"
+      echo "[\$cmd_count] Executing: \$actual_cmd"
+      eval "\$actual_cmd" && echo "[\$cmd_count] Success" || {
+        echo "[\$cmd_count] Warning: Command failed, continuing"
       }
     fi
   done < /tmp/patch-commands-\$\$.sh
+
+  echo "=== DEBUG: Execution complete ==="
+  echo "  Total commands executed: \$cmd_count"
+  echo "================================="
 
   rm -f /tmp/patch-commands-\$\$.sh
   echo "PATCH_STATUS:SUCCESS"

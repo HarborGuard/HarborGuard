@@ -94,17 +94,31 @@ fi
 if [ "$DRY_RUN" = "false" ]; then
   echo "Executing patch commands..."
 
+  # Debug: Show patch context
+  echo "=== DEBUG: Patch Context ==="
+  echo "  Container: $container"
+  echo "  Mountpoint: $mountpoint"
+  echo "  Commands file: $COMMANDS_FILE"
+  echo "  Number of commands: $(wc -l < "$COMMANDS_FILE")"
+  echo "============================="
+
   # Execute each command from the file line by line
+  cmd_count=0
   while IFS= read -r cmd || [ -n "$cmd" ]; do
     if [ -n "$cmd" ]; then
+      cmd_count=$((cmd_count + 1))
       # Replace mountpoint placeholder
       actual_cmd="${cmd//\$mountpoint/$mountpoint}"
-      echo "Executing: $actual_cmd"
-      eval "$actual_cmd" || {
-        echo "Warning: Command failed, continuing: $actual_cmd"
+      echo "[$cmd_count] Executing: $actual_cmd"
+      eval "$actual_cmd" && echo "[$cmd_count] Success" || {
+        echo "[$cmd_count] Warning: Command failed, continuing"
       }
     fi
   done < "$COMMANDS_FILE"
+
+  echo "=== DEBUG: Execution complete ==="
+  echo "  Total commands executed: $cmd_count"
+  echo "================================="
 
   echo "PATCH_STATUS:SUCCESS"
 else
