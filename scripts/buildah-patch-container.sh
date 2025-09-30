@@ -5,14 +5,21 @@
 set -e
 
 TAR_PATH=$1
-PATCH_COMMANDS=$2
+COMMANDS_FILE=$2
 OUTPUT_TAR=$3
 DRY_RUN=${4:-false}
 
-if [ -z "$TAR_PATH" ] || [ -z "$OUTPUT_TAR" ]; then
-  echo "Usage: $0 TAR_PATH PATCH_COMMANDS OUTPUT_TAR [DRY_RUN]"
+if [ -z "$TAR_PATH" ] || [ -z "$COMMANDS_FILE" ] || [ -z "$OUTPUT_TAR" ]; then
+  echo "Usage: $0 TAR_PATH COMMANDS_FILE OUTPUT_TAR [DRY_RUN]"
   exit 1
 fi
+
+# Read commands from file
+if [ ! -f "$COMMANDS_FILE" ]; then
+  echo "Error: Commands file not found: $COMMANDS_FILE"
+  exit 1
+fi
+PATCH_COMMANDS=$(cat "$COMMANDS_FILE")
 
 echo "=== Starting patch operation (container-optimized) ==="
 
@@ -86,21 +93,56 @@ fi
 # Execute patches
 if [ "$DRY_RUN" = "false" ]; then
   echo "Executing patch commands..."
-  
-  # Parse and execute patch commands
-  # Commands come in format: chroot $mountpoint <command>
-  # We need to replace $mountpoint with actual path
-  PATCH_CMD=$(echo "$PATCH_COMMANDS" | sed "s|\$mountpoint|$mountpoint|g")
-  
-  echo "Running: $PATCH_CMD"
-  eval "$PATCH_CMD" || {
-    echo "Warning: Some patch commands may have failed, continuing..."
-  }
-  
-  echo "PATCH_STATUS:SUCCESS"
+
+  # Debug: Show patch context
+  echo "=== DEBUG: Patch Context ==="
+  echo "  Container: $container"
+  echo "  Mountpoint: $mountpoint"
+  echo "  Commands file: $COMMANDS_FILE"
+  echo "  Number of commands: $(wc -l < "$COMMANDS_FILE")"
+  echo "============================="
+
+  # Execute each command from the file line by line
+  cmd_count=0
+  failed_count=0
+  while IFS= read -r cmd || [ -n "$cmd" ]; do
+    if [ -n "$cmd" ]; then
+      cmd_count=$((cmd_count + 1))
+      # Replace mountpoint placeholder
+      actual_cmd="${cmd//\$mountpoint/$mountpoint}"
+      echo "[$cmd_count] Executing: $actual_cmd"
+
+      # Execute and capture both stdout and stderr
+      if eval "$actual_cmd" 2>&1; then
+        echo "[$cmd_count] Success"
+      else
+        echo "[$cmd_count] Failed with exit code: $?"
+        failed_count=$((failed_count + 1))
+        # For package install commands, this is critical
+        if [[ "$actual_cmd" == *"apt-get"* ]] || [[ "$actual_cmd" == *"apk"* ]] || [[ "$actual_cmd" == *"yum"* ]]; then
+          echo "[$cmd_count] ERROR: Package installation failed - this is a critical error"
+        fi
+      fi
+    fi
+  done < "$COMMANDS_FILE"
+
+  echo "=== DEBUG: Execution complete ==="
+  echo "  Total commands executed: $cmd_count"
+  echo "  Failed commands: $failed_count"
+  echo "================================="
+
+  # Report success only if no critical failures
+  if [ $failed_count -gt 0 ]; then
+    echo "WARNING: $failed_count commands failed during patching"
+    echo "PATCH_STATUS:PARTIAL"
+  else
+    echo "PATCH_STATUS:SUCCESS"
+  fi
 else
   echo "DRY RUN - Would execute:"
-  echo "$PATCH_COMMANDS" | sed "s|\$mountpoint|$mountpoint|g"
+  while IFS= read -r cmd || [ -n "$cmd" ]; do
+    echo "${cmd//\$mountpoint/$mountpoint}"
+  done < "$COMMANDS_FILE"
   echo "PATCH_STATUS:DRY_RUN"
 fi
 
