@@ -173,13 +173,24 @@ export class PatchExecutorTarUnshare {
         if (stderr && !stderr.includes('warning')) {
           logger.warn(`Patch script stderr: ${stderr}`);
         }
-        
-        // Check if patch was successful
-        if (!stdout.includes('PATCH_STATUS:SUCCESS')) {
+
+        // Log the full output for debugging
+        logger.info('Patch script output:', stdout);
+
+        // Check if patch was successful or partially successful
+        const hasSuccess = stdout.includes('PATCH_STATUS:SUCCESS');
+        const hasPartial = stdout.includes('PATCH_STATUS:PARTIAL');
+
+        if (!hasSuccess && !hasPartial) {
+          logger.error('Patch operation failed - no success status found in output');
           throw new Error('Patch operation did not complete successfully');
         }
-        
-        logger.info('Patch operation completed successfully');
+
+        if (hasPartial) {
+          logger.warn('Patch operation completed with some failures - PARTIAL success');
+        } else {
+          logger.info('Patch operation completed successfully');
+        }
 
         // Debug output
         logger.info('=== Patch Execution Summary ===');
