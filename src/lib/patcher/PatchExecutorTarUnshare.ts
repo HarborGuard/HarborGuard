@@ -279,19 +279,19 @@ export class PatchExecutorTarUnshare {
     for (const [packageManager, vulns] of grouped) {
       if (packageManager === 'apt') {
         // First ensure gpg and apt-utils are available
-        // Use sh -c to check and install if needed
-        commands.push('chroot $mountpoint sh -c "which gpgv || (apt-get update && apt-get install -y --no-install-recommends gnupg apt-utils)"');
+        // Break down into simpler commands to avoid quote issues
+        commands.push('chroot $mountpoint which gpgv || chroot $mountpoint apt-get update');
+        commands.push('chroot $mountpoint which gpgv || chroot $mountpoint apt-get install -y --no-install-recommends gnupg apt-utils');
 
         // Update package lists
         commands.push('chroot $mountpoint apt-get update');
 
         // Install fixed versions - try exact version first, then fall back to upgrade
-        // Group packages to handle version availability issues
-        const packageNames = vulns.map(v => v.packageName).join(' ');
-
-        // Try to upgrade packages to their latest available versions
-        // This is more reliable than specifying exact versions that may not exist
-        commands.push(`chroot $mountpoint apt-get install -y --only-upgrade ${packageNames} || chroot $mountpoint apt-get install -y ${packageNames}`);
+        // Process each package individually for better error handling
+        for (const vuln of vulns) {
+          // Try to upgrade the specific package
+          commands.push(`chroot $mountpoint apt-get install -y --only-upgrade ${vuln.packageName} || chroot $mountpoint apt-get install -y ${vuln.packageName}`);
+        }
 
         // Clean apt cache
         commands.push('chroot $mountpoint apt-get clean');
@@ -325,8 +325,9 @@ export class PatchExecutorTarUnshare {
         commands.push('chroot $mountpoint yum clean all');
       }
     }
-    
-    return commands.join(' && ');
+
+    // Join commands with newlines instead of && to make them easier to parse
+    return commands.join('\n');
   }
 
   private async getImageTar(image: any, requestId: string): Promise<string> {
