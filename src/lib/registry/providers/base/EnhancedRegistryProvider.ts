@@ -189,11 +189,40 @@ export abstract class EnhancedRegistryProvider {
         // Docker v1 manifest - estimate based on layer count
         totalSize = manifest.fsLayers.length * 10 * 1024 * 1024; // 10MB per layer estimate
       } else if (manifest.manifests && Array.isArray(manifest.manifests)) {
-        // Multi-platform manifest - use size from first platform
-        const firstManifest = manifest.manifests[0];
-        if (firstManifest && firstManifest.size) {
-          // This is the manifest size, not image size, but better than nothing
-          totalSize = firstManifest.size * 100; // Rough estimate
+        // Multi-platform manifest - need to fetch the actual platform manifest
+        console.log('[EnhancedRegistryProvider] Detected multi-platform manifest, fetching platform-specific manifest');
+
+        // Try to get the first linux/amd64 platform, or fall back to first available
+        let platformManifest = manifest.manifests.find((m: any) =>
+          m.platform?.os === 'linux' && m.platform?.architecture === 'amd64'
+        ) || manifest.manifests[0];
+
+        if (platformManifest && platformManifest.digest) {
+          try {
+            // Fetch the actual platform-specific manifest using its digest
+            const platformCommand = `skopeo inspect --raw ${authArgs} ${tlsVerify} docker://${imageRef.split(':')[0]}@${platformManifest.digest}`;
+            const { stdout: platformStdout } = await this.executeSkopeoCommand(platformCommand);
+            const platformManifestData = JSON.parse(platformStdout);
+
+            // Now calculate size from the actual platform manifest
+            if (platformManifestData.layers && Array.isArray(platformManifestData.layers)) {
+              totalSize = platformManifestData.layers.reduce((sum: number, layer: any) => {
+                return sum + (layer.size || 0);
+              }, 0);
+              // Add config blob size if present
+              if (platformManifestData.config && platformManifestData.config.size) {
+                totalSize += platformManifestData.config.size;
+              }
+              console.log('[EnhancedRegistryProvider] Calculated size from platform manifest:', totalSize);
+            }
+          } catch (platformError) {
+            console.error('[EnhancedRegistryProvider] Failed to fetch platform-specific manifest:', platformError);
+            // Fall back to estimate based on typical image sizes
+            totalSize = 50 * 1024 * 1024; // 50MB default estimate
+          }
+        } else {
+          // No digest available, use a reasonable estimate
+          totalSize = 50 * 1024 * 1024; // 50MB default estimate
         }
       }
     } catch (error) {
