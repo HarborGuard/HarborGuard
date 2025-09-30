@@ -93,21 +93,25 @@ fi
 # Execute patches
 if [ "$DRY_RUN" = "false" ]; then
   echo "Executing patch commands..."
-  
-  # Parse and execute patch commands
-  # Commands come in format: chroot $mountpoint <command>
-  # We need to replace $mountpoint with actual path
-  PATCH_CMD=$(echo "$PATCH_COMMANDS" | sed "s|\$mountpoint|$mountpoint|g")
-  
-  echo "Running: $PATCH_CMD"
-  eval "$PATCH_CMD" || {
-    echo "Warning: Some patch commands may have failed, continuing..."
-  }
-  
+
+  # Execute each command from the file line by line
+  while IFS= read -r cmd || [ -n "$cmd" ]; do
+    if [ -n "$cmd" ]; then
+      # Replace mountpoint placeholder
+      actual_cmd="${cmd//\$mountpoint/$mountpoint}"
+      echo "Executing: $actual_cmd"
+      eval "$actual_cmd" || {
+        echo "Warning: Command failed, continuing: $actual_cmd"
+      }
+    fi
+  done < "$COMMANDS_FILE"
+
   echo "PATCH_STATUS:SUCCESS"
 else
   echo "DRY RUN - Would execute:"
-  echo "$PATCH_COMMANDS" | sed "s|\$mountpoint|$mountpoint|g"
+  while IFS= read -r cmd || [ -n "$cmd" ]; do
+    echo "${cmd//\$mountpoint/$mountpoint}"
+  done < "$COMMANDS_FILE"
   echo "PATCH_STATUS:DRY_RUN"
 fi
 
