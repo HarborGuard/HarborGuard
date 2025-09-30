@@ -361,15 +361,34 @@ export class PatchExecutorTarUnshare {
         // Update package lists
         commands.push('chroot $mountpoint apt-get update');
 
-        // Install fixed versions - install specific versions to fix only selected CVEs
+        // Install fixed versions - handle both selective and full patching
         // Process each package individually for better error handling
         logger.info(`  Generating APT commands for ${vulns.length} packages:`);
         for (const vuln of vulns) {
           logger.info(`    - ${vuln.packageName}: ${vuln.currentVersion} → ${vuln.fixedVersion}`);
-          // Install the specific fixed version, not the latest
-          // First try with the exact version, then fall back to a more general approach
-          const versionedPackage = `${vuln.packageName}=${vuln.fixedVersion}`;
-          commands.push(`chroot $mountpoint apt-get install -y ${versionedPackage} || chroot $mountpoint apt-get install -y --only-upgrade ${vuln.packageName}=${vuln.fixedVersion}* || chroot $mountpoint apt-get install -y --only-upgrade ${vuln.packageName}`);
+
+          // For selective patching, try to install specific version first
+          // For full patching or if specific version fails, upgrade to latest
+          if (vuln.fixedVersion && vuln.fixedVersion !== 'unknown') {
+            // Try multiple approaches to install the right version
+            // 1. Try exact version
+            // 2. Try version with wildcard
+            // 3. Fall back to latest available version
+            const versionedPackage = `${vuln.packageName}=${vuln.fixedVersion}`;
+            const wildcardPackage = `${vuln.packageName}=${vuln.fixedVersion}*`;
+
+            // Build a command that tries multiple approaches
+            const installCmd = [
+              `chroot $mountpoint apt-get install -y --allow-downgrades ${versionedPackage}`,
+              `chroot $mountpoint apt-get install -y --allow-downgrades ${wildcardPackage}`,
+              `chroot $mountpoint apt-get install -y --only-upgrade ${vuln.packageName}`
+            ].join(' || ');
+
+            commands.push(installCmd);
+          } else {
+            // No specific version, just upgrade
+            commands.push(`chroot $mountpoint apt-get install -y --only-upgrade ${vuln.packageName}`);
+          }
         }
 
         // Clean apt cache
