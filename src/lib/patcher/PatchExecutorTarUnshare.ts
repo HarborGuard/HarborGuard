@@ -364,6 +364,14 @@ export class PatchExecutorTarUnshare {
 
     for (const [packageManager, vulns] of grouped) {
       if (packageManager === 'apt') {
+        // Check if this is an old Debian version that needs archive repositories
+        // Debian 9 (Stretch) and older are EOL and need archive.debian.org
+        commands.push('chroot $mountpoint bash -c "if [ -f /etc/debian_version ]; then echo Debian version: $(cat /etc/debian_version); fi"');
+
+        // Update sources.list for archived Debian versions if needed (single line command)
+        // Debian 9 (stretch), 8 (jessie), 7 (wheezy) are all EOL and need archive.debian.org
+        commands.push('chroot $mountpoint bash -c "if [ -f /etc/apt/sources.list ] && grep -qE \'(stretch|jessie|wheezy)\' /etc/apt/sources.list; then echo Detected EOL Debian version - updating to archive repositories; sed -i s,deb.debian.org,archive.debian.org,g /etc/apt/sources.list; sed -i s,security.debian.org,archive.debian.org,g /etc/apt/sources.list; sed -i \'/-updates/d\' /etc/apt/sources.list; echo Updated sources.list to use archive.debian.org; fi"');
+
         // First ensure gpg and apt-utils are available
         // Break down into simpler commands to avoid quote issues
         commands.push('chroot $mountpoint which gpgv || chroot $mountpoint apt-get update');
