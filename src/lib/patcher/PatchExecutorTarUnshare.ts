@@ -361,34 +361,34 @@ export class PatchExecutorTarUnshare {
         // Update package lists
         commands.push('chroot $mountpoint apt-get update');
 
-        // Install fixed versions - handle both selective and full patching
+        // Install fixed versions - simpler approach for better reliability
         // Process each package individually for better error handling
         logger.info(`  Generating APT commands for ${vulns.length} packages:`);
+
+        // Group packages by name to handle multiple CVEs for same package
+        const packageMap = new Map<string, string>();
         for (const vuln of vulns) {
-          logger.info(`    - ${vuln.packageName}: ${vuln.currentVersion} → ${vuln.fixedVersion}`);
-
-          // For selective patching, try to install specific version first
-          // For full patching or if specific version fails, upgrade to latest
-          if (vuln.fixedVersion && vuln.fixedVersion !== 'unknown') {
-            // Try multiple approaches to install the right version
-            // 1. Try exact version
-            // 2. Try version with wildcard
-            // 3. Fall back to latest available version
-            const versionedPackage = `${vuln.packageName}=${vuln.fixedVersion}`;
-            const wildcardPackage = `${vuln.packageName}=${vuln.fixedVersion}*`;
-
-            // Build a command that tries multiple approaches
-            const installCmd = [
-              `chroot $mountpoint apt-get install -y --allow-downgrades ${versionedPackage}`,
-              `chroot $mountpoint apt-get install -y --allow-downgrades ${wildcardPackage}`,
-              `chroot $mountpoint apt-get install -y --only-upgrade ${vuln.packageName}`
-            ].join(' || ');
-
-            commands.push(installCmd);
-          } else {
-            // No specific version, just upgrade
-            commands.push(`chroot $mountpoint apt-get install -y --only-upgrade ${vuln.packageName}`);
+          // Use the latest (highest) fixed version if multiple CVEs affect same package
+          if (!packageMap.has(vuln.packageName) ||
+              (vuln.fixedVersion && vuln.fixedVersion > (packageMap.get(vuln.packageName) || ''))) {
+            packageMap.set(vuln.packageName, vuln.fixedVersion);
+            logger.info(`    - ${vuln.packageName}: ${vuln.currentVersion} → ${vuln.fixedVersion}`);
           }
+        }
+
+        // For old Debian versions, we need to be more careful about package availability
+        // Simply upgrade all affected packages to their latest available versions
+        const packages = Array.from(packageMap.keys());
+
+        if (packages.length > 0) {
+          // Install all packages in one command for better dependency resolution
+          const packageList = packages.join(' ');
+
+          // Use dist-upgrade for better dependency handling
+          commands.push(`chroot $mountpoint apt-get dist-upgrade -y ${packageList}`);
+
+          // Also try regular upgrade as fallback
+          commands.push(`chroot $mountpoint apt-get upgrade -y ${packageList}`);
         }
 
         // Clean apt cache
