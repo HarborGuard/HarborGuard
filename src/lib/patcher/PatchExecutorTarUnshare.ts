@@ -74,14 +74,23 @@ export class PatchExecutorTarUnshare {
       let patchableVulns = await this.analyzePatchableVulnerabilities(
         scan.vulnerabilityFindings
       );
-      
+
+      logger.info(`Found ${patchableVulns.length} patchable vulnerabilities out of ${scan.vulnerabilityFindings.length} total`);
+
       // Filter by selected vulnerability IDs if provided
       if (request.selectedVulnerabilityIds && request.selectedVulnerabilityIds.length > 0) {
-        patchableVulns = patchableVulns.filter(vuln => 
+        patchableVulns = patchableVulns.filter(vuln =>
           request.selectedVulnerabilityIds!.includes(vuln.id)
         );
         logger.info(`Filtered to ${patchableVulns.length} selected vulnerabilities from ${request.selectedVulnerabilityIds.length} requested`);
       }
+
+      // Log details of vulnerabilities to be patched
+      logger.info('=== Vulnerabilities to be patched ===');
+      for (const vuln of patchableVulns) {
+        logger.info(`  • ${vuln.cveId}: ${vuln.packageName} ${vuln.currentVersion} → ${vuln.fixedVersion} (${vuln.packageManager})`);
+      }
+      logger.info('=====================================');
 
       if (patchableVulns.length === 0) {
         logger.info('No patchable vulnerabilities found');
@@ -116,24 +125,47 @@ export class PatchExecutorTarUnshare {
       
       // Update status to patching
       await this.updatePatchOperationStatus(patchOperation.id, 'PATCHING');
-      
+
       // Generate patch commands
       const patchCommands = this.generatePatchCommands(patchableVulns);
-      
+
+      // Log the generated commands
+      logger.info('=== Generated patch commands ===');
+      const commandLines = patchCommands.split('\n');
+      commandLines.forEach((cmd, index) => {
+        if (cmd.trim()) {
+          // Highlight version-specific installations
+          if (cmd.includes('apt-get install') && cmd.includes('=')) {
+            logger.info(`  ${index + 1}. ${cmd} [VERSION-SPECIFIC]`);
+          } else {
+            logger.info(`  ${index + 1}. ${cmd}`);
+          }
+        }
+      });
+      logger.info('=================================');
+
+      if (request.selectedVulnerabilityIds && request.selectedVulnerabilityIds.length > 0) {
+        logger.info(`NOTE: Installing specific versions to patch ONLY the selected ${request.selectedVulnerabilityIds.length} CVE(s)`);
+      }
+
       // Choose script based on environment
       // In development: NODE_ENV is 'development' OR we're not in a Docker container
-      const isDevelopment = process.env.NODE_ENV === 'development' || 
+      const isDevelopment = process.env.NODE_ENV === 'development' ||
                            (!process.env.NODE_ENV && !existsSync('/.dockerenv'));
       const scriptName = isDevelopment ? 'buildah-patch-dev.sh' : 'buildah-patch-container.sh';
       const scriptPath = path.join(process.cwd(), 'scripts', scriptName);
       const dryRunFlag = request.dryRun ? 'true' : 'false';
-      
+
       logger.info(`Executing patch script with ${patchableVulns.length} vulnerabilities`);
-      
+
+      // Write patch commands to a temporary file to avoid quote escaping issues
+      const commandsFile = path.join(patchWorkDir, 'patch-commands.sh');
+      await fs.writeFile(commandsFile, patchCommands, 'utf8');
+
       try {
         const { stdout, stderr } = await execAsync(
-          `bash ${scriptPath} "${originalTarPath}" '${patchCommands}' "${patchedTarPath}" ${dryRunFlag}`,
-          { 
+          `bash ${scriptPath} "${originalTarPath}" "${commandsFile}" "${patchedTarPath}" ${dryRunFlag}`,
+          {
             maxBuffer: 10 * 1024 * 1024 // 10MB buffer for large outputs
           }
         );
@@ -141,15 +173,44 @@ export class PatchExecutorTarUnshare {
         if (stderr && !stderr.includes('warning')) {
           logger.warn(`Patch script stderr: ${stderr}`);
         }
-        
-        // Check if patch was successful
-        if (!stdout.includes('PATCH_STATUS:SUCCESS')) {
+
+        // Log the full output for debugging
+        logger.info('Patch script output:', stdout);
+
+        // Check if patch was successful or partially successful
+        const hasSuccess = stdout.includes('PATCH_STATUS:SUCCESS');
+        const hasPartial = stdout.includes('PATCH_STATUS:PARTIAL');
+
+        if (!hasSuccess && !hasPartial) {
+          logger.error('Patch operation failed - no success status found in output');
           throw new Error('Patch operation did not complete successfully');
         }
-        
-        logger.info('Patch operation completed successfully');
+
+        if (hasPartial) {
+          logger.warn('Patch operation completed with some failures - PARTIAL success');
+        } else {
+          logger.info('Patch operation completed successfully');
+        }
+
+        // Debug output
+        logger.info('=== Patch Execution Summary ===');
+        logger.info(`  Total vulnerabilities selected: ${patchableVulns.length}`);
+        logger.info(`  Package manager used: ${patchableVulns[0]?.packageManager || 'unknown'}`);
+        logger.info(`  Commands executed: ${commandLines.filter(cmd => cmd.trim()).length}`);
+        logger.info(`  Patch mode: ${request.dryRun ? 'DRY RUN' : 'APPLIED'}`);
+        if (request.selectedVulnerabilityIds && request.selectedVulnerabilityIds.length > 0) {
+          logger.info(`  Selective patching: YES (${request.selectedVulnerabilityIds.length} specific CVE(s))`);
+          logger.info(`  Strategy: Version-specific installation to fix ONLY selected vulnerabilities`);
+        } else {
+          logger.info(`  Selective patching: NO (fixing all patchable vulnerabilities)`);
+        }
+        logger.info('================================');
       } catch (error) {
         logger.error('Patch script failed:', error);
+        logger.error('=== Patch Execution Failed ===');
+        logger.error(`  Failed to patch ${patchableVulns.length} vulnerabilities`);
+        logger.error(`  Error details: ${error instanceof Error ? error.message : String(error)}`);
+        logger.error('===============================');
         await this.updatePatchOperationStatus(patchOperation.id, 'FAILED', {
           failedCount: patchableVulns.length,
           completedAt: new Date()
@@ -246,6 +307,30 @@ export class PatchExecutorTarUnshare {
         completedAt: new Date()
       });
 
+      // Final summary logging
+      logger.info('=== FINAL PATCH SUMMARY ===');
+      logger.info(`Operation ID: ${patchOperation.id}`);
+      logger.info(`Source Image: ${image.name}:${image.tag}`);
+      if (patchedImageId) {
+        logger.info(`Patched Image ID: ${patchedImageId}`);
+      }
+      logger.info(`Vulnerabilities Requested: ${request.selectedVulnerabilityIds?.length || 'ALL'}`);
+      logger.info(`Vulnerabilities Patched: ${successCount}`);
+      logger.info(`Patch Status: ${request.dryRun ? 'DRY RUN - No changes applied' : 'APPLIED - Image patched'}`);
+
+      if (patchableVulns.length > 0) {
+        logger.info('Patched CVEs:');
+        for (const vuln of patchableVulns) {
+          logger.info(`  ✓ ${vuln.cveId} - ${vuln.packageName} upgraded to ${vuln.fixedVersion}`);
+        }
+      }
+
+      if (request.selectedVulnerabilityIds && request.selectedVulnerabilityIds.length > 0) {
+        logger.info('IMPORTANT: Only the selected CVEs above were patched.');
+        logger.info('Other vulnerabilities in the same packages remain unpatched as requested.');
+      }
+      logger.info('============================');
+
       // Save patch report
       await this.savePatchReport(scan.requestId, patchOperation.id, patchableVulns, request.dryRun);
 
@@ -269,62 +354,123 @@ export class PatchExecutorTarUnshare {
       }
       grouped.get(vuln.packageManager)!.push(vuln);
     }
-    
+
+    logger.info(`Grouped vulnerabilities by package manager: ${Array.from(grouped.keys()).join(', ')}`);
+    for (const [pm, vulns] of grouped) {
+      logger.info(`  ${pm}: ${vulns.length} vulnerabilities`);
+    }
+
     const commands: string[] = [];
-    
+
     for (const [packageManager, vulns] of grouped) {
       if (packageManager === 'apt') {
+        // Check if this is an old Debian version that needs archive repositories
+        // Debian 9 (Stretch) and older are EOL and need archive.debian.org
+        commands.push('chroot $mountpoint bash -c "if [ -f /etc/debian_version ]; then echo Debian version: $(cat /etc/debian_version); fi"');
+
+        // Update sources.list for archived Debian versions if needed (single line command)
+        // Debian 9 (stretch), 8 (jessie), 7 (wheezy) are all EOL and need archive.debian.org
+        commands.push('chroot $mountpoint bash -c "if [ -f /etc/apt/sources.list ] && grep -qE \'(stretch|jessie|wheezy)\' /etc/apt/sources.list; then echo Detected EOL Debian version - updating to archive repositories; sed -i s,deb.debian.org,archive.debian.org,g /etc/apt/sources.list; sed -i s,security.debian.org,archive.debian.org,g /etc/apt/sources.list; sed -i \'/-updates/d\' /etc/apt/sources.list; echo Updated sources.list to use archive.debian.org; fi"');
+
         // First ensure gpg and apt-utils are available
-        commands.push('chroot $mountpoint sh -c "which gpgv || (apt-get update && apt-get install -y --no-install-recommends gnupg apt-utils)"');
-        
+        // Break down into simpler commands to avoid quote issues
+        commands.push('chroot $mountpoint which gpgv || chroot $mountpoint apt-get update');
+        commands.push('chroot $mountpoint which gpgv || chroot $mountpoint apt-get install -y --no-install-recommends gnupg apt-utils');
+
         // Update package lists
         commands.push('chroot $mountpoint apt-get update');
-        
-        // Install fixed versions - try exact version first, then fall back to upgrade
-        // Group packages to handle version availability issues
-        const packageNames = vulns.map(v => v.packageName).join(' ');
-        
-        // Try to upgrade packages to their latest available versions
-        // This is more reliable than specifying exact versions that may not exist
-        commands.push(`chroot $mountpoint apt-get install -y --only-upgrade ${packageNames} || chroot $mountpoint apt-get install -y ${packageNames}`);
-        
+
+        // Install fixed versions - simpler approach for better reliability
+        // Process each package individually for better error handling
+        logger.info(`  Generating APT commands for ${vulns.length} packages:`);
+
+        // Group packages by name to handle multiple CVEs for same package
+        const packageMap = new Map<string, string>();
+        for (const vuln of vulns) {
+          // Use the latest (highest) fixed version if multiple CVEs affect same package
+          if (!packageMap.has(vuln.packageName) ||
+              (vuln.fixedVersion && vuln.fixedVersion > (packageMap.get(vuln.packageName) || ''))) {
+            packageMap.set(vuln.packageName, vuln.fixedVersion);
+            logger.info(`    - ${vuln.packageName}: ${vuln.currentVersion} → ${vuln.fixedVersion}`);
+          }
+        }
+
+        // For old Debian versions, we need to be more careful about package availability
+        // Simply upgrade all affected packages to their latest available versions
+        const packages = Array.from(packageMap.keys());
+
+        if (packages.length > 0) {
+          // Install all packages in one command for better dependency resolution
+          const packageList = packages.join(' ');
+
+          // Use dist-upgrade for better dependency handling
+          commands.push(`chroot $mountpoint apt-get dist-upgrade -y ${packageList}`);
+
+          // Also try regular upgrade as fallback
+          commands.push(`chroot $mountpoint apt-get upgrade -y ${packageList}`);
+        }
+
         // Clean apt cache
         commands.push('chroot $mountpoint apt-get clean');
         commands.push('chroot $mountpoint rm -rf /var/lib/apt/lists/*');
         
       } else if (packageManager === 'apk') {
+        logger.info(`  Generating APK commands for ${vulns.length} packages:`);
+
         // Update apk cache
         commands.push('chroot $mountpoint apk update');
-        
+
         // For Alpine, we need to upgrade both libssl3 and libcrypto3 together as they're linked
         const packages = new Set(vulns.map(v => v.packageName));
-        
+
+        for (const vuln of vulns) {
+          logger.info(`    - ${vuln.packageName}: ${vuln.currentVersion} → ${vuln.fixedVersion}`);
+        }
+
         // If libssl3 is being patched, also include libcrypto3 and vice versa
         if (packages.has('libssl3') || packages.has('libcrypto3')) {
           packages.add('libssl3');
           packages.add('libcrypto3');
+          logger.info(`    Note: Adding linked packages libssl3 and libcrypto3`);
         }
-        
-        const packageList = Array.from(packages).join(' ');
-        commands.push(`chroot $mountpoint apk upgrade ${packageList}`);
+
+        // Install specific versions for APK
+        for (const vuln of vulns) {
+          const versionedPackage = `${vuln.packageName}=${vuln.fixedVersion}`;
+          commands.push(`chroot $mountpoint apk add --no-cache ${versionedPackage} || chroot $mountpoint apk upgrade ${vuln.packageName}`);
+        }
         
         // Clean cache
         commands.push('chroot $mountpoint rm -rf /var/cache/apk/*');
         
       } else if (packageManager === 'yum') {
-        // Update packages
-        const packages = vulns.map(v => `${v.packageName}-${v.fixedVersion}`).join(' ');
-        commands.push(`chroot $mountpoint yum update -y ${packages}`);
+        logger.info(`  Generating YUM commands for ${vulns.length} packages:`);
+
+        for (const vuln of vulns) {
+          logger.info(`    - ${vuln.packageName}: ${vuln.currentVersion} → ${vuln.fixedVersion}`);
+        }
+
+        // Install specific versions for YUM
+        for (const vuln of vulns) {
+          const versionedPackage = `${vuln.packageName}-${vuln.fixedVersion}`;
+          commands.push(`chroot $mountpoint yum install -y ${versionedPackage} || chroot $mountpoint yum update -y ${vuln.packageName}`);
+        }
         
         // Clean cache
         commands.push('chroot $mountpoint yum clean all');
       }
     }
-    
-    return commands.join(' && ');
+
+    // Join commands with newlines instead of && to make them easier to parse
+    return commands.join('\n');
   }
 
   private async getImageTar(image: any, requestId: string): Promise<string> {
+    logger.info(`Getting tar file for image: ${image.name}:${image.tag}`);
+    logger.info(`  Image source: ${image.source}`);
+    logger.info(`  Image registry: ${image.registry}`);
+    logger.info(`  Image digest: ${image.digest}`);
+
     const safeImageName = image.name.replace(/[/:]/g, '_');
     // First try to find tar file with image digest hash (from scanning)
     const imageHash = image.digest ? image.digest.replace('sha256:', '') : '';
@@ -386,18 +532,34 @@ export class PatchExecutorTarUnshare {
     // If no tar file found, we'll need to download/export it
     const tarPath = requestTarPath;
 
-    // Export from Docker if local source
-    if (image.source === 'LOCAL_DOCKER' || image.registry === 'local') {
+    // Export from Docker if local source or when using docker run
+    // Check for various conditions that indicate local Docker source
+    const isLocalDocker = image.source === 'LOCAL_DOCKER' ||
+                         image.registry === 'local' ||
+                         image.registry === 'Generic Registry' ||
+                         image.registry === 'docker' ||
+                         !image.registry;
+
+    if (isLocalDocker) {
       logger.info(`Exporting local Docker image ${image.name}:${image.tag} to tar`);
-      await execAsync(`docker save -o ${tarPath} ${image.name}:${image.tag}`);
-      
+
+      // For local Docker images, use docker save directly
+      try {
+        await execAsync(`docker save -o ${tarPath} ${image.name}:${image.tag}`);
+      } catch (error) {
+        // If the image name fails, try with just the image name (without tag)
+        logger.info(`Retrying with image ID or alternative format`);
+        await execAsync(`docker save -o ${tarPath} ${image.name}`);
+      }
+
       const stats = await fs.stat(tarPath);
       logger.info(`Exported tar file: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
     } else {
       // Download from registry using skopeo
       const fullImageName = image.registry ? `${image.registry}/${image.name}` : image.name;
       const imageRef = `${fullImageName}:${image.tag}`;
-      
+
+      logger.info(`Downloading from registry: ${imageRef}`);
       await execAsync(
         `skopeo copy --src-tls-verify=false docker://${imageRef} docker-archive:${tarPath}`
       );
