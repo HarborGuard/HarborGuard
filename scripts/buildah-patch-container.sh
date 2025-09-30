@@ -104,23 +104,40 @@ if [ "$DRY_RUN" = "false" ]; then
 
   # Execute each command from the file line by line
   cmd_count=0
+  failed_count=0
   while IFS= read -r cmd || [ -n "$cmd" ]; do
     if [ -n "$cmd" ]; then
       cmd_count=$((cmd_count + 1))
       # Replace mountpoint placeholder
       actual_cmd="${cmd//\$mountpoint/$mountpoint}"
       echo "[$cmd_count] Executing: $actual_cmd"
-      eval "$actual_cmd" && echo "[$cmd_count] Success" || {
-        echo "[$cmd_count] Warning: Command failed, continuing"
-      }
+
+      # Execute and capture both stdout and stderr
+      if eval "$actual_cmd" 2>&1; then
+        echo "[$cmd_count] Success"
+      else
+        echo "[$cmd_count] Failed with exit code: $?"
+        failed_count=$((failed_count + 1))
+        # For package install commands, this is critical
+        if [[ "$actual_cmd" == *"apt-get"* ]] || [[ "$actual_cmd" == *"apk"* ]] || [[ "$actual_cmd" == *"yum"* ]]; then
+          echo "[$cmd_count] ERROR: Package installation failed - this is a critical error"
+        fi
+      fi
     fi
   done < "$COMMANDS_FILE"
 
   echo "=== DEBUG: Execution complete ==="
   echo "  Total commands executed: $cmd_count"
+  echo "  Failed commands: $failed_count"
   echo "================================="
 
-  echo "PATCH_STATUS:SUCCESS"
+  # Report success only if no critical failures
+  if [ $failed_count -gt 0 ]; then
+    echo "WARNING: $failed_count commands failed during patching"
+    echo "PATCH_STATUS:PARTIAL"
+  else
+    echo "PATCH_STATUS:SUCCESS"
+  fi
 else
   echo "DRY RUN - Would execute:"
   while IFS= read -r cmd || [ -n "$cmd" ]; do
