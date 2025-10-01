@@ -11,6 +11,7 @@ import * as React from "react";
 import { useScans } from "@/hooks/useScans";
 import { useApp } from "@/contexts/AppContext";
 import { FullPageLoading } from "@/components/ui/loading";
+import { Button } from "@/components/ui/button";
 
 export default function ImageRepositoryPage() {
   const { scans, loading } = useScans();
@@ -21,6 +22,8 @@ export default function ImageRepositoryPage() {
   // State for dialogs
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [imageToDelete, setImageToDelete] = React.useState<string>("");
+  const [selectedImages, setSelectedImages] = React.useState<any[]>([]);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = React.useState(false);
 
   if (loading) {
     return (
@@ -34,7 +37,22 @@ export default function ImageRepositoryPage() {
   return (
     <div className="flex flex-1 flex-col">
       <div className="@container/main flex flex-1 flex-col gap-2 overflow-auto">
-        <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+        <div className="flex flex-col gap-4 p-4 lg:p-6 md:gap-6">
+          {selectedImages.length > 0 && (
+            <div className="flex items-center justify-between bg-muted/50 rounded-lg p-4">
+              <span className="text-sm font-medium">
+                {selectedImages.length} {selectedImages.length === 1 ? 'image' : 'images'} selected
+              </span>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setBulkDeleteDialogOpen(true)}
+              >
+                <IconTrash className="mr-2 h-4 w-4" />
+                Delete Selected
+              </Button>
+            </div>
+          )}
           <UnifiedTable
             data={processScansForTable(scans)}
             columns={getTableColumns()}
@@ -42,7 +60,7 @@ export default function ImageRepositoryPage() {
               sorting: true,
               filtering: true,
               pagination: 'server',
-              selection: false,
+              selection: true,
               columnVisibility: true,
               contextMenu: true,
               search: true,
@@ -55,6 +73,7 @@ export default function ImageRepositoryPage() {
               onPageChange: setPage,
             }}
             onRowClick={handleRowClick}
+            onSelectionChange={setSelectedImages}
             contextMenuItems={getContextMenuItems}
             className="bg-card rounded-lg border shadow-xs p-6"
           />
@@ -65,6 +84,13 @@ export default function ImageRepositoryPage() {
             onOpenChange={setDeleteDialogOpen}
             imageName={imageToDelete}
             onConfirm={handleDeleteConfirm}
+          />
+
+          <DeleteImageDialog
+            open={bulkDeleteDialogOpen}
+            onOpenChange={setBulkDeleteDialogOpen}
+            imageName={`${selectedImages.length} selected images`}
+            onConfirm={handleBulkDeleteConfirm}
           />
 
         </div>
@@ -286,6 +312,49 @@ export default function ImageRepositoryPage() {
     } catch (error) {
       toast.dismiss(loadingToastId)
       toast.error('Failed to delete image')
+    }
+  }
+
+  async function handleBulkDeleteConfirm() {
+    const loadingToastId = toast.loading(`Deleting ${selectedImages.length} images...`)
+    let successCount = 0
+    let failureCount = 0
+
+    try {
+      // Delete images in parallel with Promise.allSettled
+      const deletePromises = selectedImages.map(async (image) => {
+        try {
+          const response = await fetch(`/api/images/name/${encodeURIComponent(image.imageName)}`, {
+            method: 'DELETE',
+          })
+          if (response.ok) {
+            successCount++
+          } else {
+            failureCount++
+          }
+        } catch (error) {
+          failureCount++
+        }
+      })
+
+      await Promise.allSettled(deletePromises)
+
+      toast.dismiss(loadingToastId)
+
+      if (failureCount === 0) {
+        toast.success(`Successfully deleted ${successCount} images`)
+      } else if (successCount > 0) {
+        toast.warning(`Deleted ${successCount} images, ${failureCount} failed`)
+      } else {
+        toast.error(`Failed to delete all selected images`)
+      }
+
+      // Clear selection and reload
+      setSelectedImages([])
+      window.location.reload()
+    } catch (error) {
+      toast.dismiss(loadingToastId)
+      toast.error('Failed to delete images')
     }
   }
 }
