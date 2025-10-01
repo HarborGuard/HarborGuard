@@ -151,25 +151,26 @@ export default function ScheduledScansPage() {
       sortable: true,
       type: "custom",
       cellProps: {
-        render: (row: any) => (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="font-medium cursor-help">
-                  {row.name}
-                  {row.description && (
-                    <span className="ml-1 text-muted-foreground">ⓘ</span>
-                  )}
-                </div>
-              </TooltipTrigger>
-              {row.description && (
-                <TooltipContent className="max-w-sm">
-                  <p>{row.description}</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-          </TooltipProvider>
-        ),
+        render: (row: any) => {
+          if (row.description) {
+            return (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="font-medium cursor-help flex items-center gap-1">
+                      <span>{row.name}</span>
+                      <span className="text-muted-foreground">ⓘ</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-sm">
+                    <p>{row.description}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            );
+          }
+          return <div className="font-medium">{row.name}</div>;
+        },
       },
     },
     {
