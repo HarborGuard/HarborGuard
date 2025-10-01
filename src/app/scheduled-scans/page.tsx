@@ -18,6 +18,12 @@ import { FullPageLoading } from "@/components/ui/loading";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -143,24 +149,40 @@ export default function ScheduledScansPage() {
       key: "name",
       header: "Name",
       sortable: true,
-      type: "text",
+      type: "custom",
       cellProps: {
-        className: "font-medium",
+        render: (row: any) => (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="font-medium cursor-help">
+                  {row.name}
+                  {row.description && (
+                    <span className="ml-1 text-muted-foreground">ⓘ</span>
+                  )}
+                </div>
+              </TooltipTrigger>
+              {row.description && (
+                <TooltipContent className="max-w-sm">
+                  <p>{row.description}</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+        ),
       },
-    },
-    {
-      key: "description",
-      header: "Description",
-      type: "text",
     },
     {
       key: "enabled",
       header: "Status",
       sortable: true,
-      type: "badge",
+      type: "custom",
       cellProps: {
-        variant: (row: any) => (row.enabled ? "default" : "secondary"),
-        label: (row: any) => (row.enabled ? "Enabled" : "Disabled"),
+        render: (row: any) => (
+          <Badge variant={row.enabled ? "default" : "secondary"}>
+            {row.enabled ? "Enabled" : "Disabled"}
+          </Badge>
+        ),
       },
     },
     {
