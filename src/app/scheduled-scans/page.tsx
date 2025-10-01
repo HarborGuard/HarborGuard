@@ -220,37 +220,53 @@ export default function ScheduledScansPage() {
     {
       key: "actions",
       header: "Actions",
-      type: "actions",
+      type: "custom",
       cellProps: {
-        actions: (row: any) => [
-          {
-            label: "Execute Now",
-            icon: IconPlayerPlay,
-            onClick: () => handleExecuteScan(row),
-            disabled: !row.enabled,
-          },
-          {
-            label: "View History",
-            icon: IconHistory,
-            onClick: () => router.push(`/scheduled-scans/${row.id}/history`),
-          },
-          {
-            label: "Edit",
-            icon: IconEdit,
-            onClick: () => setEditingScan(row),
-          },
-          {
-            label: row.enabled ? "Disable" : "Enable",
-            icon: IconCalendarEvent,
-            onClick: () => handleToggleEnabled(row),
-          },
-          {
-            label: "Delete",
-            icon: IconTrash,
-            onClick: () => handleDeleteScan(row),
-            variant: "destructive",
-          },
-        ],
+        render: (row: any) => (
+          <div className="flex gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleExecuteScan(row);
+              }}
+              disabled={!row.enabled}
+            >
+              <IconPlayerPlay className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/scheduled-scans/${row.id}/history`);
+              }}
+            >
+              <IconHistory className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditingScan(row);
+              }}
+            >
+              <IconEdit className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteScan(row);
+              }}
+            >
+              <IconTrash className="h-4 w-4" />
+            </Button>
+          </div>
+        ),
       },
     },
   ];
