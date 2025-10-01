@@ -174,13 +174,16 @@ export default function ScheduledScansPage() {
       },
     },
     {
-      key: "enabled",
+      key: "status",
       header: "Status",
       sortable: true,
       type: "custom",
       cellProps: {
         render: (row: any) => (
-          <Badge variant={row.enabled ? "default" : "secondary"}>
+          <Badge
+            variant={row.enabled ? "default" : "secondary"}
+            className={row.enabled ? "bg-green-500 hover:bg-green-600" : ""}
+          >
             {row.enabled ? "Enabled" : "Disabled"}
           </Badge>
         ),
