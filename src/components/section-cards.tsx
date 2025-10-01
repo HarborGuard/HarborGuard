@@ -1,14 +1,14 @@
-import { 
-  IconTrendingDown, 
-  IconTrendingUp, 
+import {
+  IconTrendingDown,
+  IconTrendingUp,
   IconShield,
   IconAlertTriangle,
   IconEye,
-  IconChecks
-} from "@tabler/icons-react"
+  IconChecks,
+} from "@tabler/icons-react";
 
-import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Card,
   CardAction,
@@ -16,74 +16,88 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/ui/card";
 
 interface SectionCardsProps {
-  loading?: boolean
+  loading?: boolean;
   scanData: Array<{
-    id: number
-    riskScore: number
+    id: number;
+    riskScore: number;
     severities: {
-      crit: number
-      high: number
-      med: number
-      low: number
-    }
-    status: string
-    misconfigs: number
-    secrets: number
-    policy?: string
-    osvPackages?: number
-    osvVulnerable?: number
-    osvEcosystems?: string[]
-  }>
+      crit: number;
+      high: number;
+      med: number;
+      low: number;
+    };
+    status: string;
+    misconfigs: number;
+    secrets: number;
+    policy?: string;
+    osvPackages?: number;
+    osvVulnerable?: number;
+    osvEcosystems?: string[];
+  }>;
   stats: {
-    totalScans: number
-    uniqueImageTags?: number
-    uniqueImages?: number
+    totalScans: number;
+    uniqueImageTags?: number;
+    uniqueImages?: number;
     vulnerabilities: {
-      critical: number
-      high: number
-      medium: number
-      low: number
-      total: number
-    }
-    avgRiskScore: number
-    blockedScans: number
-    completeScans: number
-    completionRate: number
-  }
+      critical: number;
+      high: number;
+      medium: number;
+      low: number;
+      total: number;
+    };
+    avgRiskScore: number;
+    blockedScans: number;
+    completeScans: number;
+    completionRate: number;
+  };
 }
 
-export function SectionCards({ loading = false, scanData, stats }: SectionCardsProps) {
+export function SectionCards({
+  loading = false,
+  scanData,
+  stats,
+}: SectionCardsProps) {
   // Use unique image:tag count for "Images Scanned"
-  const totalImages = stats.uniqueImageTags || stats.totalScans
-  const completedScans = stats.completeScans
-  const totalScans = stats.totalScans
-  const averageRiskScore = stats.avgRiskScore
-  
+  const totalImages = stats.uniqueImageTags || stats.totalScans;
+  const completedScans = stats.completeScans;
+  const totalScans = stats.totalScans;
+  const averageRiskScore = stats.avgRiskScore;
+
   // Use unique vulnerability counts from stats (already deduplicated per image)
-  const totalCriticalVulns = stats.vulnerabilities.critical
-  const totalHighVulns = stats.vulnerabilities.high
-  const totalVulns = stats.vulnerabilities.total
-  
-  
-  const totalMisconfigs = scanData.reduce((sum, item) => sum + item.misconfigs, 0)
-  const totalSecrets = scanData.reduce((sum, item) => sum + item.secrets, 0)
-  
+  const totalCriticalVulns = stats.vulnerabilities.critical;
+  const totalHighVulns = stats.vulnerabilities.high;
+  const totalVulns = stats.vulnerabilities.total;
+
+  const totalMisconfigs = scanData.reduce(
+    (sum, item) => sum + item.misconfigs,
+    0
+  );
+  const totalSecrets = scanData.reduce((sum, item) => sum + item.secrets, 0);
+
   // OSV metrics
-  const totalOSVPackages = scanData.reduce((sum, item) => sum + (item.osvPackages || 0), 0)
-  const totalOSVVulnerable = scanData.reduce((sum, item) => sum + (item.osvVulnerable || 0), 0)
-  const uniqueEcosystems = new Set(scanData.flatMap(item => item.osvEcosystems || [])).size
-  
-  
-  const riskTrend = averageRiskScore > 50 ? "high" : averageRiskScore > 30 ? "medium" : "low"
-  const criticalTrend = totalCriticalVulns > 5 ? "up" : "down"
+  const totalOSVPackages = scanData.reduce(
+    (sum, item) => sum + (item.osvPackages || 0),
+    0
+  );
+  const totalOSVVulnerable = scanData.reduce(
+    (sum, item) => sum + (item.osvVulnerable || 0),
+    0
+  );
+  const uniqueEcosystems = new Set(
+    scanData.flatMap((item) => item.osvEcosystems || [])
+  ).size;
+
+  const riskTrend =
+    averageRiskScore > 50 ? "high" : averageRiskScore > 30 ? "medium" : "low";
+  const criticalTrend = totalCriticalVulns > 5 ? "up" : "down";
 
   // Loading state - show skeleton cards matching the actual card design
   if (loading) {
     return (
-      <div className="*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+      <div className="*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 *:data-[slot=card]:shadow-xs @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
         {/* Total Images Scanned Skeleton */}
         <Card className="@container/card">
           <CardHeader>
@@ -148,7 +162,7 @@ export function SectionCards({ loading = false, scanData, stats }: SectionCardsP
   }
 
   return (
-    <div className="*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+    <div className="*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 *:data-[slot=card]:shadow-xs @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
       <Card className="@container/card">
         <CardHeader>
           <CardDescription>Total Images Scanned</CardDescription>
@@ -164,14 +178,15 @@ export function SectionCards({ loading = false, scanData, stats }: SectionCardsP
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="line-clamp-1 flex gap-2 font-medium">
-            {completedScans} of {totalScans} scans completed <IconChecks className="size-4" />
+            {completedScans} of {totalScans} scans completed{" "}
+            <IconChecks className="size-4" />
           </div>
           <div className="text-muted-foreground">
             Active security monitoring
           </div>
         </CardFooter>
       </Card>
-      
+
       <Card className="@container/card">
         <CardHeader>
           <CardDescription>Average Risk Score</CardDescription>
@@ -179,22 +194,39 @@ export function SectionCards({ loading = false, scanData, stats }: SectionCardsP
             {averageRiskScore}
           </CardTitle>
           <CardAction>
-            <Badge variant={riskTrend === "high" ? "destructive" : riskTrend === "medium" ? "secondary" : "default"}>
+            <Badge
+              variant={
+                riskTrend === "high"
+                  ? "destructive"
+                  : riskTrend === "medium"
+                  ? "secondary"
+                  : "default"
+              }
+            >
               <IconShield />
-              {riskTrend === "high" ? "High Risk" : riskTrend === "medium" ? "Medium Risk" : "Low Risk"}
+              {riskTrend === "high"
+                ? "High Risk"
+                : riskTrend === "medium"
+                ? "Medium Risk"
+                : "Low Risk"}
             </Badge>
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="line-clamp-1 flex gap-2 font-medium">
-            {riskTrend === "high" ? "Requires attention" : riskTrend === "medium" ? "Monitor closely" : "Good security posture"} <IconShield className="size-4" />
+            {riskTrend === "high"
+              ? "Requires attention"
+              : riskTrend === "medium"
+              ? "Monitor closely"
+              : "Good security posture"}{" "}
+            <IconShield className="size-4" />
           </div>
           <div className="text-muted-foreground">
             Overall security risk assessment
           </div>
         </CardFooter>
       </Card>
-      
+
       <Card className="@container/card">
         <CardHeader>
           <CardDescription>Critical + High Vulnerabilities</CardDescription>
@@ -203,21 +235,28 @@ export function SectionCards({ loading = false, scanData, stats }: SectionCardsP
           </CardTitle>
           <CardAction>
             <Badge variant={totalCriticalVulns > 0 ? "destructive" : "outline"}>
-              {criticalTrend === "up" ? <IconTrendingUp /> : <IconTrendingDown />}
+              {criticalTrend === "up" ? (
+                <IconTrendingUp />
+              ) : (
+                <IconTrendingDown />
+              )}
               {totalCriticalVulns} Critical
             </Badge>
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="line-clamp-1 flex gap-2 font-medium">
-            {totalCriticalVulns > 0 ? "Immediate action needed" : "No critical issues"} <IconAlertTriangle className="size-4" />
+            {totalCriticalVulns > 0
+              ? "Immediate action needed"
+              : "No critical issues"}{" "}
+            <IconAlertTriangle className="size-4" />
           </div>
           <div className="text-muted-foreground">
             View details for breakdown
           </div>
         </CardFooter>
       </Card>
-      
+
       <Card className="@container/card">
         <CardHeader>
           <CardDescription>Security Issues</CardDescription>
@@ -233,13 +272,16 @@ export function SectionCards({ loading = false, scanData, stats }: SectionCardsP
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="line-clamp-1 flex gap-2 font-medium">
-            {totalMisconfigs} misconfigurations detected <IconAlertTriangle className="size-4" />
+            {totalMisconfigs} misconfigurations detected{" "}
+            <IconAlertTriangle className="size-4" />
           </div>
           <div className="text-muted-foreground">
-            {totalOSVPackages > 0 ? `${totalOSVVulnerable} of ${totalOSVPackages} packages vulnerable` : `View details for breakdown`}
+            {totalOSVPackages > 0
+              ? `${totalOSVVulnerable} of ${totalOSVPackages} packages vulnerable`
+              : `View details for breakdown`}
           </div>
         </CardFooter>
       </Card>
     </div>
-  )
+  );
 }

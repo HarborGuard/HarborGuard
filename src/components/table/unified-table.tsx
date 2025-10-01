@@ -118,6 +118,7 @@ export function UnifiedTable<T extends Record<string, any>>({
             type="checkbox"
             checked={table.getIsAllPageRowsSelected()}
             onChange={(e) => table.toggleAllPageRowsSelected(!!e.target.checked)}
+            onClick={(e) => e.stopPropagation()}
             aria-label="Select all"
           />
         ),
@@ -126,6 +127,7 @@ export function UnifiedTable<T extends Record<string, any>>({
             type="checkbox"
             checked={row.getIsSelected()}
             onChange={(e) => row.toggleSelected(!!e.target.checked)}
+            onClick={(e) => e.stopPropagation()}
             aria-label="Select row"
           />
         ),
