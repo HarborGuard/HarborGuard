@@ -174,7 +174,7 @@ export default function ScheduledScansPage() {
       },
     },
     {
-      key: "status",
+      key: "enabled",
       header: "Status",
       sortable: true,
       type: "custom",
