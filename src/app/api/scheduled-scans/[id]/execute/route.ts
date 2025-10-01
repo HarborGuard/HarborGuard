@@ -4,12 +4,14 @@ import { randomUUID } from 'crypto'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+
     // Get the scheduled scan
     const scheduledScan = await prisma.scheduledScan.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         selectedImages: {
           include: {
@@ -88,7 +90,7 @@ export async function POST(
     const executionId = randomUUID()
     const history = await prisma.scheduledScanHistory.create({
       data: {
-        scheduledScanId: params.id,
+        scheduledScanId: id,
         executionId,
         totalImages: imagesToScan.length,
         status: 'PENDING',
@@ -114,7 +116,7 @@ export async function POST(
 
     // Update last run time
     await prisma.scheduledScan.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         lastRunAt: new Date()
       }
