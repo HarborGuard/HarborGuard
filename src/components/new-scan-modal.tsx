@@ -132,11 +132,20 @@ export function NewScanModal({ children }: NewScanModalProps) {
     }
   }
 
-  const fetchRepositoryImages = async (repository: any) => {
+  const fetchRepositoryImages = async (repository: any, forceRefresh: boolean = false) => {
     setLoadingImages(prev => ({ ...prev, [repository.id]: true }))
 
     try {
-      const response = await fetch(`/api/repositories/${repository.id}/images`)
+      // Add cache-busting query parameter to force refresh when needed
+      const url = forceRefresh
+        ? `/api/repositories/${repository.id}/images?t=${Date.now()}`
+        : `/api/repositories/${repository.id}/images`
+
+      const response = await fetch(url, {
+        // Ensure browser doesn't cache the response
+        cache: forceRefresh ? 'no-cache' : 'default'
+      })
+
       if (response.ok) {
         const data = await response.json()
         setRepositoryImages(prev => ({ ...prev, [repository.id]: data }))
@@ -705,7 +714,7 @@ export function NewScanModal({ children }: NewScanModalProps) {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => fetchRepositoryImages(repo)}
+                                    onClick={() => fetchRepositoryImages(repo, true)}
                                   >
                                     Load Images
                                   </Button>
@@ -895,10 +904,10 @@ export function NewScanModal({ children }: NewScanModalProps) {
                                       <SelectValue placeholder="Select image" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {repositoryImages[repo.id].map((image: any) => {
+                                      {repositoryImages[repo.id].map((image: any, index: number) => {
                                         const displayName = image.fullName || image.name;
                                         return (
-                                          <SelectItem key={displayName} value={displayName}>
+                                          <SelectItem key={`${repo.id}-${index}-${displayName}`} value={displayName}>
                                             {displayName}
                                           </SelectItem>
                                         );
