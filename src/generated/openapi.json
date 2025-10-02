@@ -69,6 +69,10 @@
       "description": "Container scanning operations"
     },
     {
+      "name": "Scheduled Scans",
+      "description": "Scheduled Scans operations"
+    },
+    {
       "name": "Version",
       "description": "Version and build information"
     },
@@ -2211,6 +2215,219 @@
         "responses": {
           "200": {
             "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/scheduled-scans/{id}/execute": {
+      "post": {
+        "summary": "POST /api/scheduled-scans/{id}/execute",
+        "tags": [
+          "Scheduled Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ]
+      }
+    },
+    "/api/scheduled-scans/{id}": {
+      "get": {
+        "summary": "GET /api/scheduled-scans/{id}",
+        "tags": [
+          "Scheduled Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ]
+      },
+      "put": {
+        "summary": "PUT /api/scheduled-scans/{id}",
+        "tags": [
+          "Scheduled Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "name parameter"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "description parameter"
+                  },
+                  "schedule": {
+                    "type": "string",
+                    "description": "schedule parameter"
+                  },
+                  "enabled": {
+                    "type": "string",
+                    "description": "enabled parameter"
+                  },
+                  "imageSelectionMode": {
+                    "type": "string",
+                    "description": "imageSelectionMode parameter"
+                  },
+                  "imagePattern": {
+                    "type": "string",
+                    "description": "imagePattern parameter"
+                  },
+                  "selectedImageIds": {
+                    "type": "string",
+                    "description": "selectedImageIds parameter"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "DELETE /api/scheduled-scans/{id}",
+        "tags": [
+          "Scheduled Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id parameter"
+          }
+        ]
+      }
+    },
+    "/api/scheduled-scans/history": {
+      "get": {
+        "summary": "GET /api/scheduled-scans/history",
+        "tags": [
+          "Scheduled Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/scheduled-scans": {
+      "get": {
+        "summary": "GET /api/scheduled-scans",
+        "tags": [
+          "Scheduled Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/scheduled-scans",
+        "tags": [
+          "Scheduled Scans"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "name parameter"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "description parameter"
+                  },
+                  "schedule": {
+                    "type": "string",
+                    "description": "schedule parameter"
+                  },
+                  "enabled = true": {
+                    "type": "string",
+                    "description": "enabled = true parameter"
+                  },
+                  "imageSelectionMode": {
+                    "type": "string",
+                    "description": "imageSelectionMode parameter"
+                  },
+                  "imagePattern": {
+                    "type": "string",
+                    "description": "imagePattern parameter"
+                  },
+                  "selectedImageIds = []": {
+                    "type": "string",
+                    "description": "selectedImageIds = [] parameter"
+                  },
+                  "source = 'MANUAL'": {
+                    "type": "string",
+                    "description": "source = 'MANUAL' parameter"
+                  }
+                }
+              }
+            }
           }
         }
       }

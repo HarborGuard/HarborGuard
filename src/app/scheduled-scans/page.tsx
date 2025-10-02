@@ -1,5 +1,7 @@
 "use client";
 
+import { modalAction } from "@/lib/context-menu-utils";
+
 import * as React from "react";
 import { UnifiedTable } from "@/components/table/unified-table";
 import { ColumnDefinition, ContextMenuItem } from "@/components/table/types";
@@ -56,10 +58,14 @@ interface ScheduledScan {
 export default function ScheduledScansPage() {
   const router = useRouter();
   const [loading, setLoading] = React.useState(true);
-  const [scheduledScans, setScheduledScans] = React.useState<ScheduledScan[]>([]);
+  const [scheduledScans, setScheduledScans] = React.useState<ScheduledScan[]>(
+    []
+  );
   const [selectedScans, setSelectedScans] = React.useState<any[]>([]);
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
-  const [editingScan, setEditingScan] = React.useState<ScheduledScan | null>(null);
+  const [editingScan, setEditingScan] = React.useState<ScheduledScan | null>(
+    null
+  );
 
   React.useEffect(() => {
     fetchScheduledScans();
@@ -133,9 +139,7 @@ export default function ScheduledScansPage() {
       }
 
       toast.success(
-        scan.enabled
-          ? "Scheduled scan disabled"
-          : "Scheduled scan enabled"
+        scan.enabled ? "Scheduled scan disabled" : "Scheduled scan enabled"
       );
       fetchScheduledScans(); // Refresh the list
     } catch (error) {
@@ -175,7 +179,7 @@ export default function ScheduledScansPage() {
     },
     {
       key: "enabled",
-      header: "Status",
+      header: "Enabled",
       sortable: true,
       type: "custom",
       cellProps: {
@@ -266,7 +270,7 @@ export default function ScheduledScansPage() {
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
-                router.push(`/scheduled-scans/${row.id}/history`);
+                router.push(`/scheduled-scans/history?search=${encodeURIComponent(row.name)}`);
               }}
             >
               <IconHistory className="h-4 w-4" />
@@ -306,17 +310,17 @@ export default function ScheduledScansPage() {
     {
       label: "View Details",
       icon: <IconEye className="h-4 w-4" />,
-      action: () => router.push(`/scheduled-scans/${row.id}`),
+      action: modalAction(() => setEditingScan(row)),
     },
     {
       label: "View History",
       icon: <IconHistory className="h-4 w-4" />,
-      action: () => router.push(`/scheduled-scans/${row.id}/history`),
+      action: () => router.push(`/scheduled-scans/history?search=${encodeURIComponent(row.name)}`),
     },
     {
       label: "Edit",
       icon: <IconEdit className="h-4 w-4" />,
-      action: () => setEditingScan(row),
+      action: modalAction(() => setEditingScan(row)),
     },
     {
       label: row.enabled ? "Disable" : "Enable",
@@ -332,7 +336,7 @@ export default function ScheduledScansPage() {
   ];
 
   const handleRowClick = (row: any) => {
-    router.push(`/scheduled-scans/${row.id}`);
+    setEditingScan(row);
   };
 
   if (loading) {
@@ -355,10 +359,16 @@ export default function ScheduledScansPage() {
                 Manage automated scanning schedules for your container images
               </p>
             </div>
-            <Button onClick={() => setCreateDialogOpen(true)}>
-              <IconPlus className="mr-2 h-4 w-4" />
-              New Schedule
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button className="cursor-pointer" variant={"secondary"} onClick={() => router.push('/scheduled-scans/history')}>
+                <IconHistory className=" h-4 w-4" />
+                Schedule History
+              </Button>
+              <Button onClick={() => setCreateDialogOpen(true)}>
+                <IconPlus className=" h-4 w-4" />
+                New Schedule
+              </Button>
+            </div>
           </div>
 
           <UnifiedTable
@@ -368,7 +378,7 @@ export default function ScheduledScansPage() {
               sorting: true,
               filtering: true,
               pagination: true,
-              selection: true,
+              selection: false,
               columnVisibility: true,
               contextMenu: true,
               search: true,
@@ -392,7 +402,9 @@ export default function ScheduledScansPage() {
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
-                  {editingScan ? "Edit Scheduled Scan" : "Create Scheduled Scan"}
+                  {editingScan
+                    ? "Edit Scheduled Scan"
+                    : "Create Scheduled Scan"}
                 </DialogTitle>
                 <DialogDescription>
                   {editingScan

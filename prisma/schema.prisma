@@ -1084,7 +1084,7 @@ model ScheduledScanHistory {
 model ScheduledScanResult {
   id                     String                @id @default(cuid())
   scheduledScanHistoryId String
-  scanId                 String
+  scanId                 String?
   imageId                String
   imageName              String
   imageTag               String
@@ -1097,7 +1097,7 @@ model ScheduledScanResult {
   vulnerabilityLow       Int                   @default(0)
   errorMessage           String?
   history                ScheduledScanHistory  @relation(fields: [scheduledScanHistoryId], references: [id], onDelete: Cascade)
-  scan                   Scan                  @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  scan                   Scan?                 @relation(fields: [scanId], references: [id], onDelete: Cascade)
 
   @@index([scheduledScanHistoryId])
   @@index([scanId])

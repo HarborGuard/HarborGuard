@@ -85,13 +85,14 @@ export function UnifiedTable<T extends Record<string, any>>({
   initialSorting = [],
   initialFilters = [],
   initialColumnVisibility = {},
+  initialGlobalFilter = "",
 }: UnifiedTableProps<T>) {
   // State
   const [sorting, setSorting] = React.useState<SortingState>(initialSorting)
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(initialFilters)
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(initialColumnVisibility)
   const [rowSelection, setRowSelection] = React.useState({})
-  const [globalFilter, setGlobalFilter] = React.useState("")
+  const [globalFilter, setGlobalFilter] = React.useState(initialGlobalFilter)
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
     pageSize: serverPagination?.pageSize || 10,

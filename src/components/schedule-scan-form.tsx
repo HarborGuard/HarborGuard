@@ -23,8 +23,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { IconSearch, IconX } from "@tabler/icons-react";
+import { IconSearch, IconX, IconExternalLink } from "@tabler/icons-react";
 import { toast } from "sonner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ScheduleScanFormProps {
   scan?: any;
@@ -32,7 +38,11 @@ interface ScheduleScanFormProps {
   onCancel: () => void;
 }
 
-export function ScheduleScanForm({ scan, onSubmit, onCancel }: ScheduleScanFormProps) {
+export function ScheduleScanForm({
+  scan,
+  onSubmit,
+  onCancel,
+}: ScheduleScanFormProps) {
   const [formData, setFormData] = React.useState({
     name: scan?.name || "",
     description: scan?.description || "",
@@ -40,7 +50,8 @@ export function ScheduleScanForm({ scan, onSubmit, onCancel }: ScheduleScanFormP
     schedule: scan?.schedule || "",
     imageSelectionMode: scan?.imageSelectionMode || "SPECIFIC",
     imagePattern: scan?.imagePattern || "",
-    selectedImageIds: scan?.selectedImages?.map((img: any) => img.imageId) || [],
+    selectedImageIds:
+      scan?.selectedImages?.map((img: any) => img.imageId) || [],
   });
 
   const [availableImages, setAvailableImages] = React.useState<any[]>([]);
@@ -74,7 +85,10 @@ export function ScheduleScanForm({ scan, onSubmit, onCancel }: ScheduleScanFormP
       return;
     }
 
-    if (formData.imageSelectionMode === "SPECIFIC" && formData.selectedImageIds.length === 0) {
+    if (
+      formData.imageSelectionMode === "SPECIFIC" &&
+      formData.selectedImageIds.length === 0
+    ) {
       toast.error("Please select at least one image");
       return;
     }
@@ -125,7 +139,7 @@ export function ScheduleScanForm({ scan, onSubmit, onCancel }: ScheduleScanFormP
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-4">
-        <div>
+        <div className="space-y-2">
           <Label htmlFor="name">Name *</Label>
           <Input
             id="name"
@@ -138,7 +152,7 @@ export function ScheduleScanForm({ scan, onSubmit, onCancel }: ScheduleScanFormP
           />
         </div>
 
-        <div>
+        <div className="space-y-2">
           <Label htmlFor="description">Description</Label>
           <Textarea
             id="description"
@@ -152,7 +166,7 @@ export function ScheduleScanForm({ scan, onSubmit, onCancel }: ScheduleScanFormP
         </div>
 
         <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
+          <div className="space-y-2">
             <Label htmlFor="enabled">Enabled</Label>
             <p className="text-sm text-muted-foreground">
               Enable or disable this scheduled scan
@@ -167,8 +181,27 @@ export function ScheduleScanForm({ scan, onSubmit, onCancel }: ScheduleScanFormP
           />
         </div>
 
-        <div>
-          <Label htmlFor="schedule">Schedule (Cron Expression)</Label>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="schedule">Schedule (Cron Expression)</Label>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <a
+                    href="http://www.cronmaker.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-primary"
+                  >
+                    <IconExternalLink className="h-4 w-4" />
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>http://www.cronmaker.com/</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
           <Input
             id="schedule"
             value={formData.schedule}
@@ -191,7 +224,7 @@ export function ScheduleScanForm({ scan, onSubmit, onCancel }: ScheduleScanFormP
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="selectionMode">Selection Mode</Label>
             <Select
               value={formData.imageSelectionMode}
@@ -240,10 +273,14 @@ export function ScheduleScanForm({ scan, onSubmit, onCancel }: ScheduleScanFormP
               <ScrollArea className="h-64 rounded-md border">
                 <div className="p-4 space-y-2">
                   {loadingImages ? (
-                    <p className="text-sm text-muted-foreground">Loading images...</p>
+                    <p className="text-sm text-muted-foreground">
+                      Loading images...
+                    </p>
                   ) : filteredImages.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      {searchTerm ? "No images match your search" : "No images available"}
+                      {searchTerm
+                        ? "No images match your search"
+                        : "No images available"}
                     </p>
                   ) : (
                     filteredImages.map((image) => (
@@ -293,7 +330,10 @@ export function ScheduleScanForm({ scan, onSubmit, onCancel }: ScheduleScanFormP
                     id="pattern"
                     value={formData.imagePattern}
                     onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, imagePattern: e.target.value }))
+                      setFormData((prev) => ({
+                        ...prev,
+                        imagePattern: e.target.value,
+                      }))
                     }
                     placeholder="e.g., ^myapp:.*"
                   />

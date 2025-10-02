@@ -112,6 +112,7 @@ export interface UnifiedTableProps<T = any> {
   initialSorting?: SortingState
   initialFilters?: ColumnFiltersState
   initialColumnVisibility?: VisibilityState
+  initialGlobalFilter?: string
 }
 
 export interface TableState<T = any> {
