@@ -8,6 +8,7 @@ import {
   IconBook,
   IconClipboardList,
   IconGitBranch,
+  IconCalendarEvent,
 } from "@tabler/icons-react";
 
 import { NavMain } from "@/components/nav-main";
@@ -44,6 +45,11 @@ const data = {
       title: "Repositories",
       url: "/repositories",
       icon: IconGitBranch,
+    },
+    {
+      title: "Scheduled Scans",
+      url: "/scheduled-scans",
+      icon: IconCalendarEvent,
     },
   ],
 };
