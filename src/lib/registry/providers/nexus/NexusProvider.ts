@@ -129,7 +129,8 @@ export class NexusProvider extends EnhancedRegistryProvider {
   }
 
   protected formatRegistryForSkopeo(): string {
-    // For Nexus, we need to include the repository path
+    // For Nexus Docker operations, we need port 8082 without the repository name
+    // Images are accessed directly as host:8082/image:tag
     return this.getDockerRegistryUrl();
   }
 

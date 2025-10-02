@@ -75,6 +75,11 @@ export default function ScheduledScansPage() {
     try {
       setLoading(true);
       const response = await fetch("/api/scheduled-scans");
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
       setScheduledScans(data.scheduledScans || []);
     } catch (error) {
