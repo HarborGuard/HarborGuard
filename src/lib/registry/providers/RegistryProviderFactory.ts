@@ -6,6 +6,7 @@ import { DockerHubProvider } from './dockerhub/DockerHubProvider';
 import { GHCRProvider } from './ghcr/GHCRProvider';
 import { GenericOCIProvider } from './generic/GenericOCIProvider';
 import { GitLabRegistryHandler } from './gitlab/GitLabRegistryHandler';
+import { NexusProvider } from './nexus/NexusProvider';
 
 export class RegistryProviderFactory {
   private static providers = new Map<RepositoryType, new (repository: Repository) => EnhancedRegistryProvider>();
@@ -16,6 +17,7 @@ export class RegistryProviderFactory {
     this.register('GHCR', GHCRProvider);
     this.register('GITLAB', GitLabRegistryHandler);
     this.register('GENERIC', GenericOCIProvider);
+    this.register('NEXUS', NexusProvider);
   }
   
   /**
@@ -46,22 +48,34 @@ export class RegistryProviderFactory {
       if (repository.registryUrl?.includes('gitlab') || repository.authUrl?.includes('/jwt/auth')) {
         return new GitLabRegistryHandler(repository);
       }
-      
+
       // Auto-detect GHCR
       if (repository.registryUrl?.includes('ghcr.io')) {
         return new GHCRProvider(repository);
       }
+
+      // Auto-detect Nexus (common patterns)
+      if (repository.registryUrl?.includes('nexus') ||
+          repository.registryUrl?.includes(':8081') ||
+          repository.registryUrl?.includes(':8082') ||
+          repository.registryUrl?.includes(':8083')) {
+        return new NexusProvider(repository);
+      }
     }
-    
+
     // Direct type mapping
     if (repository.type === 'GITLAB') {
       return new GitLabRegistryHandler(repository);
     }
-    
+
     if (repository.type === 'GHCR') {
       return new GHCRProvider(repository);
     }
-    
+
+    if (repository.type === 'NEXUS') {
+      return new NexusProvider(repository);
+    }
+
     return this.create(repository.type, repository);
   }
   
@@ -171,7 +185,15 @@ export class RegistryProviderFactory {
         }
         // authUrl is optional as it can be derived from registryUrl
         break;
-        
+
+      case 'NEXUS':
+        // Nexus specific validations
+        if (!repository.registryUrl?.trim()) {
+          errors.push('Registry URL is required for Nexus');
+        }
+        // organization field can be used to specify the Nexus repository name
+        break;
+
       default:
         if (!this.isSupported(repository.type)) {
           errors.push(`Unsupported repository type: ${repository.type}`);

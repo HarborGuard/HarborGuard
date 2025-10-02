@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { IconBrandDocker, IconBrandGithub, IconBrandGitlab, IconServer, IconCheck, IconX, IconLoader } from "@tabler/icons-react"
+import { IconBrandDocker, IconBrandGithub, IconBrandGitlab, IconServer, IconCheck, IconX, IconLoader, IconPackage } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 interface AddRepositoryDialogProps {
@@ -26,7 +26,7 @@ interface AddRepositoryDialogProps {
   onRepositoryAdded: () => void
 }
 
-type RepositoryType = 'dockerhub' | 'ghcr' | 'gitlab' | 'generic'
+type RepositoryType = 'dockerhub' | 'ghcr' | 'gitlab' | 'generic' | 'nexus'
 
 interface RepositoryConfig {
   name: string
@@ -86,6 +86,13 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
       icon: <IconServer className="h-8 w-8" />,
       registryUrl: '',
     },
+    {
+      type: 'nexus' as const,
+      title: 'Sonatype Nexus3',
+      description: 'Connect to Nexus3 Docker repositories',
+      icon: <IconPackage className="h-8 w-8" />,
+      registryUrl: '',
+    },
   ]
 
   const handleTypeSelect = (type: RepositoryType) => {
@@ -105,9 +112,9 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
     setTestStatus('testing')
     setTestResult(null)
 
-    // Prepare the config with protocol for generic and gitlab registries
+    // Prepare the config with protocol for generic, gitlab, and nexus registries
     const testConfig = { ...config }
-    if ((config.type === 'generic' || config.type === 'gitlab') && config.registryUrl) {
+    if ((config.type === 'generic' || config.type === 'gitlab' || config.type === 'nexus') && config.registryUrl) {
       testConfig.registryUrl = `${protocol}://${config.registryUrl.replace(/^https?:\/\//, '')}`
     }
 
@@ -140,9 +147,9 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
   }
 
   const handleAddRepository = async () => {
-    // Prepare the config with protocol for generic and gitlab registries
+    // Prepare the config with protocol for generic, gitlab, and nexus registries
     const saveConfig = { ...config }
-    if ((config.type === 'generic' || config.type === 'gitlab') && config.registryUrl) {
+    if ((config.type === 'generic' || config.type === 'gitlab' || config.type === 'nexus') && config.registryUrl) {
       saveConfig.registryUrl = `${protocol}://${config.registryUrl.replace(/^https?:\/\//, '')}`
     }
 
@@ -247,7 +254,7 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
               />
             </div>
 
-            {(config.type === 'generic' || config.type === 'gitlab') && (
+            {(config.type === 'generic' || config.type === 'gitlab' || config.type === 'nexus') && (
               <>
                 <div className="space-y-2">
                   <Label htmlFor="registryUrl">Registry URL</Label>
@@ -313,9 +320,10 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
 
             <div className="space-y-2">
               <Label htmlFor="username">
-                {config.type === 'dockerhub' ? 'Docker Hub Username' : 
-                 config.type === 'ghcr' ? 'GitHub Username' : 
-                 config.type === 'gitlab' ? 'GitLab Username' : 'Username'}
+                {config.type === 'dockerhub' ? 'Docker Hub Username' :
+                 config.type === 'ghcr' ? 'GitHub Username' :
+                 config.type === 'gitlab' ? 'GitLab Username' :
+                 config.type === 'nexus' ? 'Nexus Username' : 'Username'}
               </Label>
               <Input
                 id="username"
@@ -327,9 +335,10 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
 
             <div className="space-y-2">
               <Label htmlFor="password">
-                {config.type === 'dockerhub' ? 'Personal Access Token' : 
-                 config.type === 'ghcr' ? 'GitHub Personal Access Token' : 
-                 config.type === 'gitlab' ? 'GitLab Password' : 'Password/Token'}
+                {config.type === 'dockerhub' ? 'Personal Access Token' :
+                 config.type === 'ghcr' ? 'GitHub Personal Access Token' :
+                 config.type === 'gitlab' ? 'GitLab Password' :
+                 config.type === 'nexus' ? 'Nexus Password' : 'Password/Token'}
               </Label>
               <Input
                 id="password"
@@ -340,6 +349,7 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
                   config.type === 'dockerhub' ? 'Enter Docker Hub PAT' :
                   config.type === 'ghcr' ? 'Enter GitHub PAT with packages:read scope' :
                   config.type === 'gitlab' ? 'Enter GitLab admin password' :
+                  config.type === 'nexus' ? 'Enter Nexus password' :
                   'Enter password or token'
                 }
               />
@@ -354,6 +364,21 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
                   onChange={(e) => setConfig(prev => ({ ...prev, organization: e.target.value }))}
                   placeholder="Enter organization name for org packages"
                 />
+              </div>
+            )}
+
+            {config.type === 'nexus' && (
+              <div className="space-y-2">
+                <Label htmlFor="organization">Repository Name (optional)</Label>
+                <Input
+                  id="organization"
+                  value={config.organization}
+                  onChange={(e) => setConfig(prev => ({ ...prev, organization: e.target.value }))}
+                  placeholder="docker-hosted"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Nexus repository name (default: docker-hosted)
+                </p>
               </div>
             )}
 
@@ -415,7 +440,7 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
               <div className="space-y-2 text-sm">
                 <div><strong>Name:</strong> {config.name}</div>
                 <div><strong>Type:</strong> {repositoryTypes.find(t => t.type === config.type)?.title}</div>
-                <div><strong>Registry:</strong> {(config.type === 'generic' || config.type === 'gitlab') && config.registryUrl ? `${protocol}://${config.registryUrl}` : config.registryUrl}</div>
+                <div><strong>Registry:</strong> {(config.type === 'generic' || config.type === 'gitlab' || config.type === 'nexus') && config.registryUrl ? `${protocol}://${config.registryUrl}` : config.registryUrl}</div>
                 <div><strong>Username:</strong> {config.username}</div>
               </div>
             </div>
