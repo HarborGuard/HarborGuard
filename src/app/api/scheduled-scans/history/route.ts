@@ -43,10 +43,21 @@ export async function GET(request: NextRequest) {
             select: {
               id: true,
               status: true,
-              vulnerabilityCritical: true,
-              vulnerabilityHigh: true,
-              vulnerabilityMedium: true,
-              vulnerabilityLow: true
+              scanId: true,
+              imageName: true,
+              imageTag: true,
+              scan: {
+                include: {
+                  metadata: {
+                    select: {
+                      vulnerabilityCritical: true,
+                      vulnerabilityHigh: true,
+                      vulnerabilityMedium: true,
+                      vulnerabilityLow: true
+                    }
+                  }
+                }
+              }
             }
           },
           _count: {
@@ -62,10 +73,10 @@ export async function GET(request: NextRequest) {
     // Calculate aggregate vulnerability counts for each history entry
     const historyWithStats = history.map(h => {
       const stats = h.scanResults.reduce((acc, result) => ({
-        totalCritical: acc.totalCritical + (result.vulnerabilityCritical || 0),
-        totalHigh: acc.totalHigh + (result.vulnerabilityHigh || 0),
-        totalMedium: acc.totalMedium + (result.vulnerabilityMedium || 0),
-        totalLow: acc.totalLow + (result.vulnerabilityLow || 0),
+        totalCritical: acc.totalCritical + (result.scan?.metadata?.vulnerabilityCritical || 0),
+        totalHigh: acc.totalHigh + (result.scan?.metadata?.vulnerabilityHigh || 0),
+        totalMedium: acc.totalMedium + (result.scan?.metadata?.vulnerabilityMedium || 0),
+        totalLow: acc.totalLow + (result.scan?.metadata?.vulnerabilityLow || 0),
         successCount: acc.successCount + (result.status === 'SUCCESS' ? 1 : 0),
         failedCount: acc.failedCount + (result.status === 'FAILED' ? 1 : 0),
         pendingCount: acc.pendingCount + (result.status === 'PENDING' || result.status === 'RUNNING' ? 1 : 0)
@@ -79,9 +90,10 @@ export async function GET(request: NextRequest) {
         pendingCount: 0
       })
 
-      const { scanResults, ...historyData } = h
+      const { ...historyData } = h
       return {
         ...historyData,
+        scanResults: h.scanResults,
         vulnerabilityStats: {
           critical: stats.totalCritical,
           high: stats.totalHigh,

@@ -12,6 +12,7 @@ import { durationCell } from "./duration-cell"
 import { interactiveBadgeCell } from "./interactive-badge-cell"
 import { scanDateCell } from "./scan-date-cell"
 import { packageInfoCell } from "./package-info-cell"
+import { customCell } from "./custom-cell"
 
 export function getCellRenderers<T = any>(): Record<string, CellRenderer<T>> {
   return {
@@ -28,6 +29,7 @@ export function getCellRenderers<T = any>(): Record<string, CellRenderer<T>> {
     'interactive-badge': interactiveBadgeCell,
     'scan-date': scanDateCell,
     'package-info': packageInfoCell,
+    custom: customCell,
   }
 }
 
@@ -45,4 +47,5 @@ export {
   interactiveBadgeCell,
   scanDateCell,
   packageInfoCell,
+  customCell,
 }

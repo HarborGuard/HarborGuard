@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { scannerService } from '@/lib/scanner'
 
 export async function POST(
   request: NextRequest,
@@ -51,7 +52,10 @@ export async function POST(
               id: true,
               name: true,
               tag: true,
-              registry: true
+              registry: true,
+              source: true,
+              dockerImageId: true,
+              primaryRepositoryId: true
             }
           })
           imagesToScan = allImages.filter(img =>
@@ -66,7 +70,10 @@ export async function POST(
             id: true,
             name: true,
             tag: true,
-            registry: true
+            registry: true,
+            source: true,
+            dockerImageId: true,
+            primaryRepositoryId: true
           }
         })
         break
@@ -143,33 +150,27 @@ async function startScanExecution(historyId: string, images: any[]) {
   // Update status to running
   await prisma.scheduledScanHistory.update({
     where: { id: historyId },
-    data: { status: 'RUNNING' }
+    data: {
+      status: 'RUNNING',
+      startedAt: new Date()
+    }
   })
 
   let scannedCount = 0
   let failedCount = 0
+  const scanResults = []
 
   // Process each image
   for (const image of images) {
     try {
-      // Create a scan for this image
-      const requestId = randomUUID()
-      const scan = await prisma.scan.create({
-        data: {
-          requestId,
-          imageId: image.id,
-          startedAt: new Date(),
-          status: 'PENDING',
-          tag: image.tag
-        }
-      })
-
-      // TODO: Trigger actual scan using existing scan service
-      // For now, we'll just create the result record
+      // Create a scheduled scan result record
       const result = await prisma.scheduledScanResult.create({
         data: {
-          scheduledScanHistoryId: historyId,
-          scanId: scan.id,
+          history: {
+            connect: {
+              id: historyId
+            }
+          },
           imageId: image.id,
           imageName: image.name,
           imageTag: image.tag,
@@ -178,23 +179,52 @@ async function startScanExecution(historyId: string, images: any[]) {
         }
       })
 
-      // Simulate scan completion (in real app, this would be handled by scan service)
-      await new Promise(resolve => setTimeout(resolve, 100))
+      // Trigger actual scan using the scanner service
+      // Map LOCAL_DOCKER to 'local' for the scanner service
+      const source = image.source === 'LOCAL_DOCKER' ? 'local' :
+                     image.source === 'REGISTRY' ? 'registry' :
+                     image.source || 'registry'
 
-      // Update scan result
-      await prisma.scheduledScanResult.update({
-        where: { id: result.id },
-        data: {
-          status: 'SUCCESS',
-          completedAt: new Date(),
-          vulnerabilityCritical: Math.floor(Math.random() * 5),
-          vulnerabilityHigh: Math.floor(Math.random() * 10),
-          vulnerabilityMedium: Math.floor(Math.random() * 20),
-          vulnerabilityLow: Math.floor(Math.random() * 30)
+      const scanRequest = {
+        image: image.name,
+        tag: image.tag,
+        source: source,
+        dockerImageId: image.dockerImageId,
+        repositoryId: image.primaryRepositoryId || image.repositoryId
+      }
+
+      const scanResponse = await scannerService.startScan(scanRequest)
+
+      if (scanResponse.requestId) {
+        // Link the scheduled scan result to the actual scan
+        const scan = await prisma.scan.findUnique({
+          where: { requestId: scanResponse.requestId }
+        })
+
+        if (scan) {
+          await prisma.scheduledScanResult.update({
+            where: { id: result.id },
+            data: {
+              scanId: scan.id,
+              status: 'RUNNING'
+            }
+          })
+          scanResults.push({ resultId: result.id, scanId: scan.id })
         }
-      })
 
-      scannedCount++
+        scannedCount++
+      } else {
+        // Scan failed to start
+        await prisma.scheduledScanResult.update({
+          where: { id: result.id },
+          data: {
+            status: 'FAILED',
+            completedAt: new Date(),
+            errorMessage: 'Failed to start scan'
+          }
+        })
+        failedCount++
+      }
 
       // Update progress
       await prisma.scheduledScanHistory.update({
@@ -219,15 +249,107 @@ async function startScanExecution(historyId: string, images: any[]) {
     }
   }
 
-  // Complete the execution
+  // Start monitoring scan completions
+  monitorScanCompletion(historyId, scanResults).catch(console.error)
+
+  // Update execution status based on initial results
   await prisma.scheduledScanHistory.update({
     where: { id: historyId },
     data: {
       status: failedCount === images.length ? 'FAILED' :
-             failedCount > 0 ? 'PARTIAL' : 'COMPLETED',
-      completedAt: new Date(),
+             scannedCount === 0 ? 'FAILED' : 'RUNNING',
       scannedImages: scannedCount,
       failedImages: failedCount
     }
   })
+}
+
+async function monitorScanCompletion(historyId: string, scanResults: any[]) {
+  // Poll for scan completion (in production, use webhooks or queue)
+  const maxAttempts = 180 // 15 minutes with 5-second intervals
+  let attempts = 0
+
+  const checkInterval = setInterval(async () => {
+    attempts++
+
+    try {
+      // Check all scan results
+      let allCompleted = true
+      let completedCount = 0
+      let failedCount = 0
+
+      for (const { resultId, scanId } of scanResults) {
+        const scan = await prisma.scan.findUnique({
+          where: { id: scanId },
+          include: {
+            metadata: {
+              select: {
+                vulnerabilityCritical: true,
+                vulnerabilityHigh: true,
+                vulnerabilityMedium: true,
+                vulnerabilityLow: true
+              }
+            }
+          }
+        })
+
+        if (scan) {
+          if (scan.status === 'SUCCESS' || scan.status === 'FAILED') {
+            // Update scheduled scan result status (vulnerability data is referenced from the scan)
+            await prisma.scheduledScanResult.update({
+              where: { id: resultId },
+              data: {
+                status: scan.status === 'SUCCESS' ? 'SUCCESS' : 'FAILED',
+                completedAt: new Date(),
+                errorMessage: scan.status === 'FAILED' ? 'Scan failed' : null
+              }
+            })
+
+            if (scan.status === 'SUCCESS') {
+              completedCount++
+            } else {
+              failedCount++
+            }
+          } else {
+            allCompleted = false
+          }
+        }
+      }
+
+      if (allCompleted || attempts >= maxAttempts) {
+        clearInterval(checkInterval)
+
+        // Get final counts
+        const history = await prisma.scheduledScanHistory.findUnique({
+          where: { id: historyId },
+          include: {
+            scanResults: {
+              where: { status: { in: ['SUCCESS', 'FAILED'] } }
+            }
+          }
+        })
+
+        const successCount = history?.scanResults.filter(r => r.status === 'SUCCESS').length || 0
+        const totalFailedCount = history?.scanResults.filter(r => r.status === 'FAILED').length || 0
+        const totalImages = history?.totalImages || 0
+
+        // Update final status
+        await prisma.scheduledScanHistory.update({
+          where: { id: historyId },
+          data: {
+            status: attempts >= maxAttempts ? 'FAILED' :
+                   totalFailedCount === totalImages ? 'FAILED' :
+                   totalFailedCount > 0 ? 'PARTIAL' : 'COMPLETED',
+            completedAt: new Date(),
+            scannedImages: successCount,
+            failedImages: totalFailedCount,
+            errorMessage: attempts >= maxAttempts ? 'Scan monitoring timeout after 15 minutes' : null
+          }
+        })
+      }
+    } catch (error) {
+      console.error('Error monitoring scan completion:', error)
+      clearInterval(checkInterval)
+    }
+  }, 5000) // Check every 5 seconds
 }

@@ -1,10 +1,13 @@
 "use client";
 
+import { modalAction } from "@/lib/context-menu-utils";
+
 import * as React from "react";
+import { Suspense } from "react";
 import { UnifiedTable } from "@/components/table/unified-table";
 import { ColumnDefinition, ContextMenuItem } from "@/components/table/types";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   IconEye,
   IconInfoCircle,
@@ -45,6 +48,14 @@ interface HistoricalScan {
     description?: string;
     imageSelectionMode: string;
   };
+  scanResults?: Array<{
+    id: string;
+    status: string;
+    scanId?: string;
+    imageName?: string;
+    imageTag?: string;
+    scan?: any;
+  }>;
   vulnerabilityStats: {
     critical: number;
     high: number;
@@ -61,12 +72,16 @@ interface HistoricalScan {
   };
 }
 
-export default function ScheduledScansHistoryPage() {
+function ScheduledScansHistoryContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = React.useState(true);
   const [history, setHistory] = React.useState<HistoricalScan[]>([]);
   const [selectedHistory, setSelectedHistory] = React.useState<HistoricalScan | null>(null);
   const [auditModalOpen, setAuditModalOpen] = React.useState(false);
+
+  // Get initial search value from URL params
+  const initialSearch = searchParams.get('search') || '';
 
   React.useEffect(() => {
     fetchHistory();
@@ -245,22 +260,25 @@ export default function ScheduledScansHistoryPage() {
 
   const getContextMenuItems = (row: any): ContextMenuItem[] => [
     {
-      label: "View Scan Details",
+      label: "View Scan Results",
       icon: <IconEye className="h-4 w-4" />,
       action: () => {
-        // Navigate to the specific scan
-        if (row.scheduledScanId) {
-          router.push(`/scheduled-scans/${row.scheduledScanId}/history/${row.id}`);
+        // Navigate to the image scan detail page
+        if (row.scanResults && row.scanResults.length > 0) {
+          const firstResult = row.scanResults[0];
+          if (firstResult.scanId && firstResult.imageName) {
+            router.push(`/images/${encodeURIComponent(firstResult.imageName)}/${firstResult.scanId}`);
+          }
         }
       },
     },
     {
       label: "View Audit Info",
       icon: <IconInfoCircle className="h-4 w-4" />,
-      action: () => {
+      action: modalAction(() => {
         setSelectedHistory(row);
         setAuditModalOpen(true);
-      },
+      }),
     },
   ];
 
@@ -356,6 +374,16 @@ export default function ScheduledScansHistoryPage() {
               search: true,
             }}
             contextMenuItems={getContextMenuItems}
+            initialGlobalFilter={initialSearch}
+            onRowClick={(row) => {
+              // Navigate to the image scan detail page
+              if (row.scanResults && row.scanResults.length > 0) {
+                const firstResult = row.scanResults[0];
+                if (firstResult.scanId && firstResult.imageName) {
+                  router.push(`/images/${encodeURIComponent(firstResult.imageName)}/${firstResult.scanId}`);
+                }
+              }
+            }}
             className="bg-card rounded-lg border shadow-xs p-6"
           />
 
@@ -456,4 +484,17 @@ export default function ScheduledScansHistoryPage() {
 
 function Label({ children, className }: { children: React.ReactNode; className?: string }) {
   return <div className={className}>{children}</div>;
+}
+
+export default function ScheduledScansHistoryPage() {
+  return (
+    <Suspense fallback={
+      <FullPageLoading
+        message="Loading Scan History"
+        description="Fetching historical scan execution records..."
+      />
+    }>
+      <ScheduledScansHistoryContent />
+    </Suspense>
+  );
 }
