@@ -107,6 +107,14 @@ export interface GenericOCIConfig extends RegistryConfig {
   protocol: string;
 }
 
+export interface NexusConfig extends RegistryConfig {
+  username: string;
+  password: string;
+  registryUrl: string;
+  protocol: string;
+  repositoryName?: string; // Nexus can have multiple repositories
+}
+
 export interface CacheEntry<T = any> {
   data: T;
   cachedAt: Date;
