@@ -33,6 +33,7 @@ model Image {
   patchedImagesAsResult    PatchedImage?        @relation("PatchedImageResult")
   repositoryImages         RepositoryImage[]
   scans                    Scan[]
+  scheduledScanImages      ScheduledScanImage[]
 
   @@index([name, tag])
   @@index([name, tag, primaryRepositoryId])
@@ -65,6 +66,7 @@ model Scan {
   packageFindings       ScanPackageFinding[]
   scanResults           ScanResult[]
   vulnerabilityFindings ScanVulnerabilityFinding[]
+  scheduledScanResults  ScheduledScanResult[]
   image                 Image                      @relation(fields: [imageId], references: [id], onDelete: Cascade)
   metadata              ScanMetadata?              @relation(fields: [metadataId], references: [id])
 
@@ -1013,4 +1015,119 @@ enum PatchStrategy {
   NPM
   PIP
   MULTI
+}
+
+model ScheduledScan {
+  id                  String                @id @default(cuid())
+  name                String
+  description         String?
+  schedule            String?               // Cron expression for scheduled scans
+  enabled             Boolean               @default(true)
+  nextRunAt           DateTime?
+  lastRunAt           DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  createdBy           String?
+  source              ScheduledScanSource   @default(MANUAL)
+  imageSelectionMode  ImageSelectionMode    @default(SPECIFIC)
+  imagePattern        String?               // Regex pattern for bulk selection
+  scanHistory         ScheduledScanHistory[]
+  selectedImages      ScheduledScanImage[]
+
+  @@index([enabled])
+  @@index([nextRunAt])
+  @@index([source])
+  @@map("scheduled_scans")
+}
+
+model ScheduledScanImage {
+  id               String         @id @default(cuid())
+  scheduledScanId  String
+  imageId          String
+  imageName        String
+  imageTag         String
+  registry         String?
+  addedAt          DateTime       @default(now())
+  scheduledScan    ScheduledScan  @relation(fields: [scheduledScanId], references: [id], onDelete: Cascade)
+  image            Image          @relation(fields: [imageId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduledScanId, imageId])
+  @@index([scheduledScanId])
+  @@index([imageId])
+  @@map("scheduled_scan_images")
+}
+
+model ScheduledScanHistory {
+  id                String                   @id @default(cuid())
+  scheduledScanId   String
+  executionId       String                   @unique
+  startedAt         DateTime                 @default(now())
+  completedAt       DateTime?
+  status            ScheduledScanStatus      @default(RUNNING)
+  totalImages       Int
+  scannedImages     Int                      @default(0)
+  failedImages      Int                      @default(0)
+  errorMessage      String?
+  triggerSource     ScheduledScanTrigger     @default(SCHEDULED)
+  triggeredBy       String?
+  scheduledScan     ScheduledScan            @relation(fields: [scheduledScanId], references: [id], onDelete: Cascade)
+  auditInfo         Json?                    // Additional audit information
+  scanResults       ScheduledScanResult[]
+
+  @@index([scheduledScanId])
+  @@index([startedAt])
+  @@index([status])
+  @@index([executionId])
+  @@map("scheduled_scan_history")
+}
+
+model ScheduledScanResult {
+  id                     String                @id @default(cuid())
+  scheduledScanHistoryId String
+  scanId                 String?
+  imageId                String
+  imageName              String
+  imageTag               String
+  status                 ScanStatus
+  startedAt              DateTime
+  completedAt            DateTime?
+  vulnerabilityCritical  Int                   @default(0)
+  vulnerabilityHigh      Int                   @default(0)
+  vulnerabilityMedium    Int                   @default(0)
+  vulnerabilityLow       Int                   @default(0)
+  errorMessage           String?
+  history                ScheduledScanHistory  @relation(fields: [scheduledScanHistoryId], references: [id], onDelete: Cascade)
+  scan                   Scan?                 @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  @@index([scheduledScanHistoryId])
+  @@index([scanId])
+  @@index([status])
+  @@map("scheduled_scan_results")
+}
+
+enum ScheduledScanSource {
+  MANUAL
+  AUTOMATED
+}
+
+enum ImageSelectionMode {
+  SPECIFIC     // Specific images selected
+  PATTERN      // Pattern-based selection
+  ALL          // All images
+  REPOSITORY   // All from specific repository
+}
+
+enum ScheduledScanStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  PARTIAL
+}
+
+enum ScheduledScanTrigger {
+  MANUAL
+  SCHEDULED
+  API
 }

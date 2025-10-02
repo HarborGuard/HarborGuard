@@ -20,6 +20,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { modalAction } from "@/lib/context-menu-utils";
 import { UnifiedTable } from "@/components/table/unified-table";
 import { ColumnDefinition, ContextMenuItem } from "@/components/table/types";
 import { ImagePageSkeleton } from "@/components/image-loading";
@@ -624,29 +625,26 @@ export default function ImageDetailsPage() {
       {
         label: 'Export Image',
         icon: <IconUpload className="mr-2 h-4 w-4" />,
-        action: () => {
-          // Use setTimeout to ensure the context menu closes before opening the dialog
-          setTimeout(() => {
-            // row.version contains "imageName:tag", need to extract just the tag
-            const versionParts = (row.version || 'latest').split(':');
-            const extractedTag = versionParts.length > 1 ? versionParts[versionParts.length - 1] : versionParts[0];
+        action: modalAction(() => {
+          // row.version contains "imageName:tag", need to extract just the tag
+          const versionParts = (row.version || 'latest').split(':');
+          const extractedTag = versionParts.length > 1 ? versionParts[versionParts.length - 1] : versionParts[0];
 
-            // Ensure we're using the base image name without any tags
-            const baseImageName = (imageData?.name || imageName).split(':')[0];
+          // Ensure we're using the base image name without any tags
+          const baseImageName = (imageData?.name || imageName).split(':')[0];
 
-            // Get the scan details to find the digest
-            const scan = imageData?.scans?.find((s: any) => s.id === row.scanId);
-            const matchingImage = imageData?.images?.find((img: any) => img.id === scan?.imageId);
+          // Get the scan details to find the digest
+          const scan = imageData?.scans?.find((s: any) => s.id === row.scanId);
+          const matchingImage = imageData?.images?.find((img: any) => img.id === scan?.imageId);
 
-            setExportScanData({
-              imageName: baseImageName,
-              tag: extractedTag,  // Just the tag part, not the full version string
-              scanId: row.scanId,
-              digest: matchingImage?.digest
-            });
-            setExportDialogOpen(true);
-          }, 0);
-        },
+          setExportScanData({
+            imageName: baseImageName,
+            tag: extractedTag,  // Just the tag part, not the full version string
+            scanId: row.scanId,
+            digest: matchingImage?.digest
+          });
+          setExportDialogOpen(true);
+        }),
       },
       {
         label: 'Delete Scan',
