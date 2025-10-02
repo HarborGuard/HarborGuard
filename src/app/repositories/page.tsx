@@ -31,7 +31,7 @@ import { toast } from "sonner";
 interface Repository {
   id: string;
   name: string;
-  type: "DOCKERHUB" | "GHCR" | "GITLAB" | "GENERIC";
+  type: "DOCKERHUB" | "GHCR" | "GITLAB" | "GENERIC" | "NEXUS";
   protocol?: string;
   registryUrl: string;
   username?: string;
