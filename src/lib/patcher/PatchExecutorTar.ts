@@ -250,19 +250,32 @@ export class PatchExecutorTar {
     // Export from Docker if local source, otherwise download from registry
     if (image.source === 'LOCAL_DOCKER' || image.registry === 'local') {
       logger.info(`Exporting local Docker image ${image.name}:${image.tag} to tar`);
-      
+
       // Use docker save for local images
       await execAsync(`docker save -o ${tarPath} ${image.name}:${image.tag}`);
-      
+
       const stats = await fs.stat(tarPath);
       logger.info(`Exported tar file: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
     } else {
       // Download from registry using skopeo
-      logger.info(`Downloading image ${image.name}:${image.tag} from registry`);
-      
-      const fullImageName = image.registry ? `${image.registry}/${image.name}` : image.name;
-      const imageRef = `${fullImageName}:${image.tag}`;
-      
+      // Import registry utilities to normalize registry name
+      const { normalizeRegistryUrl, detectRegistryType } = await import('@/lib/registry/registry-utils');
+
+      // Normalize the registry URL - converts display names like "Docker Hub Public" to "docker.io"
+      const registryType = detectRegistryType(image.registry);
+      const normalizedRegistry = normalizeRegistryUrl(image.registry, registryType);
+
+      // Build the image reference - for Docker Hub, don't include registry prefix
+      let imageRef: string;
+      if (registryType === 'DOCKERHUB' || normalizedRegistry === 'docker.io') {
+        // Docker Hub images don't need registry prefix
+        imageRef = `${image.name}:${image.tag}`;
+      } else {
+        // Other registries need the registry prefix
+        imageRef = `${normalizedRegistry}/${image.name}:${image.tag}`;
+      }
+
+      logger.info(`Downloading from registry: ${imageRef} (normalized from ${image.registry})`);
       await execAsync(
         `skopeo copy --src-tls-verify=false docker://${imageRef} docker-archive:${tarPath}`
       );
