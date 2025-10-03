@@ -17,19 +17,19 @@ import { logger } from '@/lib/logger';
  * Supports Docker registries hosted on Sonatype Nexus 3
  *
  * Features:
- * - Automatic configuration of Nexus for Docker operations
  * - Support for Docker push/pull operations
  * - Image scanning and metadata retrieval
- *
- * Auto-configuration (performed on connection test):
- * 1. Enables Docker Bearer Token Realm
- * 2. Enables anonymous access (required for Docker Token)
- * 3. Configures Docker repository with basic auth
+ * - Repository listing and metadata queries
  *
  * Port configuration:
  * - Port 8081: Main Nexus API
  * - Port 8082: Docker HTTP registry
  * - Port 8083: Docker HTTPS registry
+ *
+ * Prerequisites:
+ * - Nexus must be pre-configured with a Docker repository
+ * - Docker Bearer Token Realm should be enabled for Docker operations
+ * - Repository credentials must have appropriate permissions
  */
 export class NexusProvider extends EnhancedRegistryProvider {
   protected config: NexusConfig;
@@ -138,81 +138,6 @@ export class NexusProvider extends EnhancedRegistryProvider {
     return this.getDockerRegistryUrl();
   }
 
-  /**
-   * Automatically configure Nexus for Docker operations
-   * This sets up the necessary realms and repository settings
-   */
-  async configureNexusForDocker(): Promise<void> {
-    const apiUrl = this.getApiUrl();
-    const headers = await this.getAuthHeaders();
-
-    try {
-      // 1. Enable Docker Bearer Token Realm
-      const realmsResponse = await fetch(`${apiUrl}/service/rest/v1/security/realms/active`, {
-        headers
-      });
-
-      if (realmsResponse.ok) {
-        const currentRealms = await realmsResponse.json();
-        if (!currentRealms.includes('DockerToken')) {
-          const updatedRealms = [...currentRealms, 'DockerToken'];
-          await fetch(`${apiUrl}/service/rest/v1/security/realms/active`, {
-            method: 'PUT',
-            headers: {
-              ...headers,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(updatedRealms)
-          });
-          logger.info('Enabled Docker Bearer Token Realm');
-        }
-      }
-
-      // 2. Enable anonymous access (required for Docker Token Realm)
-      await fetch(`${apiUrl}/service/rest/v1/security/anonymous`, {
-        method: 'PUT',
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          enabled: true,
-          userId: 'anonymous',
-          realmName: 'NexusAuthorizingRealm'
-        })
-      });
-      logger.info('Enabled anonymous access for Docker');
-
-      // 3. Configure Docker repository with basic auth
-      const repoName = this.config.repositoryName || 'docker-hosted';
-      await fetch(`${apiUrl}/service/rest/v1/repositories/docker/hosted/${repoName}`, {
-        method: 'PUT',
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: repoName,
-          online: true,
-          storage: {
-            blobStoreName: 'default',
-            strictContentTypeValidation: true,
-            writePolicy: 'allow'
-          },
-          docker: {
-            v1Enabled: false,
-            forceBasicAuth: true,
-            httpPort: 8082,
-            httpsPort: null
-          }
-        })
-      });
-      logger.info('Configured Docker repository with basic auth');
-    } catch (error) {
-      logger.warn('Failed to auto-configure Nexus for Docker:', error);
-      // Non-fatal - continue with existing configuration
-    }
-  }
 
   async testConnection(): Promise<ConnectionTestResult> {
     try {
@@ -220,9 +145,6 @@ export class NexusProvider extends EnhancedRegistryProvider {
       const catalogUrl = `${apiUrl}/service/rest/v1/repositories`;
 
       logger.info('Testing Nexus connection:', { apiUrl, catalogUrl, username: this.config.username });
-
-      // Attempt to auto-configure Nexus for Docker operations
-      await this.configureNexusForDocker();
 
       this.logRequest('GET', catalogUrl);
       const response = await this.makeAuthenticatedRequest(catalogUrl);
