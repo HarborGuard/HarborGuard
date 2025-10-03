@@ -475,7 +475,7 @@ export class PatchExecutorTarUnshare {
     // First try to find tar file with image digest hash (from scanning)
     const imageHash = image.digest ? image.digest.replace('sha256:', '') : '';
     const scanTarPath = imageHash ? path.join(this.workDir, 'images', `${safeImageName}-${imageHash}.tar`) : '';
-    
+
     // Check if tar file from scan exists
     if (scanTarPath) {
       try {
@@ -488,10 +488,10 @@ export class PatchExecutorTarUnshare {
         logger.info(`Scan tar file not found at ${scanTarPath}`);
       }
     }
-    
+
     // Fallback to requestId-based path
     const requestTarPath = path.join(this.workDir, 'images', `${safeImageName}-${requestId}.tar`);
-    
+
     // Check if tar file already exists
     try {
       const stats = await fs.stat(requestTarPath);
@@ -502,13 +502,13 @@ export class PatchExecutorTarUnshare {
     } catch {
       logger.info(`Tar file not found at ${requestTarPath}`);
     }
-    
+
     // Try to find any matching tar file with wildcard pattern
     const imagesDir = path.join(this.workDir, 'images');
     try {
       const files = await fs.readdir(imagesDir);
       const matchingFiles = files.filter(f => f.startsWith(safeImageName) && f.endsWith('.tar'));
-      
+
       if (matchingFiles.length > 0) {
         // Sort by modification time and use the most recent
         const fileStats = await Promise.all(
@@ -518,17 +518,17 @@ export class PatchExecutorTarUnshare {
             mtime: (await fs.stat(path.join(imagesDir, f))).mtime
           }))
         );
-        
+
         fileStats.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
         const mostRecent = fileStats[0];
-        
+
         logger.info(`Found existing tar file by pattern: ${mostRecent.path}`);
         return mostRecent.path;
       }
     } catch (error) {
       logger.warn('Failed to search for tar files:', error);
     }
-    
+
     // If no tar file found, we'll need to download/export it
     const tarPath = requestTarPath;
 
@@ -556,15 +556,29 @@ export class PatchExecutorTarUnshare {
       logger.info(`Exported tar file: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
     } else {
       // Download from registry using skopeo
-      const fullImageName = image.registry ? `${image.registry}/${image.name}` : image.name;
-      const imageRef = `${fullImageName}:${image.tag}`;
+      // Import registry utilities to normalize registry name
+      const { normalizeRegistryUrl, detectRegistryType } = await import('@/lib/registry/registry-utils');
 
-      logger.info(`Downloading from registry: ${imageRef}`);
+      // Normalize the registry URL - converts display names like "Docker Hub Public" to "docker.io"
+      const registryType = detectRegistryType(image.registry);
+      const normalizedRegistry = normalizeRegistryUrl(image.registry, registryType);
+
+      // Build the image reference - for Docker Hub, don't include registry prefix
+      let imageRef: string;
+      if (registryType === 'DOCKERHUB' || normalizedRegistry === 'docker.io') {
+        // Docker Hub images don't need registry prefix
+        imageRef = `${image.name}:${image.tag}`;
+      } else {
+        // Other registries need the registry prefix
+        imageRef = `${normalizedRegistry}/${image.name}:${image.tag}`;
+      }
+
+      logger.info(`Downloading from registry: ${imageRef} (normalized from ${image.registry})`);
       await execAsync(
         `skopeo copy --src-tls-verify=false docker://${imageRef} docker-archive:${tarPath}`
       );
     }
-    
+
     return tarPath;
   }
 
