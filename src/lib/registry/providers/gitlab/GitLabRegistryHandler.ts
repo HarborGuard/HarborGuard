@@ -205,11 +205,14 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
   async getSkopeoAuthArgs(): Promise<string> {
     // For GitLab Registry V2, we use basic auth with username/password
     // The registry will handle JWT token exchange internally
+    if (!this.config.username || !this.config.password) {
+      return '';
+    }
     const escapedUsername = this.config.username.replace(/"/g, '\\"');
     const escapedPassword = this.config.password.replace(/"/g, '\\"');
-    
-    const tlsVerify = this.config.skipTlsVerify ? '--tls-verify=false' : '';
-    return `--creds "${escapedUsername}:${escapedPassword}" ${tlsVerify}`.trim();
+
+    // Note: TLS verification should be handled separately by the caller
+    return `--creds "${escapedUsername}:${escapedPassword}"`;
   }
   
   /**
