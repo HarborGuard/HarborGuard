@@ -130,15 +130,35 @@ export abstract class EnhancedRegistryProvider {
   /**
    * Copy an image between registries
    */
-  async copyImage(source: ImageReference, destination: ImageReference): Promise<void> {
+  async copyImage(source: ImageReference, destination: ImageReference, sourceCredentials?: string): Promise<void> {
     const sourceRef = this.formatImageReference(source);
     const destRef = this.formatImageReference(destination);
-    const authArgs = await this.getSkopeoAuthArgs();
-    const tlsVerify = this.shouldVerifyTLS() ? '' : '--tls-verify=false';
-    
-    const command = `skopeo copy ${authArgs} ${tlsVerify} docker://${sourceRef} docker://${destRef}`;
-    
+
+    // Get destination auth (this registry)
+    const destAuthArgs = await this.getSkopeoAuthArgs();
+    // Extract credentials from --creds format and convert to --dest-creds
+    let destAuth = '';
+    if (destAuthArgs) {
+      const credsMatch = destAuthArgs.match(/--creds\s+(.+)/);
+      if (credsMatch) {
+        destAuth = `--dest-creds ${credsMatch[1]}`;
+      }
+    }
+
+    // Handle source auth if provided
+    let srcAuth = '';
+    if (sourceCredentials) {
+      srcAuth = `--src-creds "${sourceCredentials}"`;
+    }
+
+    // Build TLS verification flags
+    const srcTlsVerify = this.shouldVerifyTLSForRegistry(source.registry) ? '' : '--src-tls-verify=false';
+    const destTlsVerify = this.shouldVerifyTLS() ? '' : '--dest-tls-verify=false';
+
+    const command = `skopeo copy ${srcAuth} ${srcTlsVerify} ${destAuth} ${destTlsVerify} docker://${sourceRef} docker://${destRef}`.replace(/\s+/g, ' ').trim();
+
     logger.info(`Copying image from ${sourceRef} to ${destRef}`);
+    logger.debug(`Skopeo copy command: ${command.replace(/--(?:src|dest)-creds\s+"[^"]+"/, '--$1-creds "***"')}`);
     await this.executeSkopeoCommand(command);
   }
   
@@ -476,6 +496,22 @@ export abstract class EnhancedRegistryProvider {
       url.includes('127.0.0.1') ||
       url.startsWith('http://') ||
       this.repository.protocol === 'http'
+    );
+  }
+
+  /**
+   * Check if TLS verification should be enabled for a specific registry
+   */
+  protected shouldVerifyTLSForRegistry(registryUrl?: string): boolean {
+    if (!registryUrl) {
+      return this.shouldVerifyTLS();
+    }
+    return !(
+      registryUrl.includes('localhost') ||
+      registryUrl.includes('127.0.0.1') ||
+      registryUrl.startsWith('http://') ||
+      // Check for IP:port pattern without protocol
+      /^\d+\.\d+\.\d+\.\d+:\d+$/.test(registryUrl)
     );
   }
   

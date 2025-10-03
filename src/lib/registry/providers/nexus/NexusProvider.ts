@@ -77,7 +77,11 @@ export class NexusProvider extends EnhancedRegistryProvider {
   }
 
   async getSkopeoAuthArgs(): Promise<string> {
-    return `--creds ${this.config.username}:${this.config.password}`;
+    if (!this.config.username || !this.config.password) {
+      return '';
+    }
+    // Properly quote credentials to handle special characters
+    return `--creds "${this.config.username}:${this.config.password}"`;
   }
 
   private getRegistryUrl(): string {
