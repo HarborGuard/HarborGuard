@@ -59,9 +59,11 @@ export default function LibraryHomePage() {
   const [severityFilter, setSeverityFilter] = React.useState<string>("");
   const [sortField, setSortField] = React.useState<string>("severity");
   const [sortOrder, setSortOrder] = React.useState<"asc" | "desc">("desc");
+  const [page, setPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(50);
   const [pagination, setPagination] = React.useState({
     total: 0,
-    limit: 100,
+    limit: 50,
     offset: 0,
     hasMore: false,
   });
@@ -74,9 +76,10 @@ export default function LibraryHomePage() {
   const fetchVulnerabilities = React.useCallback(async () => {
     try {
       setLoading(true);
+      const offset = (page - 1) * pageSize;
       const params = new URLSearchParams({
-        limit: pagination.limit.toString(),
-        offset: pagination.offset.toString(),
+        limit: pageSize.toString(),
+        offset: offset.toString(),
       });
 
       if (search) params.append("search", search);
@@ -93,7 +96,12 @@ export default function LibraryHomePage() {
     } finally {
       setLoading(false);
     }
-  }, [search, severityFilter, pagination.limit, pagination.offset]);
+  }, [search, severityFilter, page, pageSize]);
+
+  // Reset to page 1 when search or filter changes
+  React.useEffect(() => {
+    setPage(1);
+  }, [search, severityFilter]);
 
   React.useEffect(() => {
     fetchVulnerabilities();
@@ -363,20 +371,29 @@ export default function LibraryHomePage() {
                     </SelectContent>
                   </Select>
                   <div className="text-sm text-muted-foreground">
-                    {vulnerabilities.length} vulnerabilities
+                    {pagination.total !== undefined
+                      ? `${pagination.total} total vulnerabilities`
+                      : `${vulnerabilities.length} vulnerabilities`}
                   </div>
                 </div>
 
                 {/* Table */}
                 <UnifiedTable
-                  data={vulnerabilities}
+                  data={sortedVulnerabilities}
                   columns={getLibraryTableColumns()}
                   features={{
-                    sorting: true,
+                    sorting: false,
                     filtering: false,
                     pagination: true,
                     search: false,
                     columnVisibility: true,
+                  }}
+                  serverPagination={{
+                    currentPage: page,
+                    totalPages: pagination.total ? Math.ceil(pagination.total / pageSize) : 1,
+                    pageSize: pageSize,
+                    totalItems: pagination.total || 0,
+                    onPageChange: (newPage) => setPage(newPage),
                   }}
                   onRowClick={handleVulnerabilityClick}
                   rowActions={getRowActions()}
