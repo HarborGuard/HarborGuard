@@ -114,27 +114,25 @@ export class NexusProvider extends EnhancedRegistryProvider {
   }
 
   private getDockerRegistryUrl(): string {
-    // For Docker operations, Nexus uses a different port (8082 for HTTP, 8083 for HTTPS)
     let url = this.config.registryUrl;
 
     // Remove protocol if present
     url = url.replace(/^https?:\/\//, '');
 
-    // Replace port 8081 with 8082 (Docker HTTP port) if present
-    if (url.includes(':8081')) {
-      url = url.replace(':8081', ':8082');
-    } else if (!url.includes(':')) {
-      // If no port specified, add Docker HTTP port
-      url = `${url}:8082`;
+    // If repository has registryPort configured, use it for Docker operations
+    if (this.repository.registryPort) {
+      // Replace any existing port with the Docker registry port
+      url = url.replace(/:\d+$/, `:${this.repository.registryPort}`);
+    } else {
+      // No port configured - assume default Nexus setup uses port 5000 for Docker
+      url = url.replace(/:\d+$/, ':5000');
     }
 
-    // Nexus Docker repositories don't use /repository/ path prefix for Docker operations
     return url;
   }
 
   protected formatRegistryForSkopeo(): string {
-    // For Nexus Docker operations, we need port 8082 without the repository name
-    // Images are accessed directly as host:8082/image:tag
+    // For Nexus Docker operations, images are accessed directly as host:port/image:tag
     return this.getDockerRegistryUrl();
   }
 
@@ -194,15 +192,10 @@ export class NexusProvider extends EnhancedRegistryProvider {
     // Nexus API for listing components in a repository
     let url = `${apiUrl}/service/rest/v1/components?repository=${repoName}`;
 
-    // Add continuation token for pagination if offset is provided
-    if (options.offset) {
-      // Nexus uses continuation tokens, we'll need to handle this differently
-      // For now, we'll fetch all and slice
-    }
-
     this.logRequest('GET', url);
     const images: RegistryImage[] = [];
     let continuationToken: string | null = null;
+    const maxLimit = options.limit || 100; // Default limit to prevent loading all images
 
     do {
       const requestUrl = continuationToken
@@ -223,14 +216,19 @@ export class NexusProvider extends EnhancedRegistryProvider {
               fullName: item.name,
               lastUpdated: item.lastModified ? new Date(item.lastModified) : undefined
             });
+
+            // Stop early if we've reached the limit
+            if (images.length >= maxLimit) {
+              break;
+            }
           }
         }
       }
 
       continuationToken = data.continuationToken || null;
 
-      // Respect limit if provided
-      if (options.limit && images.length >= options.limit) {
+      // Stop fetching if we've reached the limit
+      if (images.length >= maxLimit) {
         break;
       }
     } while (continuationToken);
@@ -344,5 +342,49 @@ export class NexusProvider extends EnhancedRegistryProvider {
     }
 
     return tags;
+  }
+
+  validateConfiguration(): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (!this.config.registryUrl?.trim()) {
+      errors.push('Registry URL is required for Nexus');
+    }
+
+    if (!this.config.username?.trim()) {
+      errors.push('Username is required');
+    }
+
+    if (!this.config.password?.trim()) {
+      errors.push('Password is required');
+    }
+
+    // organization field can be used to specify the Nexus repository name
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+
+  formatFullImageReference(image: string, tag: string): string {
+    const registry = this.getDockerRegistryUrl();
+    const cleanTag = tag || 'latest';
+
+    // Remove registry prefix from image if already present
+    const cleanImage = image.replace(new RegExp(`^${registry}/`), '');
+
+    // Nexus Docker connector port provides direct access without /repository/ prefix
+    return `${registry}/${cleanImage}:${cleanTag}`;
+  }
+
+  static canHandle(repository: Repository): boolean {
+    return (
+      repository.type === 'NEXUS' ||
+      (repository.registryUrl?.includes('nexus') ?? false) ||
+      (repository.registryUrl?.includes(':8081') ?? false) ||
+      (repository.registryUrl?.includes(':8082') ?? false) ||
+      (repository.registryUrl?.includes(':8083') ?? false)
+    );
   }
 }
