@@ -700,20 +700,62 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
     // For GitLab Registry V2, rescanning involves:
     // 1. Re-fetching the manifest and metadata
     // 2. Triggering a new security scan if configured
-    
+
     const fullImageName = namespace ? `${namespace}/${imageName}` : imageName;
-    
+
     // Get fresh manifest
     const exportData = await this.exportImageData(fullImageName, tag);
-    
+
     logger.info(`Rescanned image ${fullImageName}:${tag}`, {
       manifestDigest: exportData.manifest?.config?.digest,
       layerCount: exportData.layers.length,
       totalSize: exportData.layers.reduce((sum, l) => sum + l.size, 0)
     });
-    
+
     // Note: Actual security scanning would be triggered by the caller
     // This method just ensures we have fresh registry data
   }
 
+  validateConfiguration(): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (!this.config.registryUrl?.trim()) {
+      errors.push('Registry URL is required for GitLab Registry');
+    }
+
+    if (!this.config.username?.trim()) {
+      errors.push('Username is required');
+    }
+
+    if (!this.config.password?.trim()) {
+      errors.push('Password is required');
+    }
+
+    // authUrl is optional as it can be derived from registryUrl
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+
+  formatFullImageReference(image: string, tag: string): string {
+    // Remove protocol from registry URL
+    let registry = this.config.registryUrl.replace(/^https?:\/\//, '');
+
+    const cleanTag = tag || 'latest';
+
+    // Remove registry prefix from image if already present
+    const cleanImage = image.replace(new RegExp(`^${registry}/`), '');
+
+    return `${registry}/${cleanImage}:${cleanTag}`;
+  }
+
+  static canHandle(repository: Repository): boolean {
+    return (
+      repository.type === 'GITLAB' ||
+      (repository.registryUrl?.includes('gitlab') ?? false) ||
+      (repository.authUrl?.includes('/jwt/auth') ?? false)
+    );
+  }
 }

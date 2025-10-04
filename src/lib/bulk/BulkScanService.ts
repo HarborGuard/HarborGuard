@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { scannerService } from '@/lib/scanner';
+import { config } from '@/lib/config';
 import type { ScanRequest } from '@/types';
 
 export interface BulkScanResult {
@@ -36,77 +37,92 @@ export interface BulkScanRequestWithName extends BulkScanRequest {
 export class BulkScanService {
   async executeBulkScan(request: BulkScanRequestWithName): Promise<BulkScanResult> {
     const batchId = this.generateBatchId();
-    
+
     console.log(`Starting bulk scan with batch ID: ${batchId}`);
 
-    try {
-      // Find matching images
-      const matchingImages = await this.findMatchingImages(
-        request.patterns,
-        request.patterns.excludeTagPattern ? [request.patterns.excludeTagPattern] : undefined
-      );
-      
-      console.log(`Found ${matchingImages.length} images matching bulk scan criteria`);
+    // Find matching images
+    const matchingImages = await this.findMatchingImages(
+      request.patterns,
+      request.patterns.excludeTagPattern ? [request.patterns.excludeTagPattern] : undefined
+    );
 
-      if (matchingImages.length === 0) {
-        throw new Error('No images found matching the specified patterns');
+    console.log(`Found ${matchingImages.length} images matching bulk scan criteria`);
+
+    if (matchingImages.length === 0) {
+      throw new Error('No images found matching the specified patterns');
+    }
+
+    // Apply maxImages limit
+    const limitedImages = request.options?.maxImages
+      ? matchingImages.slice(0, request.options.maxImages)
+      : matchingImages;
+
+    // Create batch record
+    await prisma.bulkScanBatch.create({
+      data: {
+        id: batchId,
+        name: request.name,
+        totalImages: limitedImages.length,
+        status: 'RUNNING',
+        patterns: request.patterns as any,
       }
+    });
 
-      // Apply maxImages limit
-      const limitedImages = request.options?.maxImages 
-        ? matchingImages.slice(0, request.options.maxImages)
-        : matchingImages;
+    // Queue scans in background WITHOUT blocking the HTTP response
+    // This allows the API to return immediately while scans are queued
+    this.queueScansInBackground(batchId, limitedImages, request.options?.scanners).catch(error => {
+      console.error(`Background scan queueing failed for batch ${batchId}:`, error);
+    });
 
-      // Create batch record
-      await prisma.bulkScanBatch.create({
-        data: {
-          id: batchId,
-          name: request.name,
-          totalImages: limitedImages.length,
-          status: 'RUNNING',
-          patterns: request.patterns as any,
-        }
-      });
+    // Return immediately - scans will be queued in background
+    return {
+      batchId,
+      totalImages: limitedImages.length,
+      scanIds: [], // Scans are being queued in background
+      skipped: 0
+    };
+  }
 
-      // Execute scans - queue will handle concurrency
-      const result = await this.executeQueuedScans(
-        limitedImages,
-        batchId,
-        request.options?.scanners
-      );
+  /**
+   * Queue scans in background without blocking HTTP response
+   */
+  private async queueScansInBackground(
+    batchId: string,
+    images: any[],
+    scanners?: {
+      trivy?: boolean;
+      grype?: boolean;
+      syft?: boolean;
+      dockle?: boolean;
+      osv?: boolean;
+      dive?: boolean;
+    }
+  ): Promise<void> {
+    try {
+      const result = await this.executeQueuedScans(images, batchId, scanners);
 
       // Update batch status
       await prisma.bulkScanBatch.update({
         where: { id: batchId },
-        data: { 
+        data: {
           status: 'COMPLETED',
           completedAt: new Date()
         }
       });
 
       console.log(`Bulk scan batch ${batchId} completed. ${result.successful} successful, ${result.failed} failed`);
-
-      return {
-        batchId,
-        totalImages: limitedImages.length,
-        scanIds: result.scanIds,
-        skipped: result.failed
-      };
-
     } catch (error) {
       console.error(`Bulk scan batch ${batchId} failed:`, error);
-      
+
       // Update batch status to failed
       await prisma.bulkScanBatch.update({
         where: { id: batchId },
-        data: { 
+        data: {
           status: 'FAILED',
           errorMessage: error instanceof Error ? error.message : String(error),
           completedAt: new Date()
         }
       }).catch(console.error);
-
-      throw error;
     }
   }
 
@@ -274,12 +290,16 @@ export class BulkScanService {
     const results: string[] = [];
     let successful = 0;
     let failed = 0;
-    
-    // Submit all scans to the queue with bulk scan priority
-    const scanPromises = images.map(async (image, index) => {
+
+    console.log(`Queuing ${images.length} scans`);
+
+    // Process images sequentially
+    for (let i = 0; i < images.length; i++) {
+      const image = images[i];
+
       try {
         // Determine correct source based on image source field
-        const scanSource: 'registry' | 'local' = 
+        const scanSource: 'registry' | 'local' =
           image.source === 'LOCAL_DOCKER' ? 'local' : 'registry';
 
         const scanRequest: ScanRequest = {
@@ -288,7 +308,7 @@ export class BulkScanService {
           source: scanSource,
           scanners: scanners // Pass scanner configuration
         };
-        
+
         // Use lower priority for bulk scans (0 = normal, -1 = bulk)
         const { scanId, queued, queuePosition } = await scannerService.startScan(scanRequest, -1);
 
@@ -302,19 +322,18 @@ export class BulkScanService {
           }
         });
 
-        // Monitor scan completion in background
-        this.monitorScanCompletion(batchId, scanId, image.id);
-
         if (queued) {
-          console.log(`Bulk scan for ${image.name}:${image.tag} queued at position ${queuePosition}`);
+          console.log(`[${i + 1}/${images.length}] Scan for ${image.name}:${image.tag} queued at position ${queuePosition}`);
+        } else {
+          console.log(`[${i + 1}/${images.length}] Scan for ${image.name}:${image.tag} started`);
         }
 
         successful++;
-        return scanId;
+        results.push(scanId);
 
       } catch (error) {
         console.error(`Failed to start scan for ${image.name}:${image.tag}`, error);
-        
+
         // Create a failed scan record first to satisfy foreign key constraint
         try {
           const failedScan = await prisma.scan.create({
@@ -341,59 +360,12 @@ export class BulkScanService {
         } catch (dbError) {
           console.error('Failed to create failed scan record:', dbError);
         }
-        
-        failed++;
-        return null;
-      }
-    });
 
-    // Wait for all scan submissions to complete
-    const scanResults = await Promise.all(scanPromises);
-    results.push(...scanResults.filter((id): id is string => id !== null));
+        failed++;
+      }
+    }
 
     return { scanIds: results, successful, failed };
-  }
-
-  private async monitorScanCompletion(batchId: string, scanId: string, imageId: string): Promise<void> {
-    // This would typically be handled by a background job or webhook
-    // For now, we'll use a simple polling mechanism
-    const pollInterval = setInterval(async () => {
-      try {
-        const scan = await prisma.scan.findUnique({
-          where: { id: scanId },
-          select: { status: true }
-        });
-
-        if (!scan) {
-          clearInterval(pollInterval);
-          return;
-        }
-
-        if (scan.status === 'SUCCESS' || scan.status === 'FAILED' || scan.status === 'CANCELLED') {
-          // Update bulk scan item status
-          await prisma.bulkScanItem.updateMany({
-            where: {
-              batchId,
-              scanId,
-              imageId
-            },
-            data: {
-              status: scan.status === 'SUCCESS' ? 'SUCCESS' : 'FAILED'
-            }
-          });
-
-          clearInterval(pollInterval);
-        }
-      } catch (error) {
-        console.error('Error monitoring scan completion:', error);
-        clearInterval(pollInterval);
-      }
-    }, 10000); // Poll every 10 seconds
-
-    // Clean up after 1 hour to prevent memory leaks
-    setTimeout(() => {
-      clearInterval(pollInterval);
-    }, 60 * 60 * 1000);
   }
 
   private generateBatchId(): string {

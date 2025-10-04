@@ -42,6 +42,7 @@ export interface SkopeoOptions {
   platform?: string;
   retryTimes?: number;
   quiet?: boolean;
+  env?: NodeJS.ProcessEnv;
 }
 
 /**
@@ -57,34 +58,49 @@ export abstract class EnhancedRegistryProvider {
   }
   
   // ===== Abstract Methods - Must be implemented by each provider =====
-  
+
   /**
    * Get authentication arguments for skopeo commands
    * Each registry has different auth mechanisms
    */
   abstract getSkopeoAuthArgs(): Promise<string>;
-  
+
   /**
    * Parse repository config into provider-specific format
    */
   protected abstract parseConfig(repository: Repository): RegistryConfig;
-  
+
   /**
    * Provider metadata
    */
   abstract getProviderName(): string;
   abstract getSupportedCapabilities(): RegistryCapability[];
   abstract getRateLimits(): RateLimit;
-  
+
   /**
    * Test connection to the registry
    */
   abstract testConnection(): Promise<ConnectionTestResult>;
-  
+
   /**
    * Get auth headers for HTTP API calls
    */
   abstract getAuthHeaders(): Promise<Record<string, string>>;
+
+  /**
+   * Validate provider-specific configuration
+   * Each provider defines its own validation rules
+   */
+  abstract validateConfiguration(): { valid: boolean; errors: string[] };
+
+  /**
+   * Format a complete image reference for pulling/pushing (without docker:// prefix)
+   * Each provider handles image reference formatting differently
+   * @param image - The image name (may include namespace)
+   * @param tag - The image tag
+   * @returns Fully qualified image reference (e.g., "docker.io/library/nginx:latest" or "ghcr.io/owner/repo:tag")
+   */
+  abstract formatFullImageReference(image: string, tag: string): string;
   
   // ===== Registry API Operations (Provider-specific implementation) =====
   
@@ -98,15 +114,13 @@ export abstract class EnhancedRegistryProvider {
    * Pull an image from the registry to local tar archive
    */
   async pullImage(image: string, tag: string, destination: string): Promise<void> {
-    const registry = this.formatRegistryForSkopeo();
-    const imageRef = `${registry}/${image}:${tag || 'latest'}`;
+    const imageRef = this.formatFullImageReference(image, tag);
     const authArgs = await this.getSkopeoAuthArgs();
-    // For copy command pulling FROM registry, replace --creds with --src-creds
-    const srcAuthArgs = authArgs.replace('--creds', '--src-creds');
-    const tlsVerify = this.shouldVerifyTLS() ? '' : '--tls-verify=false';
-    
+    const srcAuthArgs = authArgs.replace('--creds', '--src-creds').replace('--no-creds', '--src-no-creds');
+    const tlsVerify = this.shouldVerifyTLS() ? '' : '--src-tls-verify=false';
+
     const command = `skopeo copy ${srcAuthArgs} ${tlsVerify} docker://${imageRef} docker-archive:${destination}`;
-    
+
     logger.info(`Pulling image ${imageRef} to ${destination}`);
     await this.executeSkopeoCommand(command);
   }
@@ -115,14 +129,13 @@ export abstract class EnhancedRegistryProvider {
    * Push an image from local tar archive to the registry
    */
   async pushImage(source: string, image: string, tag: string): Promise<void> {
-    const imageRef = this.formatImageReference({ image, tag });
+    const imageRef = this.formatFullImageReference(image, tag);
     const authArgs = await this.getSkopeoAuthArgs();
-    // For copy command pushing TO registry, replace --creds with --dest-creds
-    const destAuthArgs = authArgs.replace('--creds', '--dest-creds');
-    const tlsVerify = this.shouldVerifyTLS() ? '' : '--tls-verify=false';
-    
+    const destAuthArgs = authArgs.replace('--creds', '--dest-creds').replace('--no-creds', '--dest-no-creds');
+    const tlsVerify = this.shouldVerifyTLS() ? '' : '--dest-tls-verify=false';
+
     const command = `skopeo copy ${destAuthArgs} ${tlsVerify} docker-archive:${source} docker://${imageRef}`;
-    
+
     logger.info(`Pushing image from ${source} to ${imageRef}`);
     await this.executeSkopeoCommand(command);
   }
@@ -134,21 +147,26 @@ export abstract class EnhancedRegistryProvider {
     const sourceRef = this.formatImageReference(source);
     const destRef = this.formatImageReference(destination);
 
-    // Get destination auth (this registry)
     const destAuthArgs = await this.getSkopeoAuthArgs();
-    // Extract credentials from --creds format and convert to --dest-creds
     let destAuth = '';
     if (destAuthArgs) {
-      const credsMatch = destAuthArgs.match(/--creds\s+(.+)/);
-      if (credsMatch) {
-        destAuth = `--dest-creds ${credsMatch[1]}`;
+      if (destAuthArgs.includes('--no-creds')) {
+        destAuth = '--dest-no-creds';
+      } else {
+        const credsMatch = destAuthArgs.match(/--creds\s+(.+)/);
+        if (credsMatch) {
+          destAuth = `--dest-creds ${credsMatch[1]}`;
+        }
       }
     }
 
-    // Handle source auth if provided
+    // Handle source auth
     let srcAuth = '';
     if (sourceCredentials) {
       srcAuth = `--src-creds "${sourceCredentials}"`;
+    } else {
+      // Use --src-no-creds to prevent using stored credentials from ~/.docker/config.json
+      srcAuth = '--src-no-creds';
     }
 
     // Build TLS verification flags
@@ -166,8 +184,7 @@ export abstract class EnhancedRegistryProvider {
    * Inspect an image to get detailed metadata
    */
   async inspectImage(image: string, tag: string): Promise<ImageInspection> {
-    const registry = this.formatRegistryForSkopeo();
-    const imageRef = `${registry}/${image}:${tag || 'latest'}`;
+    const imageRef = this.formatFullImageReference(image, tag);
     const authArgs = await this.getSkopeoAuthArgs();
     const tlsVerify = this.shouldVerifyTLS() ? '' : '--tls-verify=false';
 
@@ -176,7 +193,7 @@ export abstract class EnhancedRegistryProvider {
 
     console.log('[EnhancedRegistryProvider.inspectImage] Building skopeo command:', {
       repositoryType: this.repository.type,
-      registry,
+      providerName: this.getProviderName(),
       image,
       tag: tag || 'latest',
       imageRef,
@@ -297,16 +314,15 @@ export abstract class EnhancedRegistryProvider {
    * Get the digest of an image
    */
   async getImageDigest(image: string, tag: string): Promise<string> {
-    const registry = this.formatRegistryForSkopeo();
-    const imageRef = `${registry}/${image}:${tag || 'latest'}`;
+    const imageRef = this.formatFullImageReference(image, tag);
     const authArgs = await this.getSkopeoAuthArgs();
     const tlsVerify = this.shouldVerifyTLS() ? '' : '--tls-verify=false';
-    
+
     const command = `skopeo inspect ${authArgs} ${tlsVerify} --format '{{.Digest}}' docker://${imageRef}`;
-    
+
     logger.debug(`Getting digest for ${imageRef}`);
     const { stdout } = await this.executeSkopeoCommand(command);
-    
+
     return stdout.trim();
   }
   
@@ -444,10 +460,28 @@ export abstract class EnhancedRegistryProvider {
    * Format an image reference for the registry
    */
   protected formatImageReference(ref: ImageReference): string {
-    // Use the helper method to format registry URL
-    let registry = ref.registry ? ref.registry.replace(/^https?:\/\//, '') : this.formatRegistryForSkopeo();
+    // Determine which registry URL to use
+    let registry: string;
+
+    if (!ref.registry) {
+      // No registry specified - use this provider's registry
+      registry = this.formatRegistryForSkopeo();
+    } else {
+      // Check if the ref.registry matches this provider's registry (ignoring port/protocol)
+      const refRegistryClean = ref.registry.replace(/^https?:\/\//, '').replace(/:\d+$/, '');
+      const thisRegistryClean = this.repository.registryUrl.replace(/^https?:\/\//, '').replace(/:\d+$/, '');
+
+      if (refRegistryClean === thisRegistryClean) {
+        // This is our own registry - use provider-specific formatting (includes port logic)
+        registry = this.formatRegistryForSkopeo();
+      } else {
+        // This is a different registry (e.g., source in copyImage) - use as provided
+        registry = ref.registry.replace(/^https?:\/\//, '');
+      }
+    }
+
     let imageName = ref.image;
-    
+
     console.log('[EnhancedRegistryProvider.formatImageReference] Input:', {
       repositoryType: this.repository.type,
       refRegistry: ref.registry,
@@ -528,10 +562,11 @@ export abstract class EnhancedRegistryProvider {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         logger.debug(`Executing skopeo command (attempt ${attempt}/${maxRetries}): ${command}`);
-        
+
         const { stdout, stderr } = await execAsync(command, {
           maxBuffer: 50 * 1024 * 1024, // 50MB buffer
           timeout: 5 * 60 * 1000, // 5 minute timeout
+          env: options.env || process.env, // Use custom env if provided
         });
         
         return { stdout, stderr };
