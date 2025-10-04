@@ -257,28 +257,28 @@ export class PatchExecutorTar {
       const stats = await fs.stat(tarPath);
       logger.info(`Exported tar file: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
     } else {
-      // Download from registry using skopeo
-      // Import registry utilities to normalize registry name
-      const { normalizeRegistryUrl, detectRegistryType } = await import('@/lib/registry/registry-utils');
+      // Download from registry using provider
+      const { RegistryProviderFactory } = await import('@/lib/registry/providers/RegistryProviderFactory');
+      const { prisma } = await import('@/lib/prisma');
 
-      // Normalize the registry URL - converts display names like "Docker Hub Public" to "docker.io"
-      const registryType = detectRegistryType(image.registry);
-      const normalizedRegistry = normalizeRegistryUrl(image.registry, registryType);
+      // Try to find a repository for this registry
+      const repository = await prisma.repository.findFirst({
+        where: {
+          OR: [
+            { registryUrl: image.registry },
+            { registryUrl: { contains: image.registry } }
+          ]
+        }
+      });
 
-      // Build the image reference - for Docker Hub, don't include registry prefix
-      let imageRef: string;
-      if (registryType === 'DOCKERHUB' || normalizedRegistry === 'docker.io') {
-        // Docker Hub images don't need registry prefix
-        imageRef = `${image.name}:${image.tag}`;
-      } else {
-        // Other registries need the registry prefix
-        imageRef = `${normalizedRegistry}/${image.name}:${image.tag}`;
+      if (!repository) {
+        throw new Error(`No repository configured for registry: ${image.registry}. Please add the registry credentials before pulling images.`);
       }
 
-      logger.info(`Downloading from registry: ${imageRef} (normalized from ${image.registry})`);
-      await execAsync(
-        `skopeo copy --src-tls-verify=false docker://${imageRef} docker-archive:${tarPath}`
-      );
+      // Use the provider's pullImage method
+      const provider = RegistryProviderFactory.createFromRepository(repository);
+      logger.info(`Downloading ${image.name}:${image.tag} from ${provider.getProviderName()}`);
+      await provider.pullImage(image.name, image.tag, tarPath);
     }
     
     return tarPath;
@@ -390,13 +390,26 @@ export class PatchExecutorTar {
     imageName: string,
     tag: string
   ): Promise<void> {
-    const fullImageRef = `${registry}/${imageName}:${tag}`;
-    logger.info(`Pushing patched image to ${fullImageRef}`);
-    
-    // Use skopeo to push from tar to registry
-    await execAsync(
-      `skopeo copy --dest-tls-verify=false docker-archive:${tarPath} docker://${fullImageRef}`
-    );
+    const { RegistryProviderFactory } = await import('@/lib/registry/providers/RegistryProviderFactory');
+
+    // Try to find a repository for this registry
+    const repository = await prisma.repository.findFirst({
+      where: {
+        OR: [
+          { registryUrl: registry },
+          { registryUrl: { contains: registry } }
+        ]
+      }
+    });
+
+    if (!repository) {
+      throw new Error(`No repository configured for registry: ${registry}. Please add the registry credentials before pushing images.`);
+    }
+
+    // Use the provider's pushImage method
+    const provider = RegistryProviderFactory.createFromRepository(repository);
+    logger.info(`Pushing ${imageName}:${tag} to ${provider.getProviderName()}`);
+    await provider.pushImage(tarPath, imageName, tag);
   }
 
   private async savePatchReport(

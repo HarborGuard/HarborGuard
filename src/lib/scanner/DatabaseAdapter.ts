@@ -433,6 +433,23 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       where: { id: scanId },
       data: updates
     });
+
+    // Also update any bulk scan items associated with this scan
+    if (updates.status) {
+      try {
+        await prisma.bulkScanItem.updateMany({
+          where: { scanId },
+          data: {
+            status: updates.status === 'SUCCESS' || updates.status === 'COMPLETED' ? 'SUCCESS' :
+                    updates.status === 'FAILED' || updates.status === 'CANCELLED' ? 'FAILED' :
+                    'RUNNING'
+          }
+        });
+      } catch (error) {
+        // Ignore errors if bulk_scan_items table doesn't exist or scan is not part of a bulk scan
+        console.debug('Bulk scan item update skipped:', error);
+      }
+    }
   }
 
   async uploadScanResults(scanId: string, reports: ScanReports): Promise<void> {

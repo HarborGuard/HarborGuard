@@ -43,7 +43,7 @@ export interface AppConfig {
 function parseEnvConfig(): AppConfig {
   return {
     // Scanner Configuration
-    maxConcurrentScans: parseInt(process.env.MAX_CONCURRENT_SCANS || '3'),
+    maxConcurrentScans: parseInt(process.env.MAX_CONCURRENT_SCANS || '1'),
     scanTimeoutMinutes: parseInt(process.env.SCAN_TIMEOUT_MINUTES || '30'),
     enabledScanners: (process.env.ENABLED_SCANNERS || 'trivy,grype,syft,dockle,osv,dive')
       .split(',')

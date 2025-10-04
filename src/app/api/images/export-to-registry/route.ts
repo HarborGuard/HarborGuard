@@ -19,12 +19,24 @@ export async function POST(request: NextRequest) {
       targetImageName,
       targetImageTag = 'latest',
       repositoryId,
-      patchedTarPath
+      patchedTarPath,
+      scanId
     } = body;
 
-    if (!sourceImage && !patchedTarPath) {
+    logger.info('Export to registry request:', {
+      sourceImage,
+      targetRegistry,
+      targetImageName,
+      targetImageTag,
+      repositoryId,
+      patchedTarPath,
+      scanId,
+      hasScanId: !!scanId
+    });
+
+    if (!sourceImage && !patchedTarPath && !scanId) {
       return NextResponse.json(
-        { error: 'Source image or patched tar path is required' },
+        { error: 'Source image, scanId, or patched tar path is required' },
         { status: 400 }
       );
     }
@@ -100,74 +112,186 @@ export async function POST(request: NextRequest) {
       });
     } else {
       // Try to find existing tar file for the image
-      const [imageName, imageTag] = sourceImage.split(':');
-      const safeImageName = imageName.replace(/[/:]/g, '_');
       const imagesDir = path.join(workDir, 'images');
-      
-      // Look for any matching tar file
       let tarPath: string | null = null;
-      try {
-        const files = await fs.readdir(imagesDir);
-        const matchingFiles = files.filter(f => 
-          f.startsWith(safeImageName) && f.endsWith('.tar')
-        );
-        
-        if (matchingFiles.length > 0) {
-          // Use the most recent file
-          const fileStats = await Promise.all(
-            matchingFiles.map(async f => ({
-              path: path.join(imagesDir, f),
-              mtime: (await fs.stat(path.join(imagesDir, f))).mtime
-            }))
-          );
-          fileStats.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
-          tarPath = fileStats[0].path;
+
+      // First priority: Use scanId if provided (scans always create {scanId}.tar)
+      if (scanId) {
+        const scanTarPath = path.join(imagesDir, `${scanId}.tar`);
+        try {
+          await fs.access(scanTarPath);
+          tarPath = scanTarPath;
+          logger.info(`Found tar file for scan ${scanId}: ${tarPath}`);
+        } catch {
+          logger.warn(`No tar file found for scanId ${scanId} at ${scanTarPath}`);
         }
-      } catch (error) {
-        logger.warn('Failed to find tar files:', error);
+      } else if (sourceImage) {
+        // Fallback: If no scanId provided, try to find the most recent scan for this image
+        const [imageName, imageTag] = sourceImage.split(':');
+        try {
+          const mostRecentScan = await prisma.scan.findFirst({
+            where: {
+              image: {
+                name: imageName,
+                tag: imageTag || 'latest'
+              },
+              status: 'SUCCESS'
+            },
+            orderBy: {
+              createdAt: 'desc'
+            }
+          });
+
+          if (mostRecentScan) {
+            const scanTarPath = path.join(imagesDir, `${mostRecentScan.id}.tar`);
+            try {
+              await fs.access(scanTarPath);
+              tarPath = scanTarPath;
+              logger.info(`Found tar file for most recent scan ${mostRecentScan.id}: ${tarPath}`);
+            } catch {
+              logger.warn(`No tar file found for most recent scan ${mostRecentScan.id}`);
+            }
+          }
+        } catch (error) {
+          logger.warn('Failed to find most recent scan:', error);
+        }
+      }
+
+      // Second priority: Look for tar files by image name
+      if (!tarPath && sourceImage) {
+        const [imageName, imageTag] = sourceImage.split(':');
+        const safeImageName = imageName.replace(/[/:]/g, '_');
+
+        try {
+          const files = await fs.readdir(imagesDir);
+          const matchingFiles = files.filter(f =>
+            f.startsWith(safeImageName) && f.endsWith('.tar')
+          );
+
+          if (matchingFiles.length > 0) {
+            // Use the most recent file
+            const fileStats = await Promise.all(
+              matchingFiles.map(async f => ({
+                path: path.join(imagesDir, f),
+                mtime: (await fs.stat(path.join(imagesDir, f))).mtime
+              }))
+            );
+            fileStats.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+            tarPath = fileStats[0].path;
+            logger.info(`Found tar file by image name: ${tarPath}`);
+          }
+        } catch (error) {
+          logger.warn('Failed to find tar files by image name:', error);
+        }
       }
       
       if (tarPath) {
         // Push from existing tar file
+        logger.info(`Exporting from tar file: ${tarPath}`);
         await provider.pushImage(tarPath, targetImageName, targetImageTag);
+      } else if (scanId) {
+        // If scanId was provided but no tar found, this is an error
+        return NextResponse.json(
+          { error: `Scan tar file not found for scanId: ${scanId}. The scan may have failed or the tar file was cleaned up.` },
+          { status: 404 }
+        );
+      } else if (!sourceImage) {
+        return NextResponse.json(
+          { error: 'No tar file found and no source image specified' },
+          { status: 400 }
+        );
       } else {
-        // Check if we can access Docker daemon
+        // Fallback: Use registry-to-registry copy with skopeo
+        const [imageName, imageTag] = sourceImage.split(':');
+
+        logger.warn('No tar file found, falling back to registry-to-registry copy');
+
+        // Try to find the image in database to get its actual registry
+        let sourceRegistry: string | null = null;
         try {
-          await execAsync('docker version', { timeout: 5000 });
-          // Export from Docker first
-          tarPath = path.join(imagesDir, `${safeImageName}-export-${Date.now()}.tar`);
-          await fs.mkdir(imagesDir, { recursive: true });
-          
-          const dockerExport = await execAsync(`docker save -o ${tarPath} ${sourceImage}`);
-          if (dockerExport.stderr) {
-            logger.warn('Docker export stderr:', dockerExport.stderr);
-          }
-          
-          // Push the exported tar
-          await provider.pushImage(tarPath, targetImageName, targetImageTag);
-          
-          // Clean up temporary tar
-          await fs.unlink(tarPath).catch(() => {});
-        } catch (dockerError) {
-          // No Docker daemon, try direct copy between registries
-          const sourceRef = sourceImage.includes('/') 
-            ? sourceImage 
-            : `docker.io/library/${sourceImage}`;
-          
-          // Use registry handler to copy image between registries
-          await provider.copyImage(
-            { 
-              registry: sourceRef.split('/')[0],
-              image: imageName, 
-              tag: imageTag || 'latest' 
+          const dbImage = await prisma.image.findFirst({
+            where: {
+              name: imageName,
+              tag: imageTag || 'latest'
             },
-            { 
-              registry: targetRegistry.replace(/^https?:\/\//, ''),
-              image: targetImageName, 
-              tag: targetImageTag 
+            include: {
+              primaryRepository: true
+            },
+            orderBy: {
+              createdAt: 'desc'
             }
-          );
+          });
+
+          if (dbImage) {
+            // First try to use the primary repository's registryUrl
+            if (dbImage.primaryRepository?.registryUrl) {
+              sourceRegistry = dbImage.primaryRepository.registryUrl;
+              logger.info(`Found source registry from primaryRepository: ${sourceRegistry}`);
+            }
+            // Fallback: Try to map registryType to registry URL
+            else if (dbImage.registryType) {
+              const registryTypeMap: Record<string, string> = {
+                'GHCR': 'ghcr.io',
+                'DOCKERHUB': 'docker.io',
+                'GCR': 'gcr.io',
+                'ECR': 'amazonaws.com',
+                'GITLAB': 'registry.gitlab.com'
+              };
+              sourceRegistry = registryTypeMap[dbImage.registryType] || null;
+              if (sourceRegistry) {
+                logger.info(`Mapped registryType ${dbImage.registryType} to ${sourceRegistry}`);
+              }
+            }
+            // Last resort: Use the registry field if it looks like a domain
+            else if (dbImage.registry && !dbImage.registry.includes(' ')) {
+              sourceRegistry = dbImage.registry;
+              logger.info(`Using registry field: ${sourceRegistry}`);
+            }
+          }
+        } catch (dbError) {
+          logger.warn('Failed to lookup image in database:', dbError);
         }
+
+        // If we still don't have a registry, try to detect it from the image name
+        if (!sourceRegistry) {
+          // Check for common registry patterns
+          if (imageName.includes('ghcr.io/') || imageName.startsWith('ghcr.io/')) {
+            sourceRegistry = 'ghcr.io';
+          } else if (imageName.includes('gcr.io/') || imageName.startsWith('gcr.io/')) {
+            sourceRegistry = 'gcr.io';
+          } else if (imageName.includes('registry.gitlab.com/')) {
+            sourceRegistry = 'registry.gitlab.com';
+          } else if (sourceImage.includes('/')) {
+            // Default to docker.io for user/repo format
+            sourceRegistry = 'docker.io';
+          } else {
+            // Official Docker Hub images
+            sourceRegistry = 'docker.io';
+          }
+        }
+
+        const cleanImageName = imageName
+          .replace(/^ghcr\.io\//, '')
+          .replace(/^gcr\.io\//, '')
+          .replace(/^docker\.io\//, '')
+          .replace(/^registry\.gitlab\.com\//, '');
+
+        const sourceRef = `${sourceRegistry}/${cleanImageName}`;
+
+        // Use registry handler to copy image between registries
+        logger.info(`Copying image from ${sourceRef}:${imageTag || 'latest'} to ${targetRegistry}/${targetImageName}:${targetImageTag}`);
+        await provider.copyImage(
+          {
+            registry: sourceRegistry,
+            image: cleanImageName,
+            tag: imageTag || 'latest'
+          },
+          {
+            registry: targetRegistry.replace(/^https?:\/\//, ''),
+            image: targetImageName,
+            tag: targetImageTag
+          }
+        );
       }
       
       return NextResponse.json({
