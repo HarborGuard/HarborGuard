@@ -743,6 +743,10 @@
                   "patchedTarPath": {
                     "type": "string",
                     "description": "patchedTarPath parameter"
+                  },
+                  "scanId": {
+                    "type": "string",
+                    "description": "scanId parameter"
                   }
                 }
               }
