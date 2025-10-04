@@ -281,7 +281,7 @@ export class GenericOCIProvider extends EnhancedRegistryProvider {
   async deleteImage(image: string, tag: string): Promise<void> {
     const { namespace, imageName } = this.parseImageName(image);
     const fullName = this.buildFullName(namespace, imageName);
-    
+
     // First get the digest for this tag
     const manifestUrl = `${this.getRegistryUrl()}v2/${fullName}/manifests/${tag}`;
     const response = await this.makeAuthenticatedRequest(manifestUrl, {
@@ -289,16 +289,59 @@ export class GenericOCIProvider extends EnhancedRegistryProvider {
         'Accept': 'application/vnd.docker.distribution.manifest.v2+json'
       }
     });
-    
+
     const digest = response.headers.get('Docker-Content-Digest');
     if (!digest) {
       throw new Error('Unable to get digest for image');
     }
-    
+
     // Delete using the digest
     const deleteUrl = `${this.getRegistryUrl()}v2/${fullName}/manifests/${digest}`;
     await this.makeAuthenticatedRequest(deleteUrl, { method: 'DELETE' });
-    
+
     logger.info(`Deleted image ${fullName}:${tag} from registry`);
+  }
+
+  validateConfiguration(): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (!this.config.registryUrl?.trim()) {
+      errors.push('Registry URL is required for Generic OCI registries');
+    }
+
+    if (!this.config.username?.trim()) {
+      errors.push('Username is required');
+    }
+
+    if (!this.config.password?.trim()) {
+      errors.push('Password is required');
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+
+  formatFullImageReference(image: string, tag: string): string {
+    // Remove protocol and trailing slash from registry URL
+    let registry = this.config.registryUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+    // Add port if specified in repository
+    if (this.repository.registryPort && !registry.includes(':')) {
+      registry = `${registry}:${this.repository.registryPort}`;
+    }
+
+    const cleanTag = tag || 'latest';
+
+    // Remove registry prefix from image if already present
+    const cleanImage = image.replace(new RegExp(`^${registry}/`), '');
+
+    return `${registry}/${cleanImage}:${cleanTag}`;
+  }
+
+  static canHandle(repository: Repository): boolean {
+    // Generic provider is the fallback for any registry that doesn't match specific providers
+    return repository.type === 'GENERIC';
   }
 }

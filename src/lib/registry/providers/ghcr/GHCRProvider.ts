@@ -60,11 +60,9 @@ export class GHCRProvider extends EnhancedRegistryProvider {
   }
   
   async getSkopeoAuthArgs(): Promise<string> {
-    // GitHub Container Registry uses PAT for authentication
-    // Public repos don't require auth
-    // Check for non-empty credentials (not just falsy)
     if (!this.config.username?.trim() || !this.config.token?.trim()) {
-      return '';
+      // Use --no-creds to prevent using stored credentials from ~/.docker/config.json
+      return '--no-creds';
     }
     const escapedUsername = this.config.username.replace(/"/g, '\\"');
     const escapedToken = this.config.token.replace(/"/g, '\\"');
@@ -340,12 +338,46 @@ export class GHCRProvider extends EnhancedRegistryProvider {
   // Get detailed package information including vulnerability data if available
   async getPackageDetails(namespace: string | null, imageName: string): Promise<any> {
     await this.handleRateLimit();
-    
+
     const owner = namespace || this.config.username;
     const url = `${this.config.apiBaseUrl}/${this.config.organization ? 'orgs' : 'users'}/${owner}/packages/container/${imageName}`;
-    
+
     this.logRequest('GET', url);
     const response = await this.makeAuthenticatedRequest(url);
     return await response.json();
+  }
+
+  validateConfiguration(): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    // Username is optional for public repos
+    if (!this.config.username?.trim() && this.config.token?.trim()) {
+      errors.push('Username is required when using a token');
+    }
+
+    // Token validation - must be a GitHub PAT
+    if (this.config.token?.trim() && !this.config.token.startsWith('ghp_') && !this.config.token.startsWith('ghs_')) {
+      errors.push('GHCR requires a GitHub Personal Access Token (PAT) starting with ghp_ or ghs_');
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+
+  formatFullImageReference(image: string, tag: string): string {
+    // Remove ghcr.io prefix if present
+    const cleanImage = image.replace(/^ghcr\.io\//, '');
+    const cleanTag = tag || 'latest';
+
+    return `ghcr.io/${cleanImage}:${cleanTag}`;
+  }
+
+  static canHandle(repository: Repository): boolean {
+    return (
+      repository.type === 'GHCR' ||
+      (repository.registryUrl?.includes('ghcr.io') ?? false)
+    );
   }
 }

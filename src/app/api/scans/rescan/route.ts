@@ -88,28 +88,37 @@ export async function POST(request: NextRequest) {
     // Determine the source based on the image's source
     switch (imageData.source) {
       case 'LOCAL_DOCKER':
+        // For local Docker rescans, use local source without any registry info
         scanRequest.source = 'local';
         scanRequest.dockerImageId = imageData.dockerImageId || undefined;
+        // Don't set registry or registryType for local Docker scans
         break;
       case 'REGISTRY':
       case 'REGISTRY_PRIVATE':
+        // For registry rescans, use the repository from the database
         scanRequest.source = 'registry';
-        // Map registry display names to actual registry URLs
-        if (imageData.registry === 'Docker Hub Public' || imageData.registry === 'Docker Hub') {
-          // For public Docker Hub, explicitly set docker.io as registry
-          // The registryType will trigger creation of a temp repository without auth
-          scanRequest.registry = 'docker.io';
-          scanRequest.registryType = 'DOCKERHUB';
-        } else if (imageData.registry === 'GHCR Public') {
-          scanRequest.registry = 'ghcr.io';
-          scanRequest.registryType = 'GHCR';
+
+        // Use the primary repository ID if available - this ensures we use the correct provider
+        if (imageData.primaryRepositoryId) {
+          scanRequest.repositoryId = imageData.primaryRepositoryId;
         } else if (imageData.registry) {
-          scanRequest.registry = imageData.registry;
-          scanRequest.registryType = imageData.registryType as "DOCKERHUB" | "GHCR" | "GITLAB" | "GENERIC" | "ECR" | "GCR" || undefined;
-        } else {
-          // Default to Docker Hub if no registry is specified
-          scanRequest.registry = 'docker.io';
-          scanRequest.registryType = 'DOCKERHUB';
+          // Fallback: try to find a matching repository by name
+          const matchingRepo = await prisma.repository.findFirst({
+            where: {
+              OR: [
+                { name: imageData.registry },
+                { registryUrl: imageData.registry }
+              ]
+            }
+          });
+
+          if (matchingRepo) {
+            scanRequest.repositoryId = matchingRepo.id;
+          } else {
+            // Only set registry type if we don't have a repository
+            // This will cause a temporary repository to be created (which may fail)
+            scanRequest.registryType = imageData.registryType as "DOCKERHUB" | "GHCR" | "GITLAB" | "GENERIC" | "ECR" | "GCR" || undefined;
+          }
         }
         break;
       case 'FILE_UPLOAD':

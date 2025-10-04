@@ -49,25 +49,25 @@ export class DockerHubProvider extends EnhancedRegistryProvider {
   }
   
   async getAuthHeaders(): Promise<Record<string, string>> {
-    await this.ensureValidToken();
-    return this.token ? { 'Authorization': `JWT ${this.token}` } : {};
+    // Only try to get token if we have credentials
+    if (this.config.username?.trim() && this.config.password?.trim()) {
+      await this.ensureValidToken();
+      return this.token ? { 'Authorization': `JWT ${this.token}` } : {};
+    }
+    // No credentials means anonymous access - no auth headers
+    return {};
   }
   
   async getSkopeoAuthArgs(): Promise<string> {
-    // Docker Hub supports both username/password and token auth
-    // Check for non-empty credentials (not just truthy, which would include empty strings)
     if (this.config.username?.trim() && this.config.password?.trim()) {
-      // Escape credentials for shell command
       const escapedUsername = this.config.username.replace(/"/g, '\\"');
       const escapedPassword = this.config.password.replace(/"/g, '\\"');
       return `--creds "${escapedUsername}:${escapedPassword}"`;
     }
-    // For public Docker Hub access without credentials, we should not pass any auth
-    // This avoids the "unauthorized" error when accessing public images
-    // Note: This may hit rate limits for anonymous access
-    return '';
+    // Use --no-creds to prevent using stored credentials from ~/.docker/config.json
+    return '--no-creds';
   }
-  
+
   async listImages(options: ListImagesOptions = {}): Promise<RegistryImage[]> {
     await this.handleRateLimit();
     
@@ -174,17 +174,30 @@ export class DockerHubProvider extends EnhancedRegistryProvider {
   
   async testConnection(): Promise<ConnectionTestResult> {
     try {
-      await this.ensureValidToken();
-      
-      // Test by listing a small number of images
-      const images = await this.listImages({ limit: 1 });
-      
-      return {
-        success: true,
-        message: 'Successfully connected to Docker Hub',
-        repositoryCount: images.length > 0 ? 1 : 0, // We only fetched 1
-        capabilities: this.getSupportedCapabilities()
-      };
+      // If we have credentials, test by listing images
+      if (this.config.username?.trim() && this.config.password?.trim()) {
+        await this.ensureValidToken();
+
+        // Test by listing a small number of images
+        const images = await this.listImages({ limit: 1 });
+
+        return {
+          success: true,
+          message: 'Successfully connected to Docker Hub with authentication',
+          repositoryCount: images.length > 0 ? 1 : 0, // We only fetched 1
+          capabilities: this.getSupportedCapabilities()
+        };
+      } else {
+        // For anonymous access, test if we can search (doesn't require auth)
+        await this.searchImages('alpine', { limit: 1 });
+
+        return {
+          success: true,
+          message: 'Successfully connected to Docker Hub (anonymous access - may have rate limits)',
+          repositoryCount: 0,
+          capabilities: ['SEARCH']
+        };
+      }
     } catch (error) {
       return {
         success: false,
@@ -195,13 +208,19 @@ export class DockerHubProvider extends EnhancedRegistryProvider {
   }
   
   private async ensureValidToken(): Promise<void> {
+    // Don't try to get token if we don't have credentials
+    if (!this.config.username?.trim() || !this.config.password?.trim()) {
+      logger.debug('No credentials provided, skipping token authentication');
+      return;
+    }
+
     if (this.token && this.tokenExpiry && new Date() < this.tokenExpiry) {
       return; // Token is still valid
     }
-    
+
     const loginUrl = 'https://hub.docker.com/v2/users/login/';
     this.logRequest('POST', loginUrl);
-    
+
     const response = await fetch(loginUrl, {
       method: 'POST',
       headers: {
@@ -212,12 +231,12 @@ export class DockerHubProvider extends EnhancedRegistryProvider {
         password: this.config.password
       })
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
       throw new Error(`Docker Hub authentication failed: ${errorText}`);
     }
-    
+
     const data = await response.json();
     this.token = data.token;
     this.tokenExpiry = new Date(Date.now() + 30 * 60000); // 30 minutes
@@ -256,5 +275,58 @@ export class DockerHubProvider extends EnhancedRegistryProvider {
     this.token = undefined;
     this.tokenExpiry = undefined;
     await this.ensureValidToken();
+  }
+
+  validateConfiguration(): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    // For Docker Hub, credentials are optional (allows anonymous/public access)
+    // But if one is provided, both must be provided
+    const hasUsername = this.config.username?.trim();
+    const hasPassword = this.config.password?.trim();
+
+    if (hasUsername && !hasPassword) {
+      errors.push('Password/Token is required when username is provided');
+    }
+
+    if (hasPassword && !hasUsername) {
+      errors.push('Username is required when password/token is provided');
+    }
+
+    // Note: Empty credentials are valid for DockerHub (enables anonymous public access)
+    // This may hit rate limits but allows scanning public images without authentication
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+
+  formatFullImageReference(image: string, tag: string): string {
+    // Docker Hub has a special case - images without a namespace go to "library"
+    // But we don't include "docker.io" in the reference for pulling
+    const cleanImage = image.replace(/^docker\.io\//, '');
+    const cleanTag = tag || 'latest';
+
+    // If image doesn't have a namespace (no /), it's implicitly library/
+    if (!cleanImage.includes('/')) {
+      return `docker.io/library/${cleanImage}:${cleanTag}`;
+    }
+
+    return `docker.io/${cleanImage}:${cleanTag}`;
+  }
+
+  static canHandle(repository: Repository): boolean {
+    // If type is explicitly set to a non-DockerHub registry, reject
+    if (repository.type && repository.type !== 'DOCKERHUB' && repository.type !== 'GENERIC') {
+      return false;
+    }
+
+    return (
+      repository.type === 'DOCKERHUB' ||
+      repository.registryUrl === 'docker.io' ||
+      repository.registryUrl === 'registry-1.docker.io' ||
+      repository.registryUrl === 'index.docker.io'
+    );
   }
 }

@@ -110,8 +110,29 @@ export class ScanExecutor implements IScanExecutor {
     await this.setupDirectories(reportDir, cacheDir);
     this.progressTracker.updateProgress(requestId, 10, 'Setting up scan environment');
 
-    // Get registry URL from repository service
-    const registryUrl = await this.repositoryService.getRegistryUrl(request.repositoryId, request.image) || request.registry;
+    // Get registry URL from repository service or map from registry type
+    let registryUrl = await this.repositoryService.getRegistryUrl(request.repositoryId, request.image) || request.registry;
+
+    // If we don't have a registry URL but have a registry type, map it
+    if (!registryUrl && request.registryType) {
+      switch (request.registryType) {
+        case 'GHCR':
+          registryUrl = 'ghcr.io';
+          break;
+        case 'DOCKERHUB':
+          registryUrl = 'docker.io';
+          break;
+        case 'ECR':
+          // ECR needs more specific URL, but we can't determine it without more info
+          break;
+        case 'GCR':
+          registryUrl = 'gcr.io';
+          break;
+        case 'GITLAB':
+          // GitLab needs specific instance URL
+          break;
+      }
+    }
 
     // Parse the image name to handle cases where it already includes the registry
     let cleanImageName = request.image;
@@ -139,71 +160,26 @@ export class ScanExecutor implements IScanExecutor {
       // Try to find a repository for this image
       repository = await this.repositoryService.findForImage(request.image);
     }
-    
+
     if (!repository) {
-      // Create a temporary repository based on the registry URL and type hint
-      let repoType: 'DOCKERHUB' | 'GHCR' | 'GENERIC' | 'ECR' | 'GCR' = 'DOCKERHUB';
-      let repoName = 'Docker Hub';
-      let repoUrl = registryUrl || 'docker.io';
-      
-      // Use registryType hint if provided
-      if (request.registryType) {
-        if (request.registryType === 'GITLAB') {
-          // GitLab uses GENERIC type with special handling
-          repoType = 'GENERIC';
-          repoName = 'GitLab Container Registry';
-        } else {
-          repoType = request.registryType as any;
-          switch (request.registryType) {
-            case 'GHCR':
-              // Check if it's public (no auth) or private
-              repoName = (!request.repositoryId && !registryUrl) ? 'GHCR Public' : 'GitHub Container Registry';
-              break;
-            case 'ECR':
-              repoName = 'AWS Elastic Container Registry';
-              break;
-            case 'GCR':
-              repoName = 'Google Container Registry';
-              break;
-            case 'DOCKERHUB':
-              repoName = 'Docker Hub Public';
-              break;
-            default:
-              repoName = 'Generic Registry';
-          }
-        }
-      } else {
-        // Auto-detect repository type based on registry URL
-        if (repoUrl.includes('ghcr.io')) {
-          repoType = 'GHCR';
-          repoName = 'GHCR Public';
-        } else if (repoUrl.includes('gitlab')) {
-          repoType = 'GENERIC';
-          repoName = 'GitLab Container Registry';
-        } else if (repoUrl.includes('ecr')) {
-          repoType = 'ECR';
-          repoName = 'AWS Elastic Container Registry';
-        } else if (repoUrl.includes('gcr.io') || repoUrl.includes('pkg.dev')) {
-          repoType = 'GCR';
-          repoName = 'Google Container Registry';
-        } else if (repoUrl === 'docker.io' || repoUrl === 'registry-1.docker.io') {
-          repoType = 'DOCKERHUB';
-          repoName = 'Docker Hub Public';
-        } else {
-          repoType = 'GENERIC';
-          repoName = 'Generic Registry';
-        }
-      }
-      
+      // Create a temporary repository
+      // The provider factory will auto-detect the right provider
+      const repoUrl = registryUrl || 'docker.io';
+      const repoType = (request.registryType as any) || 'GENERIC';
+
       repository = {
         id: 'temp',
-        name: repoName,
+        name: `Temporary ${repoType} Repository`,
         type: repoType,
         protocol: 'https',
         registryUrl: repoUrl,
         username: '',
         encryptedPassword: '',
         organization: null,
+        authUrl: null,
+        groupId: null,
+        skipTlsVerify: false,
+        registryPort: null,
         status: 'ACTIVE',
         lastTested: null,
         repositoryCount: null,
