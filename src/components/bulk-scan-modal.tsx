@@ -132,24 +132,27 @@ export function BulkScanModal({ children }: BulkScanModalProps) {
       const result = await response.json();
       
       if (result.success) {
-        // Get detailed status for each running job
-        const jobsWithDetails = await Promise.all(
-          result.data.map(async (job: BulkScanJob) => {
-            if (job.status === "RUNNING") {
-              try {
-                const statusResponse = await fetch(`/api/scans/bulk/${job.id}`);
-                const statusResult = await statusResponse.json();
-                if (statusResult.success) {
-                  return { ...job, summary: statusResult.data.summary };
-                }
-              } catch (error) {
-                console.error(`Failed to fetch status for job ${job.id}:`, error);
+        // Get detailed status for running jobs SEQUENTIALLY to avoid database contention
+        const jobsWithDetails = [];
+        for (const job of result.data) {
+          if (job.status === "RUNNING") {
+            try {
+              const statusResponse = await fetch(`/api/scans/bulk/${job.id}`);
+              const statusResult = await statusResponse.json();
+              if (statusResult.success) {
+                jobsWithDetails.push({ ...job, summary: statusResult.data.summary });
+              } else {
+                jobsWithDetails.push(job);
               }
+            } catch (error) {
+              console.error(`Failed to fetch status for job ${job.id}:`, error);
+              jobsWithDetails.push(job);
             }
-            return job;
-          })
-        );
-        
+          } else {
+            jobsWithDetails.push(job);
+          }
+        }
+
         setJobs(jobsWithDetails);
       } else {
         toast.error("Failed to fetch bulk scan jobs");
@@ -226,9 +229,10 @@ export function BulkScanModal({ children }: BulkScanModalProps) {
           enableDive: false,
         });
 
-        // Switch to jobs tab and refresh
+        // Switch to jobs tab and refresh after a short delay
+        // This allows the backend to start queueing scans before we query status
         setActiveTab("jobs");
-        fetchJobs();
+        setTimeout(() => fetchJobs(), 2000);
       } else {
         toast.error(result.error || "Failed to start bulk scan");
       }
