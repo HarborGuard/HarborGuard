@@ -51,100 +51,99 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0');
     const search = searchParams.get('search') || '';
     const severity = searchParams.get('severity') || '';
-    const maxAffectedImages = 10; // Limit affected images per CVE to reduce payload
+    const includeTotal = searchParams.get('includeTotal') !== 'false';
+    const maxAffectedImages = 10;
 
-    // Step 1: Get unique CVE IDs with aggregated data using Prisma groupBy
-    // Build the where clause
-    const findingWhere: any = {};
+    // Build WHERE clause for SQL
+    let whereConditions: string[] = [];
+    let params: any[] = [];
+    let paramIndex = 1;
+
     if (severity) {
-      findingWhere.severity = severity.toUpperCase();
+      whereConditions.push(`severity::text = $${paramIndex}`);
+      params.push(severity.toUpperCase());
+      paramIndex++;
     }
+
     if (search) {
-      findingWhere.OR = [
-        { cveId: { contains: search, mode: 'insensitive' } },
-        { packageName: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { title: { contains: search, mode: 'insensitive' } }
-      ];
+      const searchPattern = `%${search}%`;
+      whereConditions.push(`("cveId" ILIKE $${paramIndex} OR "packageName" ILIKE $${paramIndex} OR description ILIKE $${paramIndex} OR title ILIKE $${paramIndex})`);
+      params.push(searchPattern);
+      paramIndex++;
     }
 
-    // Get total count
-    const totalCount = await prisma.scanVulnerabilityFinding.groupBy({
-      by: ['cveId'],
-      where: findingWhere
-    });
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
-    const total = totalCount.length;
+    // Single optimized query to get paginated, sorted CVEs with all aggregations
+    // Uses composite indexes on (cveId, severity, cvssScore) for efficient window function
+    // and (cveId, scanId) for efficient COUNT DISTINCT
+    const cveAggregations = await prisma.$queryRawUnsafe<Array<{
+      cveId: string;
+      severity: string;
+      maxCvssScore: number | null;
+      scanCount: bigint;
+      description: string | null;
+      packageName: string | null;
+    }>>(
+      `
+      WITH cve_aggregates AS (
+        SELECT
+          "cveId",
+          MAX(CASE severity::text
+            WHEN 'CRITICAL' THEN 5
+            WHEN 'HIGH' THEN 4
+            WHEN 'MEDIUM' THEN 3
+            WHEN 'LOW' THEN 2
+            WHEN 'INFO' THEN 1
+            ELSE 0
+          END) as severity_priority,
+          MAX("cvssScore") as "maxCvssScore",
+          COUNT(DISTINCT "scanId") as "scanCount"
+        FROM "scan_vulnerability_findings"
+        ${whereClause}
+        GROUP BY "cveId"
+        ORDER BY severity_priority DESC, "maxCvssScore" DESC NULLS LAST, "cveId" ASC
+        LIMIT $${paramIndex}
+        OFFSET $${paramIndex + 1}
+      ),
+      top_findings AS (
+        SELECT DISTINCT ON (svf."cveId")
+          svf."cveId",
+          svf.severity::text as severity,
+          svf.description,
+          svf."packageName"
+        FROM "scan_vulnerability_findings" svf
+        INNER JOIN cve_aggregates ca ON ca."cveId" = svf."cveId"
+        ORDER BY svf."cveId",
+          CASE svf.severity::text
+            WHEN 'CRITICAL' THEN 5
+            WHEN 'HIGH' THEN 4
+            WHEN 'MEDIUM' THEN 3
+            WHEN 'LOW' THEN 2
+            WHEN 'INFO' THEN 1
+            ELSE 0
+          END DESC,
+          svf."cvssScore" DESC NULLS LAST
+      )
+      SELECT
+        ca."cveId",
+        tf.severity,
+        ca."maxCvssScore",
+        ca."scanCount",
+        tf.description,
+        tf."packageName"
+      FROM cve_aggregates ca
+      INNER JOIN top_findings tf ON tf."cveId" = ca."cveId"
+      ORDER BY ca.severity_priority DESC, ca."maxCvssScore" DESC NULLS LAST, ca."cveId" ASC
+      `,
+      ...params,
+      limit,
+      offset
+    );
 
-    // Get aggregated CVEs with pagination
-    const aggregatedCVEs = await prisma.scanVulnerabilityFinding.groupBy({
-      by: ['cveId'],
-      where: findingWhere,
-      _max: {
-        cvssScore: true
-      },
-      _count: {
-        scanId: true
-      },
-      orderBy: {
-        _max: {
-          cvssScore: 'desc'
-        }
-      },
-      skip: offset,
-      take: limit
-    });
+    const finalCveIds = cveAggregations.map(c => c.cveId);
 
-    // Get severity for each CVE (need separate query since groupBy doesn't handle CASE well)
-    const cveIdsForPage = aggregatedCVEs.map(cve => cve.cveId);
-
-    const severityData = await prisma.scanVulnerabilityFinding.findMany({
-      where: {
-        cveId: { in: cveIdsForPage }
-      },
-      select: {
-        cveId: true,
-        severity: true,
-        cvssScore: true
-      },
-      orderBy: {
-        severity: 'desc'
-      }
-    });
-
-    // Map to get highest severity per CVE
-    const severityMap = new Map<string, string>();
-    severityData.forEach(s => {
-      const currentPriority = severityMap.has(s.cveId)
-        ? getSeverityPriority(severityMap.get(s.cveId)!)
-        : -1;
-      const newPriority = getSeverityPriority(s.severity);
-      if (newPriority > currentPriority) {
-        severityMap.set(s.cveId, s.severity);
-      }
-    });
-
-    // Sort CVEs by severity priority, then CVSS score
-    const sortedCveIds = aggregatedCVEs
-      .map(cve => ({
-        cveId: cve.cveId,
-        severity: severityMap.get(cve.cveId) || 'UNKNOWN',
-        maxCvssScore: cve._max.cvssScore
-      }))
-      .sort((a, b) => {
-        const aPriority = getSeverityPriority(a.severity);
-        const bPriority = getSeverityPriority(b.severity);
-        if (bPriority !== aPriority) {
-          return bPriority - aPriority;
-        }
-        const aScore = a.maxCvssScore || 0;
-        const bScore = b.maxCvssScore || 0;
-        return bScore - aScore;
-      })
-      .map(item => item.cveId);
-
-    // Step 2: Get detailed data only for CVEs in current page
-    if (sortedCveIds.length === 0) {
+    if (finalCveIds.length === 0) {
       return NextResponse.json({
         vulnerabilities: [],
         pagination: {
@@ -156,25 +155,61 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const vulnerabilityFindings = await prisma.scanVulnerabilityFinding.findMany({
-      where: {
-        cveId: { in: sortedCveIds }
-      },
-      include: {
-        scan: {
-          include: {
-            image: true
+    // Get total count in parallel only if needed
+    let total: number | undefined;
+    if (includeTotal) {
+      const countResult = await prisma.$queryRawUnsafe<Array<{ count: bigint }>>(
+        `SELECT COUNT(DISTINCT "cveId") as count FROM "scan_vulnerability_findings" ${whereClause}`,
+        ...params.slice(0, paramIndex - 1)
+      );
+      total = Number(countResult[0]?.count || 0);
+    }
+
+    // Fetch detailed findings and metadata in parallel
+    const [vulnerabilityFindings, correlations] = await Promise.all([
+      prisma.scanVulnerabilityFinding.findMany({
+        where: {
+          cveId: { in: finalCveIds }
+        },
+        select: {
+          cveId: true,
+          severity: true,
+          cvssScore: true,
+          description: true,
+          title: true,
+          packageName: true,
+          fixedVersion: true,
+          publishedDate: true,
+          vulnerabilityUrl: true,
+          source: true,
+          scanId: true,
+          scan: {
+            select: {
+              imageId: true,
+              image: {
+                select: {
+                  name: true
+                }
+              }
+            }
           }
         }
-      },
-      orderBy: [
-        { severity: 'desc' },
-        { cvssScore: 'desc' },
-        { cveId: 'asc' }
-      ]
-    });
+      }),
+      prisma.scanFindingCorrelation.findMany({
+        where: {
+          findingType: 'vulnerability',
+          correlationKey: { in: finalCveIds }
+        },
+        select: {
+          correlationKey: true,
+          sources: true,
+          sourceCount: true,
+          confidenceScore: true
+        }
+      })
+    ]);
 
-    // Get classifications only for these CVEs and their images
+    // Get classifications for affected images
     const imageIds = [...new Set(vulnerabilityFindings.map(f => f.scan.imageId))];
     const classifications = await prisma.cveClassification.findMany({
       where: {
@@ -201,15 +236,9 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // Group vulnerabilities by CVE ID
-    const cveMap = new Map<string, {
-      cveId: string;
-      severity: string;
-      description: string;
-      cvssScore?: number;
-      packageNames: Set<string>;
+    // Build quick lookup maps
+    const cveDataMap = new Map<string, {
       fixedVersions: Set<string>;
-      publishedDate?: Date;
       references: Set<string>;
       affectedImages: Array<{
         imageName: string;
@@ -217,64 +246,36 @@ export async function GET(request: NextRequest) {
         isFalsePositive: boolean;
       }>;
       sources: Set<string>;
+      publishedDate?: Date;
     }>();
 
-    // Process findings
+    // Process findings efficiently
     for (const finding of vulnerabilityFindings) {
       const cveId = finding.cveId;
 
-      const imageClassifications = classificationMap.get(cveId);
-      const isFalsePositive = imageClassifications?.get(finding.scan.imageId) || false;
-
-      if (!cveMap.has(cveId)) {
-        cveMap.set(cveId, {
-          cveId,
-          severity: finding.severity,
-          description: finding.description || finding.title || '',
-          cvssScore: finding.cvssScore || undefined,
-          packageNames: new Set(),
+      if (!cveDataMap.has(cveId)) {
+        cveDataMap.set(cveId, {
           fixedVersions: new Set(),
-          publishedDate: finding.publishedDate || undefined,
           references: new Set(),
           affectedImages: [],
-          sources: new Set()
+          sources: new Set(),
+          publishedDate: finding.publishedDate || undefined
         });
-      } else {
-        const existing = cveMap.get(cveId)!;
-        if (getSeverityPriority(finding.severity) > getSeverityPriority(existing.severity)) {
-          existing.severity = finding.severity;
-        }
-        if (finding.cvssScore && (!existing.cvssScore || finding.cvssScore > existing.cvssScore)) {
-          existing.cvssScore = finding.cvssScore;
-        }
-        if (!existing.description && (finding.description || finding.title)) {
-          existing.description = finding.description || finding.title || '';
-        }
       }
 
-      const cveData = cveMap.get(cveId)!;
+      const cveData = cveDataMap.get(cveId)!;
 
-      if (finding.packageName) {
-        cveData.packageNames.add(finding.packageName);
-      }
-
-      if (finding.fixedVersion) {
-        cveData.fixedVersions.add(finding.fixedVersion);
-      }
-
-      if (finding.vulnerabilityUrl) {
-        cveData.references.add(finding.vulnerabilityUrl);
-      }
-
+      if (finding.fixedVersion) cveData.fixedVersions.add(finding.fixedVersion);
+      if (finding.vulnerabilityUrl) cveData.references.add(finding.vulnerabilityUrl);
       cveData.sources.add(finding.source);
 
-      // Only add if we haven't reached the limit for affected images
+      // Limit affected images to reduce payload
       if (cveData.affectedImages.length < maxAffectedImages) {
-        const imageAlreadyAdded = cveData.affectedImages.some(
-          img => img.imageId === finding.scan.imageId
-        );
+        const imageClassifications = classificationMap.get(cveId);
+        const isFalsePositive = imageClassifications?.get(finding.scan.imageId) || false;
 
-        if (!imageAlreadyAdded) {
+        const imageExists = cveData.affectedImages.some(img => img.imageId === finding.scan.imageId);
+        if (!imageExists) {
           cveData.affectedImages.push({
             imageName: finding.scan.image.name,
             imageId: finding.scan.imageId,
@@ -284,47 +285,39 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get correlations only for current page CVEs
-    const correlations = await prisma.scanFindingCorrelation.findMany({
-      where: {
-        findingType: 'vulnerability',
-        correlationKey: { in: sortedCveIds }
-      },
-      select: {
-        correlationKey: true,
-        sources: true,
-        sourceCount: true,
-        confidenceScore: true
-      }
-    });
-
     const correlationMap = new Map<string, any>();
     correlations.forEach(corr => {
       correlationMap.set(corr.correlationKey, corr);
     });
 
-    // Convert to array (already sorted)
-    const vulnerabilities = sortedCveIds.map(cveId => {
-      const cve = cveMap.get(cveId)!;
+    // Build aggregation lookup map
+    const aggregationMap = new Map<string, typeof cveAggregations[0]>();
+    cveAggregations.forEach(agg => {
+      aggregationMap.set(agg.cveId, agg);
+    });
+
+    // Convert to array (already sorted by the query)
+    const vulnerabilities = finalCveIds.map((cveId) => {
+      const cveData = cveDataMap.get(cveId);
+      const aggregated = aggregationMap.get(cveId);
       const correlation = correlationMap.get(cveId);
-      const aggregated = aggregatedCVEs.find(a => a.cveId === cveId);
 
       return {
-        cveId: cve.cveId,
-        severity: cve.severity,
-        description: cve.description,
-        cvssScore: cve.cvssScore,
-        packageName: Array.from(cve.packageNames)[0],
-        affectedImages: cve.affectedImages,
-        totalAffectedImages: aggregated?._count?.scanId || cve.affectedImages.length,
-        falsePositiveImages: cve.affectedImages
+        cveId: cveId,
+        severity: aggregated?.severity || 'UNKNOWN',
+        description: aggregated?.description || undefined,
+        cvssScore: aggregated?.maxCvssScore || undefined,
+        packageName: aggregated?.packageName || (cveData ? Array.from(cveData.fixedVersions)[0] : undefined),
+        affectedImages: cveData?.affectedImages || [],
+        totalAffectedImages: Number(aggregated?.scanCount || 0),
+        falsePositiveImages: cveData?.affectedImages
           .filter(img => img.isFalsePositive)
-          .map(img => img.imageName),
-        fixedVersion: Array.from(cve.fixedVersions)[0],
-        publishedDate: cve.publishedDate?.toISOString(),
-        references: Array.from(cve.references),
-        sources: Array.from(cve.sources),
-        sourceCount: correlation?.sourceCount || cve.sources.size,
+          .map(img => img.imageName) || [],
+        fixedVersion: cveData ? Array.from(cveData.fixedVersions)[0] : undefined,
+        publishedDate: cveData?.publishedDate?.toISOString(),
+        references: cveData ? Array.from(cveData.references) : [],
+        sources: cveData ? Array.from(cveData.sources) : [],
+        sourceCount: correlation?.sourceCount || (cveData?.sources.size || 0),
         confidenceScore: correlation?.confidenceScore
       };
     });
@@ -335,7 +328,7 @@ export async function GET(request: NextRequest) {
         total,
         limit,
         offset,
-        hasMore: offset + limit < total
+        hasMore: total !== undefined ? offset + limit < total : vulnerabilities.length >= limit
       }
     });
 
