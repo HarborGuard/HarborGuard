@@ -11,6 +11,7 @@ import type {
   RateLimit
 } from '../../types';
 import { logger } from '@/lib/logger';
+import https from 'https';
 
 /**
  * Nexus Repository Manager provider implementation
@@ -67,7 +68,8 @@ export class NexusProvider extends EnhancedRegistryProvider {
       password: repository.encryptedPassword,
       registryUrl: repository.registryUrl,
       protocol: repository.protocol,
-      repositoryName
+      repositoryName,
+      skipTlsVerify: repository.skipTlsVerify
     };
   }
 
@@ -76,12 +78,46 @@ export class NexusProvider extends EnhancedRegistryProvider {
     return { 'Authorization': `Basic ${auth}` };
   }
 
-  async getSkopeoAuthArgs(): Promise<string> {
-    if (!this.config.username || !this.config.password) {
-      return '';
+  protected async makeAuthenticatedRequest(
+    url: string,
+    options?: RequestInit
+  ): Promise<Response> {
+    const headers = await this.getAuthHeaders();
+
+    const fetchOptions: RequestInit = {
+      ...options,
+      headers: { ...headers, ...options?.headers }
+    };
+
+    if (this.config.skipTlsVerify) {
+      const agent = new https.Agent({
+        rejectUnauthorized: false
+      });
+      (fetchOptions as any).agent = agent;
     }
-    // Properly quote credentials to handle special characters
-    return `--creds "${this.config.username}:${this.config.password}"`;
+
+    const response = await fetch(url, fetchOptions);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return response;
+  }
+
+  async getSkopeoAuthArgs(): Promise<string> {
+    const args: string[] = [];
+
+    if (this.config.username && this.config.password) {
+      // Properly quote credentials to handle special characters
+      args.push(`--creds "${this.config.username}:${this.config.password}"`);
+    }
+
+    if (this.config.skipTlsVerify) {
+      args.push('--tls-verify=false');
+    }
+
+    return args.join(' ');
   }
 
   private getRegistryUrl(): string {
