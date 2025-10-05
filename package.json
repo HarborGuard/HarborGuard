@@ -68,6 +68,7 @@
     "sonner": "^2.0.7",
     "swagger-ui-react": "^5.28.0",
     "tailwind-merge": "^3.3.1",
+    "undici": "^7.16.0",
     "vaul": "^1.1.2",
     "xlsx": "^0.18.5",
     "zod": "^4.0.17"

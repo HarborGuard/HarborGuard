@@ -11,7 +11,6 @@ import type {
   RateLimit
 } from '../../types';
 import { logger } from '@/lib/logger';
-import https from 'https';
 
 /**
  * Nexus Repository Manager provider implementation
@@ -84,16 +83,19 @@ export class NexusProvider extends EnhancedRegistryProvider {
   ): Promise<Response> {
     const headers = await this.getAuthHeaders();
 
-    const fetchOptions: RequestInit = {
+    const fetchOptions: RequestInit & { dispatcher?: any } = {
       ...options,
       headers: { ...headers, ...options?.headers }
     };
 
     if (this.config.skipTlsVerify) {
-      const agent = new https.Agent({
-        rejectUnauthorized: false
+      // For Node.js 18+ undici-based fetch
+      const { Agent } = await import('undici');
+      fetchOptions.dispatcher = new Agent({
+        connect: {
+          rejectUnauthorized: false
+        }
       });
-      (fetchOptions as any).agent = agent;
     }
 
     const response = await fetch(url, fetchOptions);
