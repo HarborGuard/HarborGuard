@@ -225,6 +225,7 @@ export class RegistryService {
     organization?: string;
     protocol?: string;
     skipTlsVerify?: boolean;
+    registryPort?: number;
     testConnection?: boolean;
   }): Promise<{ repository: Repository; testResult?: ConnectionTestResult }> {
     const { testConnection = true, ...repositoryData } = data;
@@ -272,7 +273,7 @@ export class RegistryService {
       authUrl: null,
       groupId: null,
       skipTlsVerify: repositoryData.skipTlsVerify || false,
-      registryPort: null,
+      registryPort: repositoryData.registryPort || null,
       status: 'UNTESTED',
       lastTested: null,
       repositoryCount: null,
@@ -339,6 +340,7 @@ export class RegistryService {
           encryptedPassword: repositoryData.password, // TODO: encrypt
           organization: repositoryData.organization || null,
           skipTlsVerify: repositoryData.skipTlsVerify || false,
+          registryPort: repositoryData.registryPort || null,
           status,
           repositoryCount,
           lastTested
@@ -370,6 +372,7 @@ export class RegistryService {
         encryptedPassword: repositoryData.password, // TODO: encrypt
         organization: repositoryData.organization || null,
         skipTlsVerify: repositoryData.skipTlsVerify || false,
+        registryPort: repositoryData.registryPort || null,
         status,
         repositoryCount,
         lastTested

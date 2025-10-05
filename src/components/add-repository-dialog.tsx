@@ -368,18 +368,33 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
             )}
 
             {config.type === 'nexus' && (
-              <div className="space-y-2">
-                <Label htmlFor="organization">Repository Name (optional)</Label>
-                <Input
-                  id="organization"
-                  value={config.organization}
-                  onChange={(e) => setConfig(prev => ({ ...prev, organization: e.target.value }))}
-                  placeholder="docker-hosted"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Nexus repository name (default: docker-hosted)
-                </p>
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="organization">Repository Name (optional)</Label>
+                  <Input
+                    id="organization"
+                    value={config.organization}
+                    onChange={(e) => setConfig(prev => ({ ...prev, organization: e.target.value }))}
+                    placeholder="docker-hosted"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Nexus repository name (default: docker-hosted)
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="registryPort">Docker Registry Port (optional)</Label>
+                  <Input
+                    id="registryPort"
+                    type="number"
+                    value={config.registryPort || ''}
+                    onChange={(e) => setConfig(prev => ({ ...prev, registryPort: e.target.value ? parseInt(e.target.value) : undefined }))}
+                    placeholder="5000"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Port for Docker push/pull operations (default: 5000)
+                  </p>
+                </div>
+              </>
             )}
 
             {config.type === 'gitlab' && (
