@@ -245,52 +245,29 @@ export class GitLabRegistryHandler extends EnhancedRegistryProvider {
     });
 
     const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
-    
+
     // Create fetch options with conditional TLS verification
-    const fetchOptions: any = {
+    const fetchOptions: RequestInit & { dispatcher?: any } = {
       method: 'GET',
       headers: {
         'Authorization': `Basic ${auth}`,
         'Accept': 'application/json'
       }
     };
-    
-    // For self-signed certificates, we need to use a custom agent in Node.js
-    if (this.config.skipTlsVerify && typeof process !== 'undefined') {
-      // Temporarily disable TLS verification for this request
-      // Store the original value to restore it later
-      const originalRejectUnauthorized = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-      logger.warn('[GitLab] TLS verification disabled for JWT auth request (NODE_TLS_REJECT_UNAUTHORIZED=0)');
-      
-      try {
-        // Send JWT auth request with TLS verification disabled
-        
-        const response = await fetch(authUrl.toString(), fetchOptions);
-        
-        // Restore the original value
-        if (originalRejectUnauthorized === undefined) {
-          delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-        } else {
-          process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalRejectUnauthorized;
+
+    // For self-signed certificates, use undici's Agent with dispatcher
+    if (this.config.skipTlsVerify) {
+      const { Agent } = await import('undici');
+      fetchOptions.dispatcher = new Agent({
+        connect: {
+          rejectUnauthorized: false
         }
-        
-        return await this.handleJWTResponse(response, authUrl.toString());
-      } catch (error) {
-        // Restore the original value even on error
-        if (originalRejectUnauthorized === undefined) {
-          delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-        } else {
-          process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalRejectUnauthorized;
-        }
-        throw error;
-      }
-    } else {
-      // Send JWT auth request with normal TLS verification
-      
-      const response = await fetch(authUrl.toString(), fetchOptions);
-      return await this.handleJWTResponse(response, authUrl.toString());
+      });
+      logger.debug('[GitLab] TLS verification disabled for JWT auth request (using undici dispatcher)');
     }
+
+    const response = await fetch(authUrl.toString(), fetchOptions);
+    return await this.handleJWTResponse(response, authUrl.toString());
   }
   
   private async handleJWTResponse(response: Response, authUrl: string): Promise<string> {
