@@ -416,6 +416,145 @@ export class NexusProvider extends EnhancedRegistryProvider {
     return `${registry}/${cleanImage}:${cleanTag}`;
   }
 
+  /**
+   * Override inspectImage to implement repository name fallback for Nexus
+   */
+  async inspectImage(image: string, tag: string): Promise<any> {
+    const authArgs = await this.getSkopeoAuthArgs();
+    const tlsVerify = this.shouldVerifyTLS() ? '' : '--tls-verify=false';
+
+    // First attempt: try without repository name
+    const imageRef = this.formatFullImageReference(image, tag);
+    const command = `skopeo inspect ${authArgs} ${tlsVerify} docker://${imageRef}`;
+
+    logger.debug(`[Nexus] Attempting to inspect image: ${imageRef}`);
+
+    try {
+      const { stdout } = await this.executeSkopeoCommand(command);
+      const result = JSON.parse(stdout);
+
+      // Calculate size from raw manifest
+      let totalSize = 0;
+      try {
+        const rawCommand = `skopeo inspect --raw ${authArgs} ${tlsVerify} docker://${imageRef}`;
+        const { stdout: rawStdout } = await this.executeSkopeoCommand(rawCommand);
+        const manifest = JSON.parse(rawStdout);
+
+        if (manifest.layers && Array.isArray(manifest.layers)) {
+          totalSize = manifest.layers.reduce((sum: number, layer: any) => sum + (layer.size || 0), 0);
+          if (manifest.config && manifest.config.size) {
+            totalSize += manifest.config.size;
+          }
+        }
+      } catch (error) {
+        logger.debug('[Nexus] Failed to get raw manifest for size calculation');
+      }
+
+      result.size = totalSize || result.Size || 0;
+      if (!result.config) {
+        result.config = { size: result.size };
+      }
+
+      return result;
+    } catch (error) {
+      logger.debug(`[Nexus] First attempt failed, trying with repository name: ${this.config.repositoryName}`);
+
+      // Second attempt: try with repository name prefix
+      const registryUrl = this.getDockerRegistryUrl();
+      const imageRefWithRepo = `${registryUrl}/${this.config.repositoryName}/${image}:${tag || 'latest'}`;
+      const fallbackCommand = `skopeo inspect ${authArgs} ${tlsVerify} docker://${imageRefWithRepo}`;
+
+      logger.debug(`[Nexus] Attempting with repository name: ${imageRefWithRepo}`);
+
+      const { stdout } = await this.executeSkopeoCommand(fallbackCommand);
+      const result = JSON.parse(stdout);
+
+      // Calculate size from raw manifest
+      let totalSize = 0;
+      try {
+        const rawCommand = `skopeo inspect --raw ${authArgs} ${tlsVerify} docker://${imageRefWithRepo}`;
+        const { stdout: rawStdout } = await this.executeSkopeoCommand(rawCommand);
+        const manifest = JSON.parse(rawStdout);
+
+        if (manifest.layers && Array.isArray(manifest.layers)) {
+          totalSize = manifest.layers.reduce((sum: number, layer: any) => sum + (layer.size || 0), 0);
+          if (manifest.config && manifest.config.size) {
+            totalSize += manifest.config.size;
+          }
+        }
+      } catch (error) {
+        logger.debug('[Nexus] Failed to get raw manifest for size calculation');
+      }
+
+      result.size = totalSize || result.Size || 0;
+      if (!result.config) {
+        result.config = { size: result.size };
+      }
+
+      return result;
+    }
+  }
+
+  /**
+   * Override pullImage to implement repository name fallback for Nexus
+   */
+  async pullImage(image: string, tag: string, destination: string): Promise<void> {
+    const authArgs = await this.getSkopeoAuthArgs();
+    const srcAuthArgs = authArgs.replace('--creds', '--src-creds').replace('--no-creds', '--src-no-creds');
+    const tlsVerify = this.shouldVerifyTLS() ? '' : '--src-tls-verify=false';
+
+    // First attempt: try without repository name
+    const imageRef = this.formatFullImageReference(image, tag);
+    const command = `skopeo copy ${srcAuthArgs} ${tlsVerify} docker://${imageRef} docker-archive:${destination}`;
+
+    logger.info(`[Nexus] Attempting to pull image: ${imageRef} to ${destination}`);
+
+    try {
+      await this.executeSkopeoCommand(command);
+    } catch (error) {
+      logger.debug(`[Nexus] First attempt failed, trying with repository name: ${this.config.repositoryName}`);
+
+      // Second attempt: try with repository name prefix
+      const registryUrl = this.getDockerRegistryUrl();
+      const imageRefWithRepo = `${registryUrl}/${this.config.repositoryName}/${image}:${tag || 'latest'}`;
+      const fallbackCommand = `skopeo copy ${srcAuthArgs} ${tlsVerify} docker://${imageRefWithRepo} docker-archive:${destination}`;
+
+      logger.info(`[Nexus] Attempting with repository name: ${imageRefWithRepo}`);
+
+      await this.executeSkopeoCommand(fallbackCommand);
+    }
+  }
+
+  /**
+   * Override pushImage to implement repository name fallback for Nexus
+   */
+  async pushImage(source: string, image: string, tag: string): Promise<void> {
+    const authArgs = await this.getSkopeoAuthArgs();
+    const destAuthArgs = authArgs.replace('--creds', '--dest-creds').replace('--no-creds', '--dest-no-creds');
+    const tlsVerify = this.shouldVerifyTLS() ? '' : '--dest-tls-verify=false';
+
+    // First attempt: try without repository name
+    const imageRef = this.formatFullImageReference(image, tag);
+    const command = `skopeo copy ${destAuthArgs} ${tlsVerify} docker-archive:${source} docker://${imageRef}`;
+
+    logger.info(`[Nexus] Attempting to push image from ${source} to ${imageRef}`);
+
+    try {
+      await this.executeSkopeoCommand(command);
+    } catch (error) {
+      logger.debug(`[Nexus] First attempt failed, trying with repository name: ${this.config.repositoryName}`);
+
+      // Second attempt: try with repository name prefix
+      const registryUrl = this.getDockerRegistryUrl();
+      const imageRefWithRepo = `${registryUrl}/${this.config.repositoryName}/${image}:${tag || 'latest'}`;
+      const fallbackCommand = `skopeo copy ${destAuthArgs} ${tlsVerify} docker-archive:${source} docker://${imageRefWithRepo}`;
+
+      logger.info(`[Nexus] Attempting with repository name: ${imageRefWithRepo}`);
+
+      await this.executeSkopeoCommand(fallbackCommand);
+    }
+  }
+
   static canHandle(repository: Repository): boolean {
     return (
       repository.type === 'NEXUS' ||
