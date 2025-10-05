@@ -459,9 +459,9 @@ export class NexusProvider extends EnhancedRegistryProvider {
     } catch (error) {
       logger.debug(`[Nexus] First attempt failed, trying with repository name: ${this.config.repositoryName}`);
 
-      // Second attempt: try with repository name prefix
-      const registryUrl = this.getDockerRegistryUrl();
-      const imageRefWithRepo = `${registryUrl}/${this.config.repositoryName}/${image}:${tag || 'latest'}`;
+      // Second attempt: try with repository name prefix using the host port
+      const hostUrl = this.config.registryUrl.replace(/^https?:\/\//, '');
+      const imageRefWithRepo = `${hostUrl}/${this.config.repositoryName}/${image}:${tag || 'latest'}`;
       const fallbackCommand = `skopeo inspect ${authArgs} ${tlsVerify} docker://${imageRefWithRepo}`;
 
       logger.debug(`[Nexus] Attempting with repository name: ${imageRefWithRepo}`);
@@ -514,9 +514,9 @@ export class NexusProvider extends EnhancedRegistryProvider {
     } catch (error) {
       logger.debug(`[Nexus] First attempt failed, trying with repository name: ${this.config.repositoryName}`);
 
-      // Second attempt: try with repository name prefix
-      const registryUrl = this.getDockerRegistryUrl();
-      const imageRefWithRepo = `${registryUrl}/${this.config.repositoryName}/${image}:${tag || 'latest'}`;
+      // Second attempt: try with repository name prefix using the host port
+      const hostUrl = this.config.registryUrl.replace(/^https?:\/\//, '');
+      const imageRefWithRepo = `${hostUrl}/${this.config.repositoryName}/${image}:${tag || 'latest'}`;
       const fallbackCommand = `skopeo copy ${srcAuthArgs} ${tlsVerify} docker://${imageRefWithRepo} docker-archive:${destination}`;
 
       logger.info(`[Nexus] Attempting with repository name: ${imageRefWithRepo}`);
@@ -544,9 +544,9 @@ export class NexusProvider extends EnhancedRegistryProvider {
     } catch (error) {
       logger.debug(`[Nexus] First attempt failed, trying with repository name: ${this.config.repositoryName}`);
 
-      // Second attempt: try with repository name prefix
-      const registryUrl = this.getDockerRegistryUrl();
-      const imageRefWithRepo = `${registryUrl}/${this.config.repositoryName}/${image}:${tag || 'latest'}`;
+      // Second attempt: try with repository name prefix using the host port
+      const hostUrl = this.config.registryUrl.replace(/^https?:\/\//, '');
+      const imageRefWithRepo = `${hostUrl}/${this.config.repositoryName}/${image}:${tag || 'latest'}`;
       const fallbackCommand = `skopeo copy ${destAuthArgs} ${tlsVerify} docker-archive:${source} docker://${imageRefWithRepo}`;
 
       logger.info(`[Nexus] Attempting with repository name: ${imageRefWithRepo}`);
