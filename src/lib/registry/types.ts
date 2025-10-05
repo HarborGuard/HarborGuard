@@ -113,6 +113,7 @@ export interface NexusConfig extends RegistryConfig {
   registryUrl: string;
   protocol: string;
   repositoryName?: string; // Nexus can have multiple repositories
+  skipTlsVerify?: boolean;
 }
 
 export interface CacheEntry<T = any> {
