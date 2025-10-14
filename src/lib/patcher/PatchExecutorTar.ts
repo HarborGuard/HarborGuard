@@ -113,7 +113,7 @@ export class PatchExecutorTar {
       });
 
       // Get or download the original tar file
-      const originalTarPath = await this.getImageTar(image, scan.requestId);
+      const originalTarPath = await this.getImageTar(image, scan.requestId, request.scanId);
       
       // Create working directory for this patch operation
       const patchWorkDir = path.join(this.patchDir, patchOperation.id);
@@ -229,23 +229,56 @@ export class PatchExecutorTar {
     }
   }
 
-  private async getImageTar(image: any, requestId: string): Promise<string> {
-    // Check if tar already exists from scan
+  private async getImageTar(image: any, requestId: string, scanId: string): Promise<string> {
+    logger.info(`Getting tar file for image: ${image.name}:${image.tag}`);
+    logger.info(`  Image source: ${image.source}`);
+    logger.info(`  Image registry: ${image.registry}`);
+    logger.info(`  Scan ID: ${scanId}`);
+
     const imageDir = path.join(this.workDir, 'images');
-    const safeImageName = image.name.replace(/[/:]/g, '_');
-    const tarPath = path.join(imageDir, `${safeImageName}-${requestId}.tar`);
-    
+
+    // Primary: Check for scan-based tar file (standard naming convention)
+    const scanTarPath = path.join(imageDir, `${scanId}.tar`);
     try {
-      const stats = await fs.stat(tarPath);
+      const stats = await fs.stat(scanTarPath);
       if (stats.size > 0) {
-        logger.info(`Using existing tar file: ${tarPath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
-        return tarPath;
-      } else {
-        logger.info(`Tar file exists but is empty, will re-export`);
+        logger.info(`Using scan tar file: ${scanTarPath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
+        return scanTarPath;
       }
     } catch {
-      logger.info(`Tar file not found at ${tarPath}`);
+      logger.info(`Scan tar file not found at ${scanTarPath}`);
     }
+
+    // Fallback: Try to find any matching tar file with wildcard pattern (for legacy files)
+    const safeImageName = image.name.replace(/[/:]/g, '_');
+    try {
+      const files = await fs.readdir(imageDir);
+      const matchingFiles = files.filter(f =>
+        (f.startsWith(safeImageName) || f.includes(safeImageName)) && f.endsWith('.tar')
+      );
+
+      if (matchingFiles.length > 0) {
+        // Sort by modification time and use the most recent
+        const fileStats = await Promise.all(
+          matchingFiles.map(async f => ({
+            name: f,
+            path: path.join(imageDir, f),
+            mtime: (await fs.stat(path.join(imageDir, f))).mtime
+          }))
+        );
+
+        fileStats.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+        const mostRecent = fileStats[0];
+
+        logger.info(`Found existing tar file by pattern: ${mostRecent.path}`);
+        return mostRecent.path;
+      }
+    } catch (error) {
+      logger.warn('Failed to search for tar files:', error);
+    }
+
+    // If no tar file found, we'll need to download/export it
+    const tarPath = scanTarPath;
 
     // Export from Docker if local source, otherwise download from registry
     if (image.source === 'LOCAL_DOCKER' || image.registry === 'local') {
