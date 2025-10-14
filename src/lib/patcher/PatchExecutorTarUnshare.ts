@@ -110,9 +110,9 @@ export class PatchExecutorTarUnshare {
 
       // Update status to pulling
       await this.updatePatchOperationStatus(patchOperation.id, 'PULLING');
-      
+
       // Get or download the original tar file
-      const originalTarPath = await this.getImageTar(image, scan.requestId);
+      const originalTarPath = await this.getImageTar(image, scan.requestId, request.scanId);
       
       // Create working directory for this patch operation
       const patchWorkDir = path.join(this.patchDir, patchOperation.id);
@@ -465,49 +465,34 @@ export class PatchExecutorTarUnshare {
     return commands.join('\n');
   }
 
-  private async getImageTar(image: any, requestId: string): Promise<string> {
+  private async getImageTar(image: any, requestId: string, scanId: string): Promise<string> {
     logger.info(`Getting tar file for image: ${image.name}:${image.tag}`);
     logger.info(`  Image source: ${image.source}`);
     logger.info(`  Image registry: ${image.registry}`);
     logger.info(`  Image digest: ${image.digest}`);
+    logger.info(`  Scan ID: ${scanId}`);
 
-    const safeImageName = image.name.replace(/[/:]/g, '_');
-    // First try to find tar file with image digest hash (from scanning)
-    const imageHash = image.digest ? image.digest.replace('sha256:', '') : '';
-    const scanTarPath = imageHash ? path.join(this.workDir, 'images', `${safeImageName}-${imageHash}.tar`) : '';
+    const imagesDir = path.join(this.workDir, 'images');
 
-    // Check if tar file from scan exists
-    if (scanTarPath) {
-      try {
-        const stats = await fs.stat(scanTarPath);
-        if (stats.size > 0) {
-          logger.info(`Using existing scan tar file: ${scanTarPath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
-          return scanTarPath;
-        }
-      } catch {
-        logger.info(`Scan tar file not found at ${scanTarPath}`);
-      }
-    }
-
-    // Fallback to requestId-based path
-    const requestTarPath = path.join(this.workDir, 'images', `${safeImageName}-${requestId}.tar`);
-
-    // Check if tar file already exists
+    // Primary: Check for scan-based tar file (standard naming convention)
+    const scanTarPath = path.join(imagesDir, `${scanId}.tar`);
     try {
-      const stats = await fs.stat(requestTarPath);
+      const stats = await fs.stat(scanTarPath);
       if (stats.size > 0) {
-        logger.info(`Using existing tar file: ${requestTarPath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
-        return requestTarPath;
+        logger.info(`Using scan tar file: ${scanTarPath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
+        return scanTarPath;
       }
     } catch {
-      logger.info(`Tar file not found at ${requestTarPath}`);
+      logger.info(`Scan tar file not found at ${scanTarPath}`);
     }
 
-    // Try to find any matching tar file with wildcard pattern
-    const imagesDir = path.join(this.workDir, 'images');
+    // Fallback: Try to find any matching tar file with wildcard pattern (for legacy files)
+    const safeImageName = image.name.replace(/[/:]/g, '_');
     try {
       const files = await fs.readdir(imagesDir);
-      const matchingFiles = files.filter(f => f.startsWith(safeImageName) && f.endsWith('.tar'));
+      const matchingFiles = files.filter(f =>
+        (f.startsWith(safeImageName) || f.includes(safeImageName)) && f.endsWith('.tar')
+      );
 
       if (matchingFiles.length > 0) {
         // Sort by modification time and use the most recent
@@ -530,7 +515,7 @@ export class PatchExecutorTarUnshare {
     }
 
     // If no tar file found, we'll need to download/export it
-    const tarPath = requestTarPath;
+    const tarPath = scanTarPath;
 
     // Export from Docker if local source or when using docker run
     // Check for various conditions that indicate local Docker source
