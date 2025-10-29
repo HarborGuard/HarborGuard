@@ -242,10 +242,10 @@ export function PatchAnalysis({ scanId, imageId, imageName = 'image', imageTag =
 
   if (error) {
     return (
-      <Alert variant="destructive">
+      <Alert variant="default">
         <AlertTriangle className="h-4 w-4" />
-        <AlertTitle>Analysis Error</AlertTitle>
-        <AlertDescription>{error}</AlertDescription>
+        <AlertTitle>Patching Unavailable</AlertTitle>
+        <AlertDescription>Patching is not available due to container lacking permissions</AlertDescription>
       </Alert>
     );
   }
