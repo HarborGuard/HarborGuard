@@ -44,6 +44,10 @@ next-env.d.ts
 /.claude
 /docs
 
+# Speckit
+/.specify
+/specs
+
 # PostgreSQL data directory
 /var/lib/postgresql/data
 
