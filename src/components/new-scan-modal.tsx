@@ -10,6 +10,7 @@ import {
   IconX,
   IconGitBranch,
   IconServer,
+  IconStack2,
 } from "@tabler/icons-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -48,8 +49,10 @@ import { useApp } from "@/contexts/AppContext"
 import { useScanning } from "@/providers/ScanningProvider"
 import { DockerImageAutocomplete } from "@/components/DockerImageAutocomplete"
 import { DockerImageSelector } from "@/components/docker-image-selector"
+import { SwarmServicesList } from "@/components/swarm-services-list"
 import { useDockerImages } from "@/hooks/useDockerImages"
-import type { DockerImage, ScanSource } from "@/types"
+import { useSwarmServices } from "@/hooks/useSwarmServices"
+import type { DockerImage, SwarmService, ScanSource } from "@/types"
 
 
 interface NewScanModalProps {
@@ -61,6 +64,8 @@ export function NewScanModal({ children }: NewScanModalProps) {
   const { state, refreshData } = useApp()
   const { addScanJob } = useScanning()
   const { dockerInfo, images: dockerImages } = useDockerImages()
+  const { isSwarmMode } = useSwarmServices()
+  const [selectedSwarmService, setSelectedSwarmService] = React.useState<SwarmService | null>(null)
   const [isLoading, setIsLoading] = React.useState(false)
   const [isOpen, setIsOpen] = React.useState(false)
   const [scanProgress, setScanProgress] = React.useState(0)
@@ -289,6 +294,8 @@ export function NewScanModal({ children }: NewScanModalProps) {
         return customRegistry
       case 'existing':
         return imageUrl
+      case 'swarm':
+        return selectedSwarmService ? `${selectedSwarmService.image}:${selectedSwarmService.imageTag}` : ''
       case 'private':
         if (selectedRepository) {
           const image = selectedImages[selectedRepository.id]
@@ -374,6 +381,12 @@ export function NewScanModal({ children }: NewScanModalProps) {
         imageName = selectedDockerImage.repository
         imageTag = selectedDockerImage.tag
         registry = 'local' // Set registry to 'local' for local images
+      } else if (selectedSource === 'swarm' && selectedSwarmService) {
+        // Handle Swarm service images - treat as registry images
+        imageName = selectedSwarmService.image
+        imageTag = selectedSwarmService.imageTag
+        // Registry is extracted from the image name if present
+        registry = undefined
       } else if (selectedSource === 'private' && selectedRepository) {
         // Handle private repository images specially to preserve namespace
         const selectedImage = selectedImages[selectedRepository.id]
@@ -429,6 +442,11 @@ export function NewScanModal({ children }: NewScanModalProps) {
         scanRequest.source = 'registry'
         // Note: image name and tag are already set correctly above with namespace preserved
       }
+
+      // For Swarm services, treat as registry images
+      if (selectedSource === 'swarm' && selectedSwarmService) {
+        scanRequest.source = 'registry'
+      }
       
       const response = await fetch('/api/scans/start', {
         method: 'POST',
@@ -469,6 +487,7 @@ export function NewScanModal({ children }: NewScanModalProps) {
       setLocalImageName('')
       setCustomRegistry('')
       setSelectedDockerImage(null)
+      setSelectedSwarmService(null)
       setSearchQuery('')
       setIsOpen(false)
       
@@ -564,7 +583,7 @@ export function NewScanModal({ children }: NewScanModalProps) {
             <h3 className="text-lg font-semibold">Scan New Image</h3>
             
             <Tabs value={selectedSource} onValueChange={setSelectedSource}>
-              <TabsList className={`grid w-full ${dockerInfo?.hasAccess ? 'grid-cols-5' : 'grid-cols-4'}`}>
+              <TabsList className={`grid w-full ${dockerInfo?.hasAccess && isSwarmMode ? 'grid-cols-6' : dockerInfo?.hasAccess ? 'grid-cols-5' : 'grid-cols-4'}`}>
                 <TabsTrigger value="dockerhub" className="flex items-center gap-1">
                   <IconBrandDocker className="h-4 w-4" />
                   <span className="hidden sm:inline">Docker Hub</span>
@@ -577,6 +596,12 @@ export function NewScanModal({ children }: NewScanModalProps) {
                   <TabsTrigger value="local" className="flex items-center gap-1">
                     <IconDeviceDesktop className="h-4 w-4" />
                     <span className="hidden sm:inline">Local</span>
+                  </TabsTrigger>
+                )}
+                {dockerInfo?.hasAccess && isSwarmMode && (
+                  <TabsTrigger value="swarm" className="flex items-center gap-1">
+                    <IconStack2 className="h-4 w-4" />
+                    <span className="hidden sm:inline">Swarm</span>
                   </TabsTrigger>
                 )}
                 <TabsTrigger value="custom" className="flex items-center gap-1">
@@ -672,6 +697,22 @@ export function NewScanModal({ children }: NewScanModalProps) {
                   Enter the full URL to your custom registry image.
                 </p>
               </TabsContent>
+
+              {dockerInfo?.hasAccess && isSwarmMode && (
+                <TabsContent value="swarm" className="space-y-3">
+                  <Label>Select Swarm Service</Label>
+                  <SwarmServicesList
+                    onServiceSelect={(service) => {
+                      setSelectedSwarmService(service)
+                    }}
+                    selectedService={selectedSwarmService}
+                    disabled={isLoading}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Select a service from your Docker Swarm cluster to scan its image.
+                  </p>
+                </TabsContent>
+              )}
 
               <TabsContent value="private" className="space-y-3">
                 {repositories.length === 0 ? (
@@ -981,16 +1022,17 @@ export function NewScanModal({ children }: NewScanModalProps) {
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button 
+          <Button
             onClick={handleStartScan}
             disabled={
-              isLoading || 
-              !selectedSource || 
+              isLoading ||
+              !selectedSource ||
               (selectedSource === 'dockerhub' && !imageUrl) ||
               (selectedSource === 'github' && !githubRepo) ||
               (selectedSource === 'local' && !scanAllLocalImages && !selectedDockerImage && !localImageName) ||
               (selectedSource === 'custom' && !customRegistry) ||
               (selectedSource === 'existing' && !imageUrl) ||
+              (selectedSource === 'swarm' && !selectedSwarmService) ||
               (selectedSource === 'private' && (!selectedRepository || !selectedImages[selectedRepository?.id] || !selectedTags[selectedRepository?.id]))
             }
           >
