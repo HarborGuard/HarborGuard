@@ -1,6 +1,5 @@
 import { useApp } from '@/contexts/AppContext'
 import { useMemo } from 'react'
-import { calculateDashboardStats, aggregateUniqueVulnerabilities } from '@/lib/scan-aggregations'
 
 export function useScans() {
   const { state, dispatch } = useApp()
