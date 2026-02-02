@@ -443,24 +443,3 @@ export function useDatabase(): DatabaseContextType {
   return context;
 }
 
-// Specialized hooks for specific data types
-export function useImages() {
-  const { images, imagesLoading, imagesError, refreshImages } = useDatabase();
-  return { images, loading: imagesLoading, error: imagesError, refresh: refreshImages };
-}
-
-export function useScans() {
-  const { scans, scansLoading, scansError, refreshScans } = useDatabase();
-  return { scans, loading: scansLoading, error: scansError, refresh: refreshScans };
-}
-
-export function useVulnerabilities() {
-  const { vulnerabilities, vulnerabilitiesLoading, vulnerabilitiesError, refreshVulnerabilities } = useDatabase();
-  return { vulnerabilities, loading: vulnerabilitiesLoading, error: vulnerabilitiesError, refresh: refreshVulnerabilities };
-}
-
-
-export function useBulkScans() {
-  const { bulkScans, bulkScansLoading, bulkScansError, refreshBulkScans } = useDatabase();
-  return { bulkScans, loading: bulkScansLoading, error: bulkScansError, refresh: refreshBulkScans };
-}
