@@ -1,5 +1,6 @@
 import { useApp } from '@/contexts/AppContext'
 import { useMemo } from 'react'
+import { getImageName } from '@/lib/image-utils'
 
 export function useScans() {
   const { state, dispatch } = useApp()

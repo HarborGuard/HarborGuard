@@ -1,3 +1,7 @@
+import type { VulnerabilityCount, ComplianceScore } from '@/types';
+
+export type { VulnerabilityCount, ComplianceScore };
+
 export interface ScanProgressEvent {
   requestId: string;
   scanId: string;
@@ -10,25 +14,6 @@ export interface ScanProgressEvent {
 
 export interface ScannerVersions {
   [scannerName: string]: string;
-}
-
-export interface VulnerabilityCount {
-  critical: number;
-  high: number;
-  medium: number;
-  low: number;
-  info: number;
-}
-
-export interface ComplianceScore {
-  dockle: {
-    score: number;
-    grade: string;
-    fatal: number;
-    warn: number;
-    info: number;
-    pass: number;
-  };
 }
 
 export interface AggregatedData {

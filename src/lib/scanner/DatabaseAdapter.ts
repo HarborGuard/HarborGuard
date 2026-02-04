@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { inspectDockerImage } from '@/lib/docker';
-import { IDatabaseAdapter, ScanReports, AggregatedData, VulnerabilityCount } from './types';
-import type { ScanRequest } from '@/types';
+import { IDatabaseAdapter, ScanReports, AggregatedData } from './types';
+import type { ScanRequest, VulnerabilityCount } from '@/types';
 import { RepositoryService } from '@/services/RepositoryService';
 import { RegistryProviderFactory } from '@/lib/registry/providers/RegistryProviderFactory';
 import type { Repository } from '@/generated/prisma';
