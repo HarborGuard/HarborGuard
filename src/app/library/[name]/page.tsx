@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { useScans } from "@/hooks/useScans";
+import { getSeverityBadgeVariant, getSeverityWeight } from "@/lib/severity-utils";
 
 interface LibraryVulnerability {
   id: string;
@@ -227,22 +228,8 @@ export default function LibraryDetailsPage() {
 
       switch (sortField) {
         case "severity":
-          const severityWeight = (s: string) => {
-            switch (s.toLowerCase()) {
-              case "critical":
-                return 4;
-              case "high":
-                return 3;
-              case "medium":
-                return 2;
-              case "low":
-                return 1;
-              default:
-                return 0;
-            }
-          };
-          aValue = severityWeight(a.severity);
-          bValue = severityWeight(b.severity);
+          aValue = getSeverityWeight(a.severity);
+          bValue = getSeverityWeight(b.severity);
           break;
         case "cvss":
           aValue = a.cvss || 0;
@@ -274,21 +261,6 @@ export default function LibraryDetailsPage() {
     } else {
       setSortField(field);
       setSortOrder("desc");
-    }
-  };
-
-  const getSeverityColor = (severity: string) => {
-    switch (severity.toLowerCase()) {
-      case "critical":
-        return "destructive";
-      case "high":
-        return "destructive";
-      case "medium":
-        return "secondary";
-      case "low":
-        return "outline";
-      default:
-        return "outline";
     }
   };
 
@@ -543,7 +515,7 @@ export default function LibraryDetailsPage() {
                         <TableRow key={`${vuln.id}-${vuln.scanId}-${index}`}>
                           <TableCell>
                             <Badge
-                              variant={getSeverityColor(vuln.severity) as any}
+                              variant={getSeverityBadgeVariant(vuln.severity) as any}
                             >
                               {vuln.severity}
                             </Badge>

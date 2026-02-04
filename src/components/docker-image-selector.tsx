@@ -5,6 +5,7 @@ import { IconServer, IconClock, IconSearch } from '@tabler/icons-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { formatDate as formatDateUtil } from '@/lib/format-utils'
 import type { DockerImage } from '@/types'
 
 interface DockerImageSelectorProps {
@@ -92,15 +93,7 @@ export function DockerImageSelector({ onImageSelect, disabled, className }: Dock
     return size
   }
 
-  const formatDate = (dateStr: string) => {
-    try {
-      // Docker date format: "2023-12-01 15:30:45 +0000 UTC"
-      const date = new Date(dateStr)
-      return date.toLocaleDateString()
-    } catch {
-      return dateStr
-    }
-  }
+  const formatDate = formatDateUtil;
 
   // Click outside handler
   useEffect(() => {

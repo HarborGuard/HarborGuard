@@ -12,6 +12,7 @@ import * as React from "react";
 import { SectionCards } from "@/components/section-cards";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useScans } from "@/hooks/useScans";
+import { getImageName, getImageTag } from "@/lib/image-utils";
 
 export default function Page() {
   const { scans, stats, loading, dataReady, error } = useScans();
@@ -147,7 +148,7 @@ export default function Page() {
         type: 'multi-text',
         sortable: true,
         accessorFn: (row: any) => ({
-          primary: row.imageName || row.image.split(':')[0],
+          primary: row.imageName || getImageName(row.image),
           secondary: row._tagCount > 1 ? `${row._tagCount} tags: ${row._allTags}` : undefined
         })
       },
@@ -232,7 +233,7 @@ export default function Page() {
 
     scans.forEach(item => {
       const imageName = typeof item.image === 'string'
-        ? item.image.split(':')[0]
+        ? getImageName(item.image)
         : item.imageName
       if (!grouped.has(imageName)) {
         grouped.set(imageName, [])
@@ -272,13 +273,13 @@ export default function Page() {
         , baseItem.lastScan),
         _tagCount: [...new Set(items.map(item => {
           const tag = typeof item.image === 'string'
-            ? item.image.split(':')[1] || 'latest'
+            ? getImageTag(item.image)
             : 'latest'
           return tag
         }))].length,
         _allTags: [...new Set(items.map(item => {
           const tag = typeof item.image === 'string'
-            ? item.image.split(':')[1] || 'latest'
+            ? getImageTag(item.image)
             : 'latest'
           return tag
         }))].join(', '),

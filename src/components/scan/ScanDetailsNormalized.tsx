@@ -50,6 +50,7 @@ import { VulnerabilityUrlMenu } from "@/components/vulnerability-url-menu";
 import { CveClassificationDialog } from "@/components/cve-classification-dialog";
 import { VulnerabilityDetailModal } from "./VulnerabilityDetailModal";
 import { PackageDetailModal } from "./PackageDetailModal";
+import { formatLicense } from "@/lib/format-utils";
 
 interface ScanDetailsNormalizedProps {
   scanId: string;
@@ -248,29 +249,6 @@ export function ScanDetailsNormalized({
         {source}
       </Badge>
     );
-  };
-
-  const formatLicense = (license: any): string => {
-    if (!license) return '-';
-    if (typeof license === 'string') return license;
-    if (typeof license === 'object') {
-      // Handle common license object structures
-      if (license.name) return license.name;
-      if (license.type) return license.type;
-      if (license.value) return license.value;
-      if (license.license) return license.license;
-      // Handle SPDX expressions
-      if (license.expression) return license.expression;
-      // Handle array of licenses
-      if (Array.isArray(license)) {
-        return license.map(l => formatLicense(l)).filter(Boolean).join(', ');
-      }
-      // Try to extract first string value from object
-      const values = Object.values(license);
-      const firstString = values.find(v => typeof v === 'string');
-      if (firstString) return firstString as string;
-    }
-    return '-';
   };
 
   if (loading) {
