@@ -10,6 +10,7 @@ import { IconRefresh, IconTrash } from "@tabler/icons-react";
 import * as React from "react";
 import { useScans } from "@/hooks/useScans";
 import { useApp } from "@/contexts/AppContext";
+import { getImageName, getImageTag } from "@/lib/image-utils";
 import { FullPageLoading } from "@/components/ui/loading";
 import { Button } from "@/components/ui/button";
 
@@ -107,7 +108,7 @@ export default function ImageRepositoryPage() {
         type: 'multi-text',
         sortable: true,
         accessorFn: (row: any) => ({
-          primary: row.imageName || row.image.split(':')[0],
+          primary: row.imageName || getImageName(row.image),
           secondary: row._tagCount > 1 ? `${row._tagCount} tags: ${row._allTags}` : undefined
         })
       },
@@ -155,7 +156,7 @@ export default function ImageRepositoryPage() {
 
     scans.forEach(item => {
       const imageName = typeof item.image === 'string'
-        ? item.image.split(':')[0]
+        ? getImageName(item.image)
         : item.imageName
       if (!grouped.has(imageName)) {
         grouped.set(imageName, [])
@@ -191,13 +192,13 @@ export default function ImageRepositoryPage() {
         , baseItem.lastScan),
         _tagCount: [...new Set(items.map(item => {
           const tag = typeof item.image === 'string'
-            ? item.image.split(':')[1] || 'latest'
+            ? getImageTag(item.image)
             : 'latest'
           return tag
         }))].length,
         _allTags: [...new Set(items.map(item => {
           const tag = typeof item.image === 'string'
-            ? item.image.split(':')[1] || 'latest'
+            ? getImageTag(item.image)
             : 'latest'
           return tag
         }))].join(', '),

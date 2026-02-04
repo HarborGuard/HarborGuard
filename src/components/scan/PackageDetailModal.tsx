@@ -25,6 +25,7 @@ import {
   IconStack,
 } from "@tabler/icons-react";
 import { toast } from "sonner";
+import { formatDate, renderValue, formatLicense } from "@/lib/format-utils";
 
 interface PackageDetailModalProps {
   isOpen: boolean;
@@ -42,32 +43,6 @@ export function PackageDetailModal({
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied to clipboard`);
-  };
-
-  const formatDate = (date: string | Date | null) => {
-    if (!date) return 'N/A';
-    return new Date(date).toLocaleString();
-  };
-
-  const renderValue = (value: any, defaultValue = 'N/A'): string => {
-    if (value === null || value === undefined || value === '') return defaultValue;
-    if (typeof value === 'object') return JSON.stringify(value, null, 2);
-    return String(value);
-  };
-
-  const formatLicense = (license: any): string => {
-    if (!license) return 'N/A';
-    if (typeof license === 'string') return license;
-    if (typeof license === 'object') {
-      if (license.name) return license.name;
-      if (license.value) return license.value;
-      if (license.license) return license.license;
-      if (license.expression) return license.expression;
-      if (Array.isArray(license)) {
-        return license.map(l => formatLicense(l)).filter(Boolean).join(', ');
-      }
-    }
-    return 'N/A';
   };
 
   const getTypeColor = (type: string) => {
