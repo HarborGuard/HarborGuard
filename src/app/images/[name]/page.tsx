@@ -27,6 +27,7 @@ import { ImagePageSkeleton } from "@/components/image-loading";
 import { toast } from "sonner";
 import { IconDownload, IconUpload, IconTrash } from "@tabler/icons-react";
 import { ExportImageDialogEnhanced } from "@/components/export-image-dialog-enhanced";
+import { getImageName } from "@/lib/image-utils";
 
 export default function ImageDetailsPage() {
   const params = useParams();
@@ -631,7 +632,7 @@ export default function ImageDetailsPage() {
           const extractedTag = versionParts.length > 1 ? versionParts[versionParts.length - 1] : versionParts[0];
 
           // Ensure we're using the base image name without any tags
-          const baseImageName = (imageData?.name || imageName).split(':')[0];
+          const baseImageName = getImageName(imageData?.name || imageName);
 
           // Get the scan details to find the digest
           const scan = imageData?.scans?.find((s: any) => s.id === row.scanId);

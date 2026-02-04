@@ -385,7 +385,7 @@ export interface VulnerabilityCount {
   high: number;
   medium: number;
   low: number;
-  info?: number;
+  info: number;
 }
 
 export interface ComplianceScore {
