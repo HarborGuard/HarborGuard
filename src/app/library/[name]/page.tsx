@@ -37,6 +37,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useScans } from "@/hooks/useScans";
 import { getSeverityBadgeVariant, getSeverityWeight } from "@/lib/severity-utils";
+import { getImageName, getImageTag } from "@/lib/image-utils";
 
 interface LibraryVulnerability {
   id: string;
@@ -68,12 +69,12 @@ export default function LibraryDetailsPage() {
 
     scans.forEach((scan) => {
       // Handle both string and object formats for scan.image
-      const imageName = scan.imageName || 
-        (typeof scan.image === 'string' 
-          ? scan.image.split(":")[0] 
+      const imageName = scan.imageName ||
+        (typeof scan.image === 'string'
+          ? getImageName(scan.image)
           : (scan.image as any)?.name) || "unknown";
       const imageTag = typeof scan.image === 'string'
-        ? scan.image.split(":")[1] || "latest"
+        ? getImageTag(scan.image)
         : (scan.image as any)?.tag || "latest";
       const fullImageName = `${imageName}:${imageTag}`;
 
@@ -294,12 +295,12 @@ export default function LibraryDetailsPage() {
     const affectedImagesSet = new Set<string>();
     scans.forEach((scan) => {
       // Handle both string and object formats for scan.image
-      const imageName = scan.imageName || 
-        (typeof scan.image === 'string' 
-          ? scan.image.split(":")[0] 
+      const imageName = scan.imageName ||
+        (typeof scan.image === 'string'
+          ? getImageName(scan.image)
           : (scan.image as any)?.name) || "unknown";
       const imageTag = typeof scan.image === 'string'
-        ? scan.image.split(":")[1] || "latest"
+        ? getImageTag(scan.image)
         : (scan.image as any)?.tag || "latest";
       const fullImageName = `${imageName}:${imageTag}`;
 

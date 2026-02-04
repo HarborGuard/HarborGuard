@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { RegistryService } from '@/lib/registry/RegistryService'
+import { apiError } from '@/lib/api-utils'
 
 const registryService = new RegistryService(prisma)
 
@@ -9,11 +10,7 @@ export async function GET() {
     const repositories = await registryService.listRepositories()
     return NextResponse.json(repositories)
   } catch (error) {
-    console.error('Failed to fetch repositories:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch repositories' },
-      { status: 500 }
-    )
+    return apiError(error, 'Failed to fetch repositories');
   }
 }
 
@@ -56,11 +53,6 @@ export async function POST(request: NextRequest) {
       testResult
     })
   } catch (error) {
-    console.error('Failed to create repository:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create repository'
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    )
+    return apiError(error, 'Failed to create repository');
   }
 }

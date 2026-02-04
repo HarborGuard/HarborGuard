@@ -3,7 +3,7 @@ import { exec } from 'child_process';
 import { PatchStrategy } from './PatchStrategy';
 import { logger } from '@/lib/logger';
 import type { PatchResult } from '@/generated/prisma';
-import type { PatchableVulnerability } from '../PatchExecutor';
+import type { PatchableVulnerability } from '../types';
 
 const execAsync = promisify(exec);
 

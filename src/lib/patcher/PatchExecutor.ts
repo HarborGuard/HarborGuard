@@ -6,15 +6,18 @@ import { PatchStrategy } from './strategies/PatchStrategy';
 import { AptPatchStrategy } from './strategies/AptPatchStrategy';
 import { YumPatchStrategy } from './strategies/YumPatchStrategy';
 import { ApkPatchStrategy } from './strategies/ApkPatchStrategy';
-import type { 
-  PatchOperation, 
-  PatchOperationStatus, 
+import type {
+  PatchOperation,
+  PatchOperationStatus,
   PatchResult,
   PatchResultStatus,
-  PatchStrategy as PatchStrategyType 
+  PatchStrategy as PatchStrategyType
 } from '@/generated/prisma';
+import type { PatchableVulnerability } from './types';
 
 const execAsync = promisify(exec);
+
+export type { PatchableVulnerability };
 
 export interface PatchRequest {
   sourceImageId: string;
@@ -22,14 +25,6 @@ export interface PatchRequest {
   targetRegistry?: string;
   targetTag?: string;
   dryRun?: boolean;
-}
-
-export interface PatchableVulnerability {
-  cveId: string;
-  packageName: string;
-  currentVersion: string;
-  fixedVersion: string;
-  packageManager: string;
 }
 
 export class PatchExecutor {
