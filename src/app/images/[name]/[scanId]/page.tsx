@@ -69,6 +69,7 @@ import {
 } from "@/types";
 import { CveClassificationDialog } from "@/components/cve-classification-dialog";
 import { PatchAnalysis } from "@/components/patch-analysis";
+import { getSeverityBadgeVariant, getSeverityWeight } from "@/lib/severity-utils";
 
 export default function ScanResultsPage() {
   const params = useParams();
@@ -592,36 +593,6 @@ export default function ScanResultsPage() {
     
     setSelectedVulnerability(transformedVuln);
     setIsVulnModalOpen(true);
-  };
-
-  const getSeverityColor = (severity: string) => {
-    switch (severity.toLowerCase()) {
-      case "critical":
-        return "destructive";
-      case "high":
-        return "destructive";
-      case "medium":
-        return "secondary";
-      case "low":
-        return "outline";
-      default:
-        return "outline";
-    }
-  };
-
-  const getSeverityWeight = (severity: string) => {
-    switch (severity.toLowerCase()) {
-      case "critical":
-        return 4;
-      case "high":
-        return 3;
-      case "medium":
-        return 2;
-      case "low":
-        return 1;
-      default:
-        return 0;
-    }
   };
 
   const getLevelWeight = (level: string) => {
@@ -1446,7 +1417,7 @@ export default function ScanResultsPage() {
                                 <div className="flex items-center gap-2">
                                   <Badge
                                     variant={
-                                      getSeverityColor(
+                                      getSeverityBadgeVariant(
                                         vuln.Severity || ""
                                       ) as any
                                     }
@@ -1640,7 +1611,7 @@ export default function ScanResultsPage() {
                               <div className="flex items-center gap-2">
                                 <Badge
                                   variant={
-                                    getSeverityColor(
+                                    getSeverityBadgeVariant(
                                       match.vulnerability.severity
                                     ) as any
                                   }

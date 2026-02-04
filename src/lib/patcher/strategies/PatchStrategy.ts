@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import type { PatchResult } from '@/generated/prisma';
-import type { PatchableVulnerability } from '../PatchExecutor';
+import type { PatchableVulnerability } from '../types';
 
 export abstract class PatchStrategy {
   abstract readonly packageManager: string;
