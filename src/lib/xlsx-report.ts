@@ -231,7 +231,7 @@ export function generateXlsxReport(scan: any, decodedImageName: string): Buffer 
         const severity = trivySheet[severityCell].v
         addCellStyle(trivySheet, severityCell, {
           font: { bold: true, color: { rgb: 'FFFFFF' } },
-          fill: { fgColor: { rgb: getSeverityColor(severity) } },
+          fill: { fgColor: { rgb: getSeverityHexColor(severity) } },
           alignment: { horizontal: 'center' }
         })
       }
@@ -287,7 +287,7 @@ export function generateXlsxReport(scan: any, decodedImageName: string): Buffer 
         const severity = grypeSheet[severityCell].v
         addCellStyle(grypeSheet, severityCell, {
           font: { bold: true, color: { rgb: 'FFFFFF' } },
-          fill: { fgColor: { rgb: getSeverityColor(severity) } },
+          fill: { fgColor: { rgb: getSeverityHexColor(severity) } },
           alignment: { horizontal: 'center' }
         })
       }
@@ -441,7 +441,7 @@ export function generateXlsxReport(scan: any, decodedImageName: string): Buffer 
         const severity = osvSheet[severityCell].v
         addCellStyle(osvSheet, severityCell, {
           font: { bold: true, color: { rgb: 'FFFFFF' } },
-          fill: { fgColor: { rgb: getSeverityColor(severity) } },
+          fill: { fgColor: { rgb: getSeverityHexColor(severity) } },
           alignment: { horizontal: 'center' }
         })
       }
@@ -530,7 +530,7 @@ export function generateXlsxReport(scan: any, decodedImageName: string): Buffer 
         const severity = combinedSheet[severityCell].v
         addCellStyle(combinedSheet, severityCell, {
           font: { bold: true, color: { rgb: 'FFFFFF' } },
-          fill: { fgColor: { rgb: getSeverityColor(severity) } },
+          fill: { fgColor: { rgb: getSeverityHexColor(severity) } },
           alignment: { horizontal: 'center' }
         })
       }
