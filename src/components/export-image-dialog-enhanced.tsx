@@ -9,6 +9,7 @@ import { useState, useEffect } from "react";
 import { Loader2, Upload, AlertCircle, Server, Package } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { getImageName, getImageTag, parseImageRef } from "@/lib/image-utils";
 
 interface Repository {
   id: string;
@@ -61,16 +62,15 @@ export function ExportImageDialogEnhanced({
   useEffect(() => {
     if (open) {
       // Split imageName in case it contains a tag
-      const [baseImageName, embeddedTag] = imageName.split(':');
+      const { name: baseImageName, tag: embeddedTag } = parseImageRef(imageName);
       setTargetImageName(baseImageName);
 
       // Extract tag from imageTag if it contains a colon, otherwise use it as-is
       let finalTag = 'latest';
       if (imageTag) {
         // If imageTag contains a colon, take the part after it, otherwise use the whole imageTag
-        const tagParts = imageTag.split(':');
-        finalTag = tagParts.length > 1 ? tagParts[1] : imageTag;
-      } else if (embeddedTag) {
+        finalTag = getImageTag(imageTag) || imageTag;
+      } else if (embeddedTag && embeddedTag !== 'latest') {
         // If no imageTag but imageName had a tag embedded, use that
         finalTag = embeddedTag;
       }
@@ -191,7 +191,7 @@ export function ExportImageDialogEnhanced({
             tarPath: patchedTarPath,
             imageName: targetImageName,
             imageTag: targetImageTag,
-            sourceImage: imageTag ? `${imageName.split(':')[0]}:${imageTag}` : imageName,
+            sourceImage: imageTag ? `${getImageName(imageName)}:${imageTag}` : imageName,
             scanId: scanId,
             digest: digest
           })
@@ -237,7 +237,7 @@ export function ExportImageDialogEnhanced({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sourceImage: imageTag ? `${imageName.split(':')[0]}:${imageTag}` : imageName,
+          sourceImage: imageTag ? `${getImageName(imageName)}:${imageTag}` : imageName,
           targetRegistry,
           targetImageName,
           targetImageTag,

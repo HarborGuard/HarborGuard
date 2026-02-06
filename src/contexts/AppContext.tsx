@@ -4,6 +4,7 @@ import React, { createContext, useContext, useReducer, useEffect, ReactNode, use
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import type { LegacyScan } from '@/types'
+import { getImageName } from '@/lib/image-utils'
 
 // Use LegacyScan for backward compatibility with existing UI components
 type Scan = LegacyScan
@@ -188,7 +189,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           osvPackages: 0,
           osvVulnerable: 0,
           osvEcosystems: [],
-          baseImage: scan.image?.name?.split(':')[0] || 'unknown', // Simplified extraction
+          baseImage: getImageName(scan.image?.name || '') || 'unknown', // Simplified extraction
           osInfo: undefined,
           lastScan: scan.finishedAt || scan.startedAt,
           registry: scan.image.registry

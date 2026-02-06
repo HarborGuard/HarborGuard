@@ -28,9 +28,9 @@ export function useScans() {
     const imageGroups = new Map<string, any>()
     scans.forEach(scan => {
       // Handle both string and object formats for scan.image
-      const imageName = scan.image 
-        ? (typeof scan.image === 'string' 
-            ? scan.image.split(':')[0] 
+      const imageName = scan.image
+        ? (typeof scan.image === 'string'
+            ? getImageName(scan.image)
             : (scan.image as any).name)
         : 'unknown'
       // Keep only the most recent scan for each image

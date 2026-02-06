@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { RegistryService } from '@/lib/registry/RegistryService'
+import { apiError } from '@/lib/api-utils'
 
 const registryService = new RegistryService(prisma)
 
@@ -28,12 +29,7 @@ export async function GET(
 
     return NextResponse.json(images)
   } catch (error) {
-    console.error('Failed to fetch repository images:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch repository images'
-    
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: error instanceof Error && error.message.includes('not found') ? 404 : 500 }
-    )
+    const status = error instanceof Error && error.message.includes('not found') ? 404 : 500;
+    return apiError(error, 'Failed to fetch repository images', status);
   }
 }

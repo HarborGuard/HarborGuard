@@ -4,6 +4,7 @@ import { logger } from '@/lib/logger';
 import { ScannerService } from '@/lib/scanner/ScannerService';
 import { auditLogger } from '@/lib/audit-logger';
 import type { ScanRequest } from '@/types';
+import { apiError } from '@/lib/api-utils';
 
 const prisma = new PrismaClient();
 const scannerService = ScannerService.getInstance();
@@ -156,10 +157,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    logger.error('Failed to start rescan:', error);
-    return NextResponse.json(
-      { error: 'Failed to start rescan', message: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    return apiError(error, 'Failed to start rescan');
   }
 }
