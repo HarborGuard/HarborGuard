@@ -32,10 +32,10 @@ export interface ImageMetadata {
   lastUpdated?: Date;
   tags?: ImageTag[];
   availableTags?: ImageTag[]; // Deprecated, use tags
-  vulnerabilities?: Vulnerability[];
+  vulnerabilities?: RegistryVulnerability[];
 }
 
-export interface Vulnerability {
+export interface RegistryVulnerability {
   id: string;
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
   title: string;

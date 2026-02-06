@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import { getSeverityHexColor } from '@/lib/severity-utils'
 
 interface VulnerabilityData {
   package: string
@@ -32,19 +33,6 @@ const COLORS = {
 function addCellStyle(worksheet: any, cell: string, style: any) {
   if (!worksheet[cell]) worksheet[cell] = {}
   worksheet[cell].s = style
-}
-
-function getSeverityColor(severity: string): string {
-  const severityUpper = severity.toUpperCase()
-  switch (severityUpper) {
-    case 'CRITICAL': return COLORS.critical
-    case 'HIGH': return COLORS.high
-    case 'MEDIUM': return COLORS.medium
-    case 'LOW': return COLORS.low
-    case 'INFO':
-    case 'NEGLIGIBLE': return COLORS.info
-    default: return COLORS.secondary
-  }
 }
 
 export function generateXlsxReport(scan: any, decodedImageName: string): Buffer {

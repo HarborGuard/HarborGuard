@@ -7,6 +7,7 @@ import { promisify } from 'util';
 import { exec } from 'child_process';
 import { RegistryProviderFactory } from '@/lib/registry/providers/RegistryProviderFactory';
 import type { Repository } from '@/generated/prisma';
+import { apiError } from '@/lib/api-utils';
 
 const execAsync = promisify(exec);
 
@@ -301,13 +302,6 @@ export async function POST(request: NextRequest) {
       });
     }
   } catch (error) {
-    logger.error('Export to registry failed:', error);
-    return NextResponse.json(
-      { 
-        error: 'Export failed', 
-        details: error instanceof Error ? error.message : 'Unknown error' 
-      },
-      { status: 500 }
-    );
+    return apiError(error, 'Export failed');
   }
 }
