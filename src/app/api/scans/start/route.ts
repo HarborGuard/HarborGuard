@@ -277,8 +277,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result, { status: 201 })
     
   } catch (error) {
-    console.error('Failed to start scan:', error)
-    
     if (error instanceof z.ZodError) {
       return NextResponse.json({
         success: false,
@@ -286,11 +284,8 @@ export async function POST(request: NextRequest) {
         details: error.issues
       }, { status: 400 })
     }
-    
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to start scan'
-    }, { status: 500 })
+
+    return apiError(error, 'Failed to start scan');
   }
 }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BulkScanService } from '@/lib/bulk/BulkScanService';
+import { apiError } from '@/lib/api-utils';
 
 interface RouteParams {
   params: Promise<{ batchId: string }>;
@@ -17,12 +18,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     });
     
   } catch (error) {
-    console.error('Failed to get bulk scan status:', error);
-    
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to get bulk scan status'
-    }, { status: 500 });
+    return apiError(error, 'Failed to get bulk scan status');
   }
 }
 
@@ -38,11 +34,6 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     });
     
   } catch (error) {
-    console.error('Failed to cancel bulk scan:', error);
-    
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to cancel bulk scan'
-    }, { status: 500 });
+    return apiError(error, 'Failed to cancel bulk scan');
   }
 }

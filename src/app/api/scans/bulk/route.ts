@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BulkScanService } from '@/lib/bulk/BulkScanService';
 import { z } from 'zod';
 import { config } from '@/lib/config';
+import { apiError } from '@/lib/api-utils';
 
 const BulkScanRequestSchema = z.object({
   name: z.string().optional(),
@@ -69,8 +70,6 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
     
   } catch (error) {
-    console.error('Failed to start bulk scan:', error);
-    
     if (error instanceof z.ZodError) {
       return NextResponse.json({
         success: false,
@@ -78,11 +77,8 @@ export async function POST(request: NextRequest) {
         details: error.issues
       }, { status: 400 });
     }
-    
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to start bulk scan'
-    }, { status: 500 });
+
+    return apiError(error, 'Failed to start bulk scan');
   }
 }
 
@@ -97,11 +93,6 @@ export async function GET() {
     });
     
   } catch (error) {
-    console.error('Failed to get bulk scan history:', error);
-    
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to get bulk scan history'
-    }, { status: 500 });
+    return apiError(error, 'Failed to get bulk scan history');
   }
 }

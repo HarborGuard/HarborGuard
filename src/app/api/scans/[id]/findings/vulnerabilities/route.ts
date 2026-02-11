@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { apiError } from '@/lib/api-utils';
 
 export async function GET(
   request: NextRequest,
@@ -104,10 +105,6 @@ export async function GET(
       });
     }
   } catch (error) {
-    console.error('Error fetching vulnerability findings:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch vulnerability findings' },
-      { status: 500 }
-    );
+    return apiError(error, 'Failed to fetch vulnerability findings');
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import puppeteer from 'puppeteer'
+import { apiError } from '@/lib/api-utils'
 
 function generateHtmlReport(scan: any, decodedImageName: string): string {
   const metadata = scan.metadata
@@ -653,10 +654,9 @@ export async function GET(
 
     return new NextResponse(Buffer.from(pdfBuffer), { headers })
   } catch (error) {
-    console.error('Error generating PDF report:', error)
     if (browser) {
       await browser.close()
     }
-    return NextResponse.json({ error: 'Failed to generate PDF report' }, { status: 500 })
+    return apiError(error, 'Failed to generate PDF report');
   }
 }

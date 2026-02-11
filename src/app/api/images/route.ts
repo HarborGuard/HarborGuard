@@ -60,6 +60,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { serializeForJson } from '@/lib/type-utils';
+import { apiError } from '@/lib/api-utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -94,10 +95,6 @@ export async function GET(request: NextRequest) {
     }));
 
   } catch (error) {
-    console.error('Failed to fetch images:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch images' },
-      { status: 500 }
-    );
+    return apiError(error, 'Failed to fetch images');
   }
 }

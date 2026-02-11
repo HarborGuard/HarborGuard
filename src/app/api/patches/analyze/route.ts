@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { VulnerabilityAnalyzer } from '@/lib/patcher/VulnerabilityAnalyzer';
 import { logger } from '@/lib/logger';
+import { apiError } from '@/lib/api-utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,14 +26,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    logger.error('Failed to fetch patchable vulnerabilities:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to fetch patchable vulnerabilities',
-        details: error instanceof Error ? error.message : String(error)
-      },
-      { status: 500 }
-    );
+    return apiError(error, 'Failed to fetch patchable vulnerabilities');
   }
 }
 
@@ -58,13 +52,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    logger.error('Failed to analyze scan for patching:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to analyze scan for patching',
-        details: error instanceof Error ? error.message : String(error)
-      },
-      { status: 500 }
-    );
+    return apiError(error, 'Failed to analyze scan for patching');
   }
 }
