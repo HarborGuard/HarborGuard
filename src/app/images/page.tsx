@@ -10,7 +10,8 @@ import { IconRefresh, IconTrash } from "@tabler/icons-react";
 import * as React from "react";
 import { useScans } from "@/hooks/useScans";
 import { useApp } from "@/contexts/AppContext";
-import { getImageName, getImageTag } from "@/lib/image-utils";
+import { getImageName } from "@/lib/image-utils";
+import { groupScansByImage } from "@/lib/scan-table-utils";
 import { FullPageLoading } from "@/components/ui/loading";
 import { Button } from "@/components/ui/button";
 
@@ -152,58 +153,7 @@ export default function ImageRepositoryPage() {
   }
 
   function processScansForTable(scans: any[]) {
-    const grouped = new Map<string, any[]>()
-
-    scans.forEach(item => {
-      const imageName = typeof item.image === 'string'
-        ? getImageName(item.image)
-        : item.imageName
-      if (!grouped.has(imageName)) {
-        grouped.set(imageName, [])
-      }
-      grouped.get(imageName)!.push(item)
-    })
-
-    return Array.from(grouped.entries()).map(([imageName, items]) => {
-      const baseItem = items.reduce((latest, current) =>
-        new Date(current.lastScan) > new Date(latest.lastScan) ? current : latest
-      )
-
-      const aggregatedSeverities = baseItem.severities
-      const totalVulns = items.reduce((sum, item) =>
-        sum + item.severities.crit + item.severities.high + item.severities.med + item.severities.low, 0
-      )
-      const weightedRiskScore = totalVulns > 0
-        ? Math.round(items.reduce((sum, item) => {
-            const itemTotal = item.severities.crit + item.severities.high + item.severities.med + item.severities.low
-            return sum + (item.riskScore * itemTotal)
-          }, 0) / totalVulns)
-        : baseItem.riskScore
-
-      return {
-        ...baseItem,
-        imageName,
-        severities: aggregatedSeverities,
-        riskScore: weightedRiskScore,
-        misconfigs: items.reduce((sum, item) => sum + item.misconfigs, 0),
-        secrets: items.reduce((sum, item) => sum + item.secrets, 0),
-        lastScan: items.reduce((latest, current) =>
-          new Date(current.lastScan) > new Date(latest) ? current.lastScan : latest
-        , baseItem.lastScan),
-        _tagCount: [...new Set(items.map(item => {
-          const tag = typeof item.image === 'string'
-            ? getImageTag(item.image)
-            : 'latest'
-          return tag
-        }))].length,
-        _allTags: [...new Set(items.map(item => {
-          const tag = typeof item.image === 'string'
-            ? getImageTag(item.image)
-            : 'latest'
-          return tag
-        }))].join(', '),
-      }
-    })
+    return groupScansByImage(scans);
   }
 
   function handleRowClick(row: any) {
