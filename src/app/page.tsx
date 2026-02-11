@@ -12,7 +12,8 @@ import * as React from "react";
 import { SectionCards } from "@/components/section-cards";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useScans } from "@/hooks/useScans";
-import { getImageName, getImageTag } from "@/lib/image-utils";
+import { getImageName } from "@/lib/image-utils";
+import { groupScansByImage } from "@/lib/scan-table-utils";
 
 export default function Page() {
   const { scans, stats, loading, dataReady, error } = useScans();
@@ -229,62 +230,7 @@ export default function Page() {
 
   // Process scans data for table (group by image name)
   function processScansForTable(scans: any[]) {
-    const grouped = new Map<string, any[]>()
-
-    scans.forEach(item => {
-      const imageName = typeof item.image === 'string'
-        ? getImageName(item.image)
-        : item.imageName
-      if (!grouped.has(imageName)) {
-        grouped.set(imageName, [])
-      }
-      grouped.get(imageName)!.push(item)
-    })
-
-    // Convert to array and merge data for same image names
-    return Array.from(grouped.entries()).map(([imageName, items]) => {
-      // Use the most recent scan as the base item
-      const baseItem = items.reduce((latest, current) =>
-        new Date(current.lastScan) > new Date(latest.lastScan) ? current : latest
-      )
-
-      const aggregatedSeverities = baseItem.severities
-
-      // Calculate aggregated risk score
-      const totalVulns = items.reduce((sum, item) =>
-        sum + item.severities.crit + item.severities.high + item.severities.med + item.severities.low, 0
-      )
-      const weightedRiskScore = totalVulns > 0
-        ? Math.round(items.reduce((sum, item) => {
-            const itemTotal = item.severities.crit + item.severities.high + item.severities.med + item.severities.low
-            return sum + (item.riskScore * itemTotal)
-          }, 0) / totalVulns)
-        : baseItem.riskScore
-
-      return {
-        ...baseItem,
-        imageName,
-        severities: aggregatedSeverities,
-        riskScore: weightedRiskScore,
-        misconfigs: items.reduce((sum, item) => sum + item.misconfigs, 0),
-        secrets: items.reduce((sum, item) => sum + item.secrets, 0),
-        lastScan: items.reduce((latest, current) =>
-          new Date(current.lastScan) > new Date(latest) ? current.lastScan : latest
-        , baseItem.lastScan),
-        _tagCount: [...new Set(items.map(item => {
-          const tag = typeof item.image === 'string'
-            ? getImageTag(item.image)
-            : 'latest'
-          return tag
-        }))].length,
-        _allTags: [...new Set(items.map(item => {
-          const tag = typeof item.image === 'string'
-            ? getImageTag(item.image)
-            : 'latest'
-          return tag
-        }))].join(', '),
-      }
-    })
+    return groupScansByImage(scans);
   }
 
   // Handle row click
