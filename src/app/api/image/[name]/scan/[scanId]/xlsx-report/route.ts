@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { generateXlsxReport } from '@/lib/xlsx-report'
+import { apiError } from '@/lib/api-utils'
 
 export async function GET(
   _request: NextRequest,
@@ -35,7 +36,6 @@ export async function GET(
 
     return new NextResponse(xlsxBuffer as any, { headers })
   } catch (error) {
-    console.error('Error generating XLSX report:', error)
-    return NextResponse.json({ error: 'Failed to generate XLSX report' }, { status: 500 })
+    return apiError(error, 'Failed to generate XLSX report');
   }
 }

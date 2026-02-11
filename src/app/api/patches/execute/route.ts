@@ -4,6 +4,7 @@ import { PatchExecutorTar } from '@/lib/patcher/PatchExecutorTar';
 import { PatchExecutorTarUnshare } from '@/lib/patcher/PatchExecutorTarUnshare';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
+import { apiError } from '@/lib/api-utils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -77,13 +78,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    logger.error('Failed to execute patch:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to execute patch',
-        details: error instanceof Error ? error.message : String(error)
-      },
-      { status: 500 }
-    );
+    return apiError(error, 'Failed to execute patch');
   }
 }

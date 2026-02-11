@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { prismaToScanWithImage, serializeScan } from '@/lib/type-utils'
+import { apiError } from '@/lib/api-utils'
 
 export async function GET(
   request: NextRequest,
@@ -184,11 +185,7 @@ export async function GET(
     
     return NextResponse.json(serializeScan(scanData))
   } catch (error) {
-    console.error('Error retrieving scan:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return apiError(error, 'Error retrieving scan');
   }
 }
 
@@ -231,11 +228,7 @@ export async function PATCH(
     
     return NextResponse.json(serializeScan(scanData))
   } catch (error) {
-    console.error('Error updating scan:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return apiError(error, 'Error updating scan');
   }
 }
 
@@ -269,10 +262,6 @@ export async function DELETE(
       { status: 200 }
     )
   } catch (error) {
-    console.error('Error deleting scan:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return apiError(error, 'Error deleting scan');
   }
 }

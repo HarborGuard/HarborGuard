@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { apiError } from '@/lib/api-utils'
 
 export async function GET(
   request: NextRequest,
@@ -44,10 +45,6 @@ export async function GET(
     return NextResponse.json(serializedImage)
     
   } catch (error) {
-    console.error('Error fetching image:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return apiError(error, 'Error fetching image');
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { apiError } from '@/lib/api-utils'
 
 export async function GET(
   request: NextRequest,
@@ -74,7 +75,6 @@ export async function GET(
     
     return new NextResponse(JSON.stringify(reportData, null, 2), { headers })
   } catch (error) {
-    console.error('Error downloading report:', error)
-    return NextResponse.json({ error: 'Failed to download report' }, { status: 500 })
+    return apiError(error, 'Failed to download report');
   }
 }

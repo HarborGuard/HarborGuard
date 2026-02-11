@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import JSZip from 'jszip'
+import { apiError } from '@/lib/api-utils'
 
 export async function GET(
   request: NextRequest,
@@ -90,7 +91,6 @@ export async function GET(
     
     return new NextResponse(zipBuffer, { headers })
   } catch (error) {
-    console.error('Error creating report ZIP:', error)
-    return NextResponse.json({ error: 'Failed to create report ZIP' }, { status: 500 })
+    return apiError(error, 'Failed to create report ZIP');
   }
 }

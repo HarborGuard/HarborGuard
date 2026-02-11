@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import fs from 'fs/promises';
 import path from 'path';
+import { apiError } from '@/lib/api-utils';
 
 export async function GET(
   request: NextRequest,
@@ -62,10 +63,6 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('Failed to download patched image:', error);
-    return NextResponse.json(
-      { error: 'Failed to download patched image' },
-      { status: 500 }
-    );
+    return apiError(error, 'Failed to download patched image');
   }
 }

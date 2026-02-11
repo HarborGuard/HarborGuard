@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { apiError } from '@/lib/api-utils'
 
 export async function GET(
   request: NextRequest,
@@ -70,11 +71,7 @@ export async function GET(
 
     return NextResponse.json(scheduledScan)
   } catch (error) {
-    console.error('Error fetching scheduled scan:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch scheduled scan' },
-      { status: 500 }
-    )
+    return apiError(error, 'Failed to fetch scheduled scan');
   }
 }
 
@@ -180,11 +177,7 @@ export async function PUT(
 
     return NextResponse.json(updatedScan)
   } catch (error) {
-    console.error('Error updating scheduled scan:', error)
-    return NextResponse.json(
-      { error: 'Failed to update scheduled scan' },
-      { status: 500 }
-    )
+    return apiError(error, 'Failed to update scheduled scan');
   }
 }
 
@@ -213,10 +206,6 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Scheduled scan deleted successfully' })
   } catch (error) {
-    console.error('Error deleting scheduled scan:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete scheduled scan' },
-      { status: 500 }
-    )
+    return apiError(error, 'Failed to delete scheduled scan');
   }
 }

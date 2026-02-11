@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { prismaToScanWithImage, serializeScan } from '@/lib/type-utils'
+import { apiError } from '@/lib/api-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -239,10 +240,6 @@ export async function GET(request: NextRequest) {
       }
     })
   } catch (error) {
-    console.error('Error retrieving scans:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return apiError(error, 'Error retrieving scans');
   }
 }
