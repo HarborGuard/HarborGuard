@@ -27,13 +27,11 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-import { toast } from "sonner"
-import { buildScanRequest, parseImageString as parseImage } from "@/lib/registry/registry-utils"
 import { useApp } from "@/contexts/AppContext"
-import { useScanning } from "@/providers/ScanningProvider"
 import { useDockerImages } from "@/hooks/useDockerImages"
 import { useSwarmServices } from "@/hooks/useSwarmServices"
 import { useScanSources } from "@/hooks/useScanSources"
+import { useScanExecution } from "@/hooks/useScanExecution"
 import {
   DockerHubTab,
   GitHubTab,
@@ -52,19 +50,12 @@ interface NewScanModalProps {
 
 
 export function NewScanModal({ children }: NewScanModalProps) {
-  const { state, refreshData } = useApp()
-  const { addScanJob } = useScanning()
+  const { state } = useApp()
   const { dockerInfo, images: dockerImages } = useDockerImages()
   const { isSwarmMode } = useSwarmServices()
   const scanSources = useScanSources()
 
-  const [selectedSwarmService, setSelectedSwarmService] = React.useState<SwarmService | null>(null)
-  const [isLoading, setIsLoading] = React.useState(false)
   const [isOpen, setIsOpen] = React.useState(false)
-  const [scanProgress, setScanProgress] = React.useState(0)
-  const [showProgress, setShowProgress] = React.useState(false)
-  const progressIntervalRef = React.useRef<NodeJS.Timeout | null>(null)
-
   const [searchQuery, setSearchQuery] = React.useState("")
   const [selectedSource, setSelectedSource] = React.useState<string>("dockerhub")
   const [imageUrl, setImageUrl] = React.useState("")
@@ -73,36 +64,39 @@ export function NewScanModal({ children }: NewScanModalProps) {
   const [customRegistry, setCustomRegistry] = React.useState("")
   const [selectedDockerImage, setSelectedDockerImage] = React.useState<DockerImage | null>(null)
   const [selectedExistingImage, setSelectedExistingImage] = React.useState<{source: string, name: string} | null>(null)
+  const [selectedSwarmService, setSelectedSwarmService] = React.useState<SwarmService | null>(null)
   const [scanAllLocalImages, setScanAllLocalImages] = React.useState(false)
 
-  // Progress animation helpers
-  const startProgressAnimation = () => {
-    setScanProgress(0)
-    setShowProgress(true)
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current)
+  const { isLoading, setIsLoading, showProgress, scanProgress, handleStartScan } = useScanExecution(
+    {
+      selectedSource,
+      imageUrl,
+      githubRepo,
+      localImageName,
+      customRegistry,
+      selectedDockerImage,
+      selectedExistingImage,
+      selectedSwarmService,
+      scanAllLocalImages,
+      selectedRepository: scanSources.selectedRepository,
+      selectedImages: scanSources.selectedImages,
+      selectedTags: scanSources.selectedTags,
+      dockerImages,
+    },
+    {
+      setSelectedSource,
+      setImageUrl,
+      setGithubRepo,
+      setLocalImageName,
+      setCustomRegistry,
+      setSelectedDockerImage,
+      setSelectedSwarmService,
+      setSearchQuery,
+      setScanAllLocalImages,
+      setLocalImageCount: scanSources.setLocalImageCount,
+      setIsOpen,
     }
-    progressIntervalRef.current = setInterval(() => {
-      setScanProgress(prev => (prev >= 80 ? 80 : prev + 1))
-    }, 125)
-  }
-
-  const resetProgress = () => {
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current)
-      progressIntervalRef.current = null
-    }
-    setScanProgress(0)
-    setShowProgress(false)
-  }
-
-  React.useEffect(() => {
-    return () => {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current)
-      }
-    }
-  }, [])
+  )
 
   // Fetch repositories when modal opens
   React.useEffect(() => {
@@ -118,7 +112,7 @@ export function NewScanModal({ children }: NewScanModalProps) {
     }
   }, [scanAllLocalImages, dockerInfo?.hasAccess])
 
-  // Get real scanned images from app state
+  // Derive existing images from app state
   const existingImages = React.useMemo(() => {
     const imageMap = new Map()
     state.scans
@@ -141,218 +135,6 @@ export function NewScanModal({ children }: NewScanModalProps) {
     return Array.from(imageMap.values())
       .sort((a, b) => new Date(b.lastScan).getTime() - new Date(a.lastScan).getTime())
   }, [state.scans])
-
-  const parseImageString = (imageString: string) => {
-    const parsed = parseImage(imageString)
-    return {
-      imageName: parsed.imageName,
-      imageTag: parsed.tag,
-      registry: parsed.registry,
-      registryType: parsed.registryType
-    }
-  }
-
-  const getCurrentImageString = (): string => {
-    switch (selectedSource) {
-      case 'dockerhub':
-        return imageUrl
-      case 'github':
-        return githubRepo
-      case 'local':
-        return selectedDockerImage?.fullName || localImageName
-      case 'custom':
-        return customRegistry
-      case 'existing':
-        return imageUrl
-      case 'swarm':
-        return selectedSwarmService ? `${selectedSwarmService.image}:${selectedSwarmService.imageTag}` : ''
-      case 'private':
-        if (scanSources.selectedRepository) {
-          const image = scanSources.selectedImages[scanSources.selectedRepository.id]
-          const tag = scanSources.selectedTags[scanSources.selectedRepository.id]
-          return image && tag ? `${image.fullName || image.name}:${tag}` : ''
-        }
-        return ''
-      default:
-        return ''
-    }
-  }
-
-  const handleStartScan = async () => {
-    // Handle scan all local images
-    if (selectedSource === 'local' && scanAllLocalImages) {
-      try {
-        setIsLoading(true)
-        startProgressAnimation()
-
-        const response = await fetch('/api/scans/local-bulk', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({})
-        })
-
-        const data = await response.json()
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to start bulk scan')
-        }
-
-        if (data.data.scanJobs && Array.isArray(data.data.scanJobs)) {
-          data.data.scanJobs.forEach((job: any) => {
-            addScanJob({
-              requestId: job.requestId,
-              scanId: job.scanId,
-              imageId: job.imageId || '',
-              imageName: job.imageName,
-              status: 'RUNNING',
-              progress: 0,
-              step: 'Initializing...'
-            })
-          })
-        }
-
-        toast.success(`Started scanning ${data.data.totalImages} local images`)
-        setIsOpen(false)
-        setScanAllLocalImages(false)
-        scanSources.setLocalImageCount(0)
-        await refreshData()
-        resetProgress()
-      } catch (error) {
-        console.error('Failed to start bulk scan:', error)
-        toast.error(error instanceof Error ? error.message : 'Failed to start bulk scan')
-        resetProgress()
-      } finally {
-        setIsLoading(false)
-      }
-      return
-    }
-
-    const imageString = getCurrentImageString()
-
-    if (!imageString) {
-      toast.error("Please specify an image to scan")
-      return
-    }
-
-    try {
-      setIsLoading(true)
-      startProgressAnimation()
-
-      let imageName: string
-      let imageTag: string
-      let registry: string | undefined
-
-      if (selectedSource === 'local' && selectedDockerImage) {
-        imageName = selectedDockerImage.repository
-        imageTag = selectedDockerImage.tag
-        registry = 'local'
-      } else if (selectedSource === 'swarm' && selectedSwarmService) {
-        imageName = selectedSwarmService.image
-        imageTag = selectedSwarmService.imageTag
-        registry = undefined
-      } else if (selectedSource === 'private' && scanSources.selectedRepository) {
-        const selectedImage = scanSources.selectedImages[scanSources.selectedRepository.id]
-        const selectedTag = scanSources.selectedTags[scanSources.selectedRepository.id]
-        if (selectedImage && selectedTag) {
-          imageName = selectedImage.fullName || selectedImage.name
-          imageTag = selectedTag
-          registry = scanSources.selectedRepository.registryUrl
-        } else {
-          toast.error("Please select an image and tag")
-          setIsLoading(false)
-          return
-        }
-      } else {
-        const parsed = parseImageString(imageString)
-        imageName = parsed.imageName
-        imageTag = parsed.imageTag
-        registry = parsed.registry
-      }
-
-      const scanRequest = buildScanRequest(imageString, selectedSource, {
-        registry,
-        image: imageName,
-        tag: imageTag
-      })
-
-      if (selectedSource === 'local' && selectedDockerImage) {
-        scanRequest.source = 'local'
-        scanRequest.dockerImageId = selectedDockerImage.id
-      }
-
-      if (selectedSource === 'existing' && selectedExistingImage) {
-        scanRequest.source = selectedExistingImage.source
-        if (selectedExistingImage.source === 'local') {
-          const localImage = dockerImages.find((img: any) => img.fullName === selectedExistingImage.name)
-          if (localImage) {
-            scanRequest.dockerImageId = localImage.id
-          }
-        }
-      }
-
-      if (selectedSource === 'private' && scanSources.selectedRepository) {
-        scanRequest.repositoryId = scanSources.selectedRepository.id
-        scanRequest.source = 'registry'
-      }
-
-      if (selectedSource === 'swarm' && selectedSwarmService) {
-        scanRequest.source = 'registry'
-      }
-
-      const response = await fetch('/api/scans/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(scanRequest),
-      })
-
-      if (!response.ok) {
-        const error = await response.text()
-        throw new Error(error || 'Failed to start scan')
-      }
-
-      const result = await response.json()
-
-      addScanJob({
-        requestId: result.requestId,
-        scanId: result.scanId,
-        imageId: '',
-        status: 'RUNNING',
-        progress: 0,
-        step: 'Initializing scan'
-      })
-
-      toast.success(`Started scanning ${imageName}:${imageTag}`, {
-        description: `Request ID: ${result.requestId}`,
-      })
-
-      resetProgress()
-
-      setSelectedSource('')
-      setImageUrl('')
-      setGithubRepo('')
-      setLocalImageName('')
-      setCustomRegistry('')
-      setSelectedDockerImage(null)
-      setSelectedSwarmService(null)
-      setSearchQuery('')
-      setIsOpen(false)
-
-      setTimeout(() => {
-        refreshData()
-      }, 1000)
-
-    } catch (error) {
-      console.error('Failed to start scan:', error)
-      toast.error("Scan Failed", {
-        description: error instanceof Error ? error.message : "Failed to start scan",
-      })
-    } finally {
-      setIsLoading(false)
-      if (progressIntervalRef.current) {
-        resetProgress()
-      }
-    }
-  }
 
   const isScanDisabled =
     isLoading ||
@@ -386,7 +168,6 @@ export function NewScanModal({ children }: NewScanModalProps) {
         </DialogHeader>
 
         <div className="flex flex-col gap-6 overflow-y-auto px-1 max-h-[75vh]">
-          {/* Existing Images Section */}
           <ExistingImagesSection
             existingImages={existingImages}
             searchQuery={searchQuery}
@@ -398,7 +179,6 @@ export function NewScanModal({ children }: NewScanModalProps) {
             }}
           />
 
-          {/* New Image Source Selection */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Scan New Image</h3>
 
@@ -480,7 +260,6 @@ export function NewScanModal({ children }: NewScanModalProps) {
           </div>
         </div>
 
-        {/* Progress Bar */}
         {showProgress && (
           <div className="px-6 py-4 border-t">
             <div className="space-y-2">
