@@ -481,13 +481,13 @@ async function createFindingCorrelations(scanId: string): Promise<void> {
         sources,
         sourceCount: sources.length,
         confidenceScore: sources.length / 3,
-        severity: getHighestSeverity(data.severities)
+        severity: getHighestSeverity(data.severities) as any
       },
       update: {
         sources,
         sourceCount: sources.length,
         confidenceScore: sources.length / 3,
-        severity: getHighestSeverity(data.severities)
+        severity: getHighestSeverity(data.severities) as any
       }
     });
   }
