@@ -1,19 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -25,44 +18,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Play,
   Settings,
   Filter,
   Activity,
-  CheckCircle,
-  XCircle,
-  Clock,
   Layers2Icon,
 } from "lucide-react";
-import { toast } from "sonner";
-import type { ScannerInfo } from "@/types";
-
-interface BulkScanJob {
-  id: string;
-  name?: string;
-  totalImages: number;
-  status: "RUNNING" | "COMPLETED" | "FAILED" | "PAUSED";
-  patterns: {
-    imagePattern?: string;
-    tagPattern?: string;
-    registryPattern?: string;
-  };
-  createdAt: string;
-  completedAt?: string;
-  errorMessage?: string;
-  _count: {
-    items: number;
-  };
-  summary?: {
-    completed: number;
-    failed: number;
-    running: number;
-  };
-}
+import { useBulkScan } from "@/hooks/useBulkScan";
+import { BulkScanJobsList } from "@/components/bulk-scan-jobs-list";
 
 interface BulkScanModalProps {
   children: React.ReactNode;
@@ -70,207 +35,23 @@ interface BulkScanModalProps {
 
 export function BulkScanModal({ children }: BulkScanModalProps) {
   const [activeTab, setActiveTab] = useState("new");
-  const [jobs, setJobs] = useState<BulkScanJob[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [jobsLoading, setJobsLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [scannerAvailability, setScannerAvailability] = useState<ScannerInfo[]>([]);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    name: "",
-    imagePattern: "",
-    tagPattern: "",
-    registryPattern: "",
-    excludeTagPattern: "",
-    maxImages: 100,
-    enableTrivy: true,
-    enableGrype: true,
-    enableSyft: true,
-    enableDockle: true,
-    enableOsv: false,
-    enableDive: false,
-  });
+  const {
+    jobs,
+    loading,
+    jobsLoading,
+    scannerAvailability,
+    formData,
+    handleSubmit,
+    handleInputChange,
+    fetchJobs,
+  } = useBulkScan(open);
 
-  // Fetch scanner availability
-  const fetchScannerAvailability = async () => {
-    try {
-      const response = await fetch("/api/scanners/available");
-      const result = await response.json();
-      
-      if (result.success) {
-        setScannerAvailability(result.scanners);
-        
-        // Update form data to pre-check available scanners
-        const updatedFormData = { ...formData };
-        result.scanners.forEach((scanner: ScannerInfo) => {
-          const key = `enable${scanner.name.charAt(0).toUpperCase()}${scanner.name.slice(1)}`;
-          // Type-safe update for boolean scanner fields
-          switch(key) {
-            case 'enableTrivy':
-            case 'enableGrype':
-            case 'enableSyft':
-            case 'enableDockle':
-            case 'enableOsv':
-            case 'enableDive':
-              updatedFormData[key] = scanner.available;
-              break;
-          }
-        });
-        setFormData(updatedFormData);
-      }
-    } catch (error) {
-      console.error("Error fetching scanner availability:", error);
-    }
-  };
-
-  // Fetch bulk scan jobs
-  const fetchJobs = async () => {
-    setJobsLoading(true);
-    try {
-      const response = await fetch("/api/scans/bulk");
-      const result = await response.json();
-      
-      if (result.success) {
-        // Get detailed status for running jobs SEQUENTIALLY to avoid database contention
-        const jobsWithDetails = [];
-        for (const job of result.data) {
-          if (job.status === "RUNNING") {
-            try {
-              const statusResponse = await fetch(`/api/scans/bulk/${job.id}`);
-              const statusResult = await statusResponse.json();
-              if (statusResult.success) {
-                jobsWithDetails.push({ ...job, summary: statusResult.data.summary });
-              } else {
-                jobsWithDetails.push(job);
-              }
-            } catch (error) {
-              console.error(`Failed to fetch status for job ${job.id}:`, error);
-              jobsWithDetails.push(job);
-            }
-          } else {
-            jobsWithDetails.push(job);
-          }
-        }
-
-        setJobs(jobsWithDetails);
-      } else {
-        toast.error("Failed to fetch bulk scan jobs");
-      }
-    } catch (error) {
-      console.error("Error fetching bulk scan jobs:", error);
-      toast.error("Failed to fetch bulk scan jobs");
-    } finally {
-      setJobsLoading(false);
-    }
-  };
-
-  // Load jobs and scanner availability when dialog opens
-  useEffect(() => {
-    if (open) {
-      fetchJobs();
-      fetchScannerAvailability();
-    }
-  }, [open]);
-
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const response = await fetch("/api/scans/bulk", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: formData.name.trim() || undefined,
-          patterns: {
-            imagePattern: formData.imagePattern.trim() || undefined,
-            tagPattern: formData.tagPattern.trim() || undefined,
-            registryPattern: formData.registryPattern.trim() || undefined,
-            excludeTagPattern: formData.excludeTagPattern.trim() || undefined,
-          },
-          options: {
-            maxImages: formData.maxImages,
-            scanners: {
-              trivy: formData.enableTrivy,
-              grype: formData.enableGrype,
-              syft: formData.enableSyft,
-              dockle: formData.enableDockle,
-              osv: formData.enableOsv,
-              dive: formData.enableDive,
-            },
-          },
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast.success(
-          `Bulk scan started with ${result.data.totalImages} images`
-        );
-        
-        // Reset form
-        setFormData({
-          name: "",
-          imagePattern: "",
-          tagPattern: "",
-          registryPattern: "",
-          excludeTagPattern: "",
-          maxImages: 100,
-          enableTrivy: true,
-          enableGrype: true,
-          enableSyft: true,
-          enableDockle: true,
-          enableOsv: false,
-          enableDive: false,
-        });
-
-        // Switch to jobs tab and refresh after a short delay
-        // This allows the backend to start queueing scans before we query status
-        setActiveTab("jobs");
-        setTimeout(() => fetchJobs(), 2000);
-      } else {
-        toast.error(result.error || "Failed to start bulk scan");
-      }
-    } catch (error) {
-      console.error("Error starting bulk scan:", error);
-      toast.error("Failed to start bulk scan");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleInputChange = (field: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "RUNNING":
-        return <Activity className="h-4 w-4 text-blue-500 animate-pulse" />;
-      case "COMPLETED":
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case "FAILED":
-        return <XCircle className="h-4 w-4 text-red-500" />;
-      default:
-        return <Clock className="h-4 w-4 text-gray-500" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "RUNNING":
-        return "bg-blue-100 text-blue-800";
-      case "COMPLETED":
-        return "bg-green-100 text-green-800";
-      case "FAILED":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+  const onSubmit = async (e: React.FormEvent) => {
+    const success = await handleSubmit(e);
+    if (success) {
+      setActiveTab("jobs");
     }
   };
 
@@ -303,7 +84,7 @@ export function BulkScanModal({ children }: BulkScanModalProps) {
           </TabsList>
 
           <TabsContent value="new" className="space-y-4">
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={onSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Scan Name (Optional)</Label>
@@ -404,7 +185,7 @@ export function BulkScanModal({ children }: BulkScanModalProps) {
                   ].map((scanner) => {
                     const availability = scannerAvailability.find(s => s.name === scanner.name);
                     const isAvailable = availability?.available ?? false;
-                    
+
                     return (
                       <div key={scanner.key} className="flex items-center space-x-2">
                         {isAvailable ? (
@@ -468,91 +249,11 @@ export function BulkScanModal({ children }: BulkScanModalProps) {
           </TabsContent>
 
           <TabsContent value="jobs" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Active Bulk Scan Jobs</h3>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={fetchJobs}
-                disabled={jobsLoading}
-              >
-                {jobsLoading ? "Refreshing..." : "Refresh"}
-              </Button>
-            </div>
-
-            {jobs.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-8">
-                  <Activity className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold">No Active Jobs</h3>
-                  <p className="text-muted-foreground text-center">
-                    Start a new bulk scan to see job progress here
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {jobs.map((job) => (
-                  <Card key={job.id}>
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">
-                          {job.name || `Bulk Scan ${job.id.slice(0, 8)}`}
-                        </CardTitle>
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(job.status)}
-                          <Badge className={getStatusColor(job.status)}>
-                            {job.status}
-                          </Badge>
-                        </div>
-                      </div>
-                      <CardDescription>
-                        {job.totalImages} images • Started{" "}
-                        {new Date(job.createdAt).toLocaleDateString()}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {job.summary && job.status === "RUNNING" && (
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span>Progress</span>
-                            <span>
-                              {job.summary.completed + job.summary.failed} /{" "}
-                              {job.totalImages}
-                            </span>
-                          </div>
-                          <Progress
-                            value={
-                              ((job.summary.completed + job.summary.failed) /
-                                job.totalImages) *
-                              100
-                            }
-                            className="w-full"
-                          />
-                          <div className="flex gap-4 text-xs text-muted-foreground">
-                            <span>✓ {job.summary.completed} completed</span>
-                            <span>✗ {job.summary.failed} failed</span>
-                            <span>⏳ {job.summary.running} running</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {job.status === "FAILED" && job.errorMessage && (
-                        <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
-                          {job.errorMessage}
-                        </div>
-                      )}
-
-                      {job.status === "COMPLETED" && (
-                        <div className="text-sm text-green-600">
-                          Completed {job.completedAt && new Date(job.completedAt).toLocaleDateString()}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+            <BulkScanJobsList
+              jobs={jobs}
+              jobsLoading={jobsLoading}
+              onRefresh={fetchJobs}
+            />
           </TabsContent>
         </Tabs>
       </DialogContent>
