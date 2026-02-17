@@ -65,7 +65,7 @@ import { apiError } from '@/lib/api-utils';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '25');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '25'), 100);
     const offset = parseInt(searchParams.get('offset') || '0');
     const includeScans = searchParams.get('includeScans') === 'true';
     const includeVulnerabilities = searchParams.get('includeVulnerabilities') === 'true';
