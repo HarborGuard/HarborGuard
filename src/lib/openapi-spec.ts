@@ -438,9 +438,14 @@ export const openApiSpec = {
             content: {
               'application/json': {
                 schema: {
-                  type: 'array',
-                  items: {
-                    $ref: '#/components/schemas/Repository',
+                  type: 'object',
+                  properties: {
+                    data: {
+                      type: 'array',
+                      items: {
+                        $ref: '#/components/schemas/Repository',
+                      },
+                    },
                   },
                 },
               },
@@ -520,17 +525,22 @@ export const openApiSpec = {
             content: {
               'application/json': {
                 schema: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      id: { type: 'string' },
-                      repoTags: {
-                        type: 'array',
-                        items: { type: 'string' },
+                  type: 'object',
+                  properties: {
+                    data: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          repoTags: {
+                            type: 'array',
+                            items: { type: 'string' },
+                          },
+                          size: { type: 'number' },
+                          created: { type: 'string' },
+                        },
                       },
-                      size: { type: 'number' },
-                      created: { type: 'string' },
                     },
                   },
                 },

@@ -5,7 +5,7 @@ import { apiError } from '@/lib/api-utils';
 export async function GET() {
   try {
     const images = await listDockerImages();
-    return NextResponse.json(images);
+    return NextResponse.json({ data: images });
   } catch (error) {
     return apiError(error, 'Failed to list Docker images');
   }

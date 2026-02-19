@@ -60,7 +60,7 @@ export function useScanSources(): UseScanSourcesReturn {
     try {
       const response = await fetch('/api/docker/images')
       if (response.ok) {
-        const images = await response.json()
+        const { data: images } = await response.json()
         setLocalImageCount(images.length)
       }
     } catch (error) {
@@ -73,7 +73,7 @@ export function useScanSources(): UseScanSourcesReturn {
     try {
       const response = await fetch('/api/repositories')
       if (response.ok) {
-        const data = await response.json()
+        const { data } = await response.json()
         setRepositories(data.filter((repo: any) => repo.status === 'ACTIVE'))
       }
     } catch (error) {
