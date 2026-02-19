@@ -80,7 +80,7 @@ export default function RepositoriesPage() {
     try {
       const response = await fetch("/api/repositories");
       if (response.ok) {
-        const data = await response.json();
+        const { data } = await response.json();
         setRepositories(data);
       }
     } catch (error) {

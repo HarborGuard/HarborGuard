@@ -22,7 +22,7 @@ const registryService = new RegistryService(prisma)
 export async function GET() {
   try {
     const repositories = await registryService.listRepositories()
-    return NextResponse.json(repositories)
+    return NextResponse.json({ data: repositories })
   } catch (error) {
     return apiError(error, 'Failed to fetch repositories');
   }

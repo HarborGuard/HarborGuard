@@ -38,7 +38,7 @@ export function DockerImageSelector({ onImageSelect, disabled, className }: Dock
         throw new Error('Failed to load Docker images')
       }
       
-      const imageData = await response.json()
+      const { data: imageData } = await response.json()
       setAllImages(imageData)
       setFilteredImages(imageData)
     } catch (err) {
