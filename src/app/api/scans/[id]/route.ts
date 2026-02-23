@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { prismaToScanWithImage, serializeScan } from '@/lib/type-utils'
 import { apiError } from '@/lib/api-utils'
+
+const UpdateScanSchema = z.object({
+  status: z.enum(['PENDING', 'RUNNING', 'SUCCESS', 'FAILED', 'CANCELLED']).optional(),
+  errorMessage: z.string().optional().nullable(),
+  riskScore: z.number().min(0).max(100).optional().nullable(),
+  finishedAt: z.string().datetime().optional().nullable(),
+})
 
 export async function GET(
   request: NextRequest,
@@ -195,8 +203,18 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const updates = await request.json()
-    
+    const body = await request.json()
+    const parsed = UpdateScanSchema.safeParse(body)
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues },
+        { status: 400 }
+      )
+    }
+
+    const updates = parsed.data
+
     // Find scan by ID or requestId
     let scan = await prisma.scan.findUnique({ where: { id } })
     if (!scan) {

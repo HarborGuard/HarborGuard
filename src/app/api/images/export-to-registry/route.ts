@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import path from 'path';
@@ -9,20 +10,39 @@ import { RegistryProviderFactory } from '@/lib/registry/providers/RegistryProvid
 import type { Repository } from '@/generated/prisma';
 import { apiError } from '@/lib/api-utils';
 
+const ExportToRegistrySchema = z.object({
+  sourceImage: z.string().optional(),
+  targetRegistry: z.string().min(1),
+  targetImageName: z.string().min(1),
+  targetImageTag: z.string().optional().default('latest'),
+  repositoryId: z.string().optional(),
+  patchedTarPath: z.string().optional(),
+  scanId: z.string().optional(),
+});
+
 const execAsync = promisify(exec);
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const parsed = ExportToRegistrySchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues },
+        { status: 400 }
+      );
+    }
+
     const {
       sourceImage,
       targetRegistry,
       targetImageName,
-      targetImageTag = 'latest',
+      targetImageTag,
       repositoryId,
       patchedTarPath,
       scanId
-    } = body;
+    } = parsed.data;
 
     logger.info('Export to registry request:', {
       sourceImage,
@@ -38,13 +58,6 @@ export async function POST(request: NextRequest) {
     if (!sourceImage && !patchedTarPath && !scanId) {
       return NextResponse.json(
         { error: 'Source image, scanId, or patched tar path is required' },
-        { status: 400 }
-      );
-    }
-
-    if (!targetRegistry || !targetImageName) {
-      return NextResponse.json(
-        { error: 'Target registry and image name are required' },
         { status: 400 }
       );
     }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { PatchExecutor } from '@/lib/patcher/PatchExecutor';
 import { PatchExecutorTar } from '@/lib/patcher/PatchExecutorTar';
 import { PatchExecutorTarUnshare } from '@/lib/patcher/PatchExecutorTarUnshare';
@@ -6,26 +7,39 @@ import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
 import { apiError } from '@/lib/api-utils';
 
+const ExecutePatchSchema = z.object({
+  sourceImageId: z.string().min(1),
+  scanId: z.string().min(1),
+  targetRegistry: z.string().optional(),
+  targetTag: z.string().optional(),
+  dryRun: z.boolean().optional().default(false),
+  selectedVulnerabilityIds: z.array(z.string()).optional(),
+  newImageName: z.string().optional(),
+  newImageTag: z.string().optional(),
+});
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { 
-      sourceImageId, 
-      scanId, 
-      targetRegistry, 
-      targetTag, 
-      dryRun = false,
-      selectedVulnerabilityIds,
-      newImageName,
-      newImageTag
-    } = body;
-    
-    if (!sourceImageId || !scanId) {
+    const parsed = ExecutePatchSchema.safeParse(body);
+
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Source image ID and scan ID are required' },
+        { error: parsed.error.issues },
         { status: 400 }
       );
     }
+
+    const {
+      sourceImageId,
+      scanId,
+      targetRegistry,
+      targetTag,
+      dryRun,
+      selectedVulnerabilityIds,
+      newImageName,
+      newImageTag
+    } = parsed.data;
 
     // Verify image and scan exist
     const image = await prisma.image.findUnique({
