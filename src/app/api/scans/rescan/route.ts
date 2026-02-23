@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { PrismaClient } from '@/generated/prisma';
 import { logger } from '@/lib/logger';
 import { ScannerService } from '@/lib/scanner/ScannerService';
@@ -6,20 +7,30 @@ import { auditLogger } from '@/lib/audit-logger';
 import type { ScanRequest } from '@/types';
 import { apiError } from '@/lib/api-utils';
 
+const RescanSchema = z.object({
+  scanId: z.string().optional(),
+  imageId: z.string().optional(),
+  tag: z.string().optional(),
+}).refine(data => data.scanId || data.imageId, {
+  message: 'Either scanId or imageId is required',
+});
+
 const prisma = new PrismaClient();
 const scannerService = ScannerService.getInstance();
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { scanId, imageId, tag } = body;
+    const parsed = RescanSchema.safeParse(body);
 
-    if (!scanId && !imageId) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Either scanId or imageId is required' },
+        { error: parsed.error.issues },
         { status: 400 }
       );
     }
+
+    const { scanId, imageId, tag } = parsed.data;
 
     // Fetch the original scan or image data from the database
     let scanData;

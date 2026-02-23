@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { VulnerabilityAnalyzer } from '@/lib/patcher/VulnerabilityAnalyzer';
 import { logger } from '@/lib/logger';
 import { apiError } from '@/lib/api-utils';
+
+const AnalyzePatchSchema = z.object({
+  scanId: z.string().min(1),
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -32,17 +37,20 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { scanId } = await request.json();
-    
-    if (!scanId) {
+    const body = await request.json();
+    const parsed = AnalyzePatchSchema.safeParse(body);
+
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Scan ID is required' },
+        { error: parsed.error.issues },
         { status: 400 }
       );
     }
 
+    const { scanId } = parsed.data;
+
     logger.info(`Analyzing scan ${scanId} for patching`);
-    
+
     const analyzer = new VulnerabilityAnalyzer();
     const analysis = await analyzer.analyzeScanForPatching(scanId);
     
