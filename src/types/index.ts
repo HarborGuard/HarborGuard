@@ -463,26 +463,20 @@ export interface DatabaseContextType {
   images: Image[];
   imagesLoading: boolean;
   imagesError: string | null;
-  
-  // Scans
-  scans: ScanWithImage[];
-  scansLoading: boolean;
-  scansError: string | null;
-  
+
   // Vulnerabilities
   vulnerabilities: VulnerabilityWithImages[];
   vulnerabilitiesLoading: boolean;
   vulnerabilitiesError: string | null;
-  
+
   // Bulk Scans
   bulkScans: BulkScanBatch[];
   bulkScansLoading: boolean;
   bulkScansError: string | null;
-  
+
   // Actions
   refreshAll: () => Promise<void>;
   refreshImages: () => Promise<void>;
-  refreshScans: () => Promise<void>;
   refreshVulnerabilities: () => Promise<void>;
   refreshBulkScans: () => Promise<void>;
 }
