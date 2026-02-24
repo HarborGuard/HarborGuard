@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { apiError } from '@/lib/api-utils'
+
+const UpdateScheduledScanSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  description: z.string().max(1000).optional().nullable(),
+  schedule: z.string().min(1).optional(),
+  enabled: z.boolean().optional(),
+  imageSelectionMode: z.enum(['ALL', 'SELECTED', 'PATTERN']).optional(),
+  imagePattern: z.string().optional().nullable(),
+  selectedImageIds: z.array(z.string()).optional(),
+})
 
 export async function GET(
   request: NextRequest,
@@ -82,6 +93,15 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json()
+    const parsed = UpdateScheduledScanSchema.safeParse(body)
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues },
+        { status: 400 }
+      )
+    }
+
     const {
       name,
       description,
@@ -90,7 +110,7 @@ export async function PUT(
       imageSelectionMode,
       imagePattern,
       selectedImageIds
-    } = body
+    } = parsed.data
 
     // Check if scheduled scan exists
     const existingScan = await prisma.scheduledScan.findUnique({

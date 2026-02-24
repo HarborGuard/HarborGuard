@@ -74,21 +74,24 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       const imageData = await inspectDockerImage(imageRef);
       const digest = imageData.Id;
 
-      const image = await prisma.image.upsert({
-        where: { digest },
-        update: { name: request.image, tag: request.tag, dockerImageId: request.dockerImageId },
-        create: {
-          name: request.image, tag: request.tag, source: 'LOCAL_DOCKER', digest,
-          platform: `${imageData.Os}/${imageData.Architecture}`,
-          sizeBytes: imageData.Size ? BigInt(imageData.Size) : null,
-          registryType: 'LOCAL', dockerImageId: request.dockerImageId,
-        }
-      });
+      const result = await prisma.$transaction(async (tx) => {
+        const image = await tx.image.upsert({
+          where: { digest },
+          update: { name: request.image, tag: request.tag, dockerImageId: request.dockerImageId },
+          create: {
+            name: request.image, tag: request.tag, source: 'LOCAL_DOCKER', digest,
+            platform: `${imageData.Os}/${imageData.Architecture}`,
+            sizeBytes: imageData.Size ? BigInt(imageData.Size) : null,
+            registryType: 'LOCAL', dockerImageId: request.dockerImageId,
+          }
+        });
 
-      const scan = await prisma.scan.create({
-        data: { requestId, imageId: image.id, tag: request.tag, startedAt: new Date(), status: 'RUNNING', source: 'local' }
+        const scan = await tx.scan.create({
+          data: { requestId, imageId: image.id, tag: request.tag, startedAt: new Date(), status: 'RUNNING', source: 'local' }
+        });
+        return { scanId: scan.id, imageId: image.id };
       });
-      return { scanId: scan.id, imageId: image.id };
+      return result;
     } catch (error) {
       console.error('Failed to initialize local Docker scan record:', error);
       const imageRef = request.dockerImageId || `${request.image}:${request.tag}`;
@@ -99,13 +102,16 @@ export class DatabaseAdapter implements IDatabaseAdapter {
   private async initializeTarScanRecord(requestId: string, request: ScanRequest) {
     try {
       const digest = `sha256:tar-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-      const image = await prisma.image.create({
-        data: { name: request.image, tag: request.tag, source: 'FILE_UPLOAD', digest, platform: 'linux/amd64', sizeBytes: null, registryType: 'TAR' }
+      const result = await prisma.$transaction(async (tx) => {
+        const image = await tx.image.create({
+          data: { name: request.image, tag: request.tag, source: 'FILE_UPLOAD', digest, platform: 'linux/amd64', sizeBytes: null, registryType: 'TAR' }
+        });
+        const scan = await tx.scan.create({
+          data: { requestId, imageId: image.id, tag: request.tag, startedAt: new Date(), status: 'RUNNING', source: 'tar' }
+        });
+        return { scanId: scan.id, imageId: image.id };
       });
-      const scan = await prisma.scan.create({
-        data: { requestId, imageId: image.id, tag: request.tag, startedAt: new Date(), status: 'RUNNING', source: 'tar' }
-      });
-      return { scanId: scan.id, imageId: image.id };
+      return result;
     } catch (error) {
       console.error('Failed to initialize tar scan record:', error);
       throw new Error(`Failed to initialize tar scan: ${error instanceof Error ? error.message : String(error)}`);
@@ -189,30 +195,33 @@ export class DatabaseAdapter implements IDatabaseAdapter {
       };
       if (request.repositoryId) imageData.primaryRepositoryId = request.repositoryId;
 
-      const image = await prisma.image.upsert({
-        where: { digest },
-        update: {
-          name: cleanImageName, tag: request.tag,
-          registry: repository ? repository.name : null, registryType: registryTypeValue,
-          ...(imageSize && { sizeBytes: BigInt(imageSize) }),
-          ...(request.repositoryId && { primaryRepositoryId: request.repositoryId })
-        },
-        create: imageData
-      });
+      const result = await prisma.$transaction(async (tx) => {
+        const image = await tx.image.upsert({
+          where: { digest },
+          update: {
+            name: cleanImageName, tag: request.tag,
+            registry: repository ? repository.name : null, registryType: registryTypeValue,
+            ...(imageSize && { sizeBytes: BigInt(imageSize) }),
+            ...(request.repositoryId && { primaryRepositoryId: request.repositoryId })
+          },
+          create: imageData
+        });
 
-      if (request.repositoryId && image) {
-        const ns = this.extractNamespaceFromImageName(cleanImageName);
-        await prisma.repositoryImage.upsert({
-          where: { repositoryId_imageId: { repositoryId: request.repositoryId, imageId: image.id } },
-          update: { imageName: cleanImageName, namespace: ns, lastSynced: new Date(), syncStatus: 'COMPLETED' },
-          create: { repositoryId: request.repositoryId, imageId: image.id, imageName: cleanImageName, namespace: ns, lastSynced: new Date(), syncStatus: 'COMPLETED' }
-        }).catch(err => console.warn('Failed to create/update repository-image relationship:', err));
-      }
+        if (request.repositoryId && image) {
+          const ns = this.extractNamespaceFromImageName(cleanImageName);
+          await tx.repositoryImage.upsert({
+            where: { repositoryId_imageId: { repositoryId: request.repositoryId, imageId: image.id } },
+            update: { imageName: cleanImageName, namespace: ns, lastSynced: new Date(), syncStatus: 'COMPLETED' },
+            create: { repositoryId: request.repositoryId, imageId: image.id, imageName: cleanImageName, namespace: ns, lastSynced: new Date(), syncStatus: 'COMPLETED' }
+          }).catch(err => console.warn('Failed to create/update repository-image relationship:', err));
+        }
 
-      const scan = await prisma.scan.create({
-        data: { requestId, imageId: image.id, tag: request.tag, startedAt: new Date(), status: 'RUNNING', source: request.source || 'registry' }
+        const scan = await tx.scan.create({
+          data: { requestId, imageId: image.id, tag: request.tag, startedAt: new Date(), status: 'RUNNING', source: request.source || 'registry' }
+        });
+        return { scanId: scan.id, imageId: image.id };
       });
-      return { scanId: scan.id, imageId: image.id };
+      return result;
     } catch (error) {
       console.error('Failed to initialize scan record:', error);
       throw new Error(`Failed to inspect image ${imageRef}: ${error instanceof Error ? error.message : String(error)}`);

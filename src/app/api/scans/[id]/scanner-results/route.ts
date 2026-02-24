@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { serializeForJson } from '@/lib/type-utils'
 import { apiError } from '@/lib/api-utils'
 
 export async function GET(
@@ -43,12 +44,7 @@ export async function GET(
       );
     }
 
-    // Serialize BigInt values
-    const serialized = JSON.parse(JSON.stringify(scanMetadata, (key, value) =>
-      typeof value === 'bigint' ? value.toString() : value
-    ));
-
-    return NextResponse.json(serialized);
+    return NextResponse.json(serializeForJson(scanMetadata));
   } catch (error) {
     return apiError(error, 'Error retrieving scanner results');
   }

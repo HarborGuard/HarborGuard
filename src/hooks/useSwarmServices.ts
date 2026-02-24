@@ -30,7 +30,7 @@ export function useSwarmServices(): UseSwarmServicesReturn {
 
     try {
       const response = await fetch('/api/docker/services');
-      const data: SwarmServicesResponse = await response.json();
+      const { data }: { data: SwarmServicesResponse } = await response.json();
 
       setIsSwarmMode(data.swarmMode);
       setIsManager(data.isManager ?? false);
