@@ -131,11 +131,7 @@ export async function POST(request: NextRequest) {
         error: result.success ? undefined : result.message
       })
     } catch (connectionError) {
-      const errorMessage = connectionError instanceof Error ? connectionError.message : 'Connection test failed'
-      return NextResponse.json({
-        success: false,
-        error: errorMessage,
-      })
+      return apiError(connectionError, 'Connection test failed')
     }
   } catch (error) {
     return apiError(error, 'Failed to test connection');
