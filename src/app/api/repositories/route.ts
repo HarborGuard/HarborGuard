@@ -1,14 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { RegistryService } from '@/lib/registry/RegistryService'
 import { apiError } from '@/lib/api-utils'
+
+const CreateRepositorySchema = z.object({
+  name: z.string().min(1).max(255),
+  type: z.enum(['DOCKERHUB', 'GHCR', 'GITLAB', 'GENERIC', 'ECR', 'GCR', 'ACR', 'HARBOR', 'NEXUS', 'ARTIFACTORY', 'QUAY']),
+  registryUrl: z.string().url().optional(),
+  username: z.string().min(1),
+  password: z.string().min(1),
+  organization: z.string().optional(),
+  protocol: z.string().optional(),
+  skipTlsVerify: z.boolean().optional(),
+  registryPort: z.number().int().positive().optional().nullable(),
+  testConnection: z.boolean().optional().default(true),
+})
 
 const registryService = new RegistryService(prisma)
 
 export async function GET() {
   try {
     const repositories = await registryService.listRepositories()
-    return NextResponse.json(repositories)
+    return NextResponse.json({ data: repositories })
   } catch (error) {
     return apiError(error, 'Failed to fetch repositories');
   }
@@ -17,14 +31,16 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, type, registryUrl, username, password, organization, protocol, skipTlsVerify, registryPort, testConnection = true } = body
+    const parsed = CreateRepositorySchema.safeParse(body)
 
-    if (!name || !type || !username || !password) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Missing required fields: name, type, username, password' },
+        { error: parsed.error.issues },
         { status: 400 }
       )
     }
+
+    const { name, type, registryUrl, username, password, organization, protocol, skipTlsVerify, registryPort, testConnection } = parsed.data
 
     const { repository, testResult } = await registryService.createRepository({
       name,

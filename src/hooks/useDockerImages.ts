@@ -30,7 +30,8 @@ export function useDockerImages(): UseDockerImagesReturn {
     if (!response.ok) {
       throw new Error('Failed to fetch Docker images')
     }
-    return response.json()
+    const { data } = await response.json()
+    return data
   }
 
   const refetch = async () => {

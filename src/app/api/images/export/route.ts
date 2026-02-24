@@ -1,21 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { promisify } from 'util';
 import { exec } from 'child_process';
 import { logger } from '@/lib/logger';
+
+const ExportImageSchema = z.object({
+  tarPath: z.string().optional(),
+  imageName: z.string().min(1),
+  imageTag: z.string().min(1),
+  sourceImage: z.string().optional(),
+  scanId: z.string().optional(),
+  digest: z.string().optional(),
+});
 
 const execAsync = promisify(exec);
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { tarPath, imageName, imageTag, sourceImage, scanId, digest } = body;
-    
-    if (!imageName || !imageTag) {
+    const parsed = ExportImageSchema.safeParse(body);
+
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'imageName and imageTag are required' },
+        { error: parsed.error.issues },
         { status: 400 }
       );
     }
+
+    const { tarPath, imageName, imageTag, sourceImage, scanId, digest } = parsed.data;
     
     // If no tar path provided but we have scanId, use the scan's tar file
     if (!tarPath && scanId) {

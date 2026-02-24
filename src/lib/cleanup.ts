@@ -22,39 +22,54 @@ export class DatabaseCleanup {
 
       logger.info(`Starting cleanup of scans older than ${config.cleanupOldScansDays} days (before ${cutoffDate.toISOString()})`);
 
-      // Find old scans to delete
-      const oldScans = await prisma.scan.findMany({
-        where: {
-          createdAt: {
-            lt: cutoffDate
-          }
-        },
-        select: {
-          id: true,
-          requestId: true,
-          reportsDir: true,
-          createdAt: true
-        }
-      });
-
-      if (oldScans.length === 0) {
-        logger.info('No old scans found for cleanup');
-        return;
-      }
-
-      logger.info(`Found ${oldScans.length} old scans to clean up`);
-
       let cleanupCount = 0;
       let errorCount = 0;
 
-      for (const scan of oldScans) {
+      // Process in batches of 100 to prevent memory exhaustion
+      while (true) {
+        const batch = await prisma.scan.findMany({
+          where: {
+            createdAt: {
+              lt: cutoffDate
+            }
+          },
+          take: 100,
+          select: {
+            id: true,
+            requestId: true,
+            reportsDir: true,
+          }
+        });
+
+        if (batch.length === 0) break;
+
+        // Clean up report directories for this batch
+        for (const scan of batch) {
+          try {
+            if (scan.reportsDir) {
+              await this.cleanupReportDirectory(scan.reportsDir);
+            } else {
+              const defaultReportDir = path.join(this.workDir, 'reports', scan.requestId);
+              await this.cleanupReportDirectory(defaultReportDir);
+            }
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            logger.error(`Failed to cleanup report files for scan ${scan.id}:`, errorMessage);
+          }
+        }
+
+        // Batch delete scans from database (cascade handles related records)
         try {
-          await this.cleanupScan(scan.id, scan.requestId, scan.reportsDir);
-          cleanupCount++;
+          await prisma.scan.deleteMany({
+            where: {
+              id: { in: batch.map(s => s.id) }
+            }
+          });
+          cleanupCount += batch.length;
         } catch (error) {
-          errorCount++;
+          errorCount += batch.length;
           const errorMessage = error instanceof Error ? error.message : String(error);
-          logger.error(`Failed to cleanup scan ${scan.id}:`, errorMessage);
+          logger.error(`Failed to delete batch of ${batch.length} scans:`, errorMessage);
         }
       }
 
@@ -71,27 +86,6 @@ export class DatabaseCleanup {
       logger.error('Failed to perform database cleanup:', errorMessage);
       throw error;
     }
-  }
-
-  /**
-   * Clean up a single scan and its associated data
-   */
-  private async cleanupScan(scanId: string, requestId: string, reportsDir?: string | null): Promise<void> {
-    // Delete from database (cascade will handle related records)
-    await prisma.scan.delete({
-      where: { id: scanId }
-    });
-
-    // Clean up report files
-    if (reportsDir) {
-      await this.cleanupReportDirectory(reportsDir);
-    } else {
-      // Fallback: use requestId to find report directory
-      const defaultReportDir = path.join(this.workDir, 'reports', requestId);
-      await this.cleanupReportDirectory(defaultReportDir);
-    }
-
-    logger.debug(`Cleaned up scan ${scanId} (${requestId})`);
   }
 
   /**
@@ -115,34 +109,33 @@ export class DatabaseCleanup {
    */
   private async cleanupOrphanedBulkScanItems(cutoffDate: Date): Promise<void> {
     try {
-      const orphanedItems = await prisma.bulkScanItem.findMany({
-        where: {
-          batch: {
+      let totalCleaned = 0;
+
+      // Process in batches of 100 to prevent memory exhaustion
+      while (true) {
+        const batch = await prisma.bulkScanBatch.findMany({
+          where: {
             createdAt: {
               lt: cutoffDate
             }
-          }
-        },
-        include: {
-          batch: true
-        }
-      });
+          },
+          take: 100,
+          select: { id: true }
+        });
 
-      if (orphanedItems.length > 0) {
-        const batchIds = [...new Set(orphanedItems.map(item => item.batchId))];
-        
+        if (batch.length === 0) break;
+
         await prisma.bulkScanBatch.deleteMany({
           where: {
-            id: {
-              in: batchIds
-            },
-            createdAt: {
-              lt: cutoffDate
-            }
+            id: { in: batch.map(b => b.id) }
           }
         });
 
-        logger.debug(`Cleaned up ${batchIds.length} old bulk scan batches`);
+        totalCleaned += batch.length;
+      }
+
+      if (totalCleaned > 0) {
+        logger.debug(`Cleaned up ${totalCleaned} old bulk scan batches`);
       }
     } catch (error) {
       logger.warn('Failed to cleanup orphaned bulk scan items:', error);

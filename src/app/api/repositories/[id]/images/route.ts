@@ -13,7 +13,7 @@ export async function GET(
     const { id } = await params
     const { searchParams } = new URL(request.url)
     
-    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!, 10) : undefined
+    const limit = searchParams.get('limit') ? Math.min(parseInt(searchParams.get('limit')!, 10), 100) : undefined
     const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!, 10) : undefined
     const namespace = searchParams.get('namespace') || undefined
     const query = searchParams.get('query') || undefined
