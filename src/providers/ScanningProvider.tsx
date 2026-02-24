@@ -171,6 +171,7 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
 
   const onScanCompleteRef = useRef<((job: ScanJob) => void) | null>(null);
   const previousJobsRef = useRef<Map<string, ScanJob>>(new Map());
+  const sseClientsRef = useRef<Map<string, SSEClient>>(new Map());
 
   // Monitor for scan completions
   useEffect(() => {
@@ -196,18 +197,19 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     return () => {
       // Disconnect all SSE clients on unmount
-      state.sseClients.forEach(client => client.disconnect());
+      sseClientsRef.current.forEach(client => client.disconnect());
+      sseClientsRef.current.clear();
     };
-  }, [state.sseClients]);
+  }, []);
 
   const subscribeTo = useCallback((requestId: string) => {
-    // Don't create duplicate SSE clients
-    if (state.sseClients.has(requestId)) {
+    // Use ref to avoid stale closure -- prevent duplicate SSE clients
+    if (sseClientsRef.current.has(requestId)) {
       return;
     }
 
     const sseClient = new SSEClient(requestId);
-    
+
     // Set up progress listener
     sseClient.onProgress((data) => {
       dispatch({ type: 'UPDATE_SCAN_PROGRESS', payload: data });
@@ -216,14 +218,20 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
     // Set up error listener
     sseClient.onError((error) => {
       console.error(`SSE error for scan ${requestId}:`, error);
+      // Remove from ref on error so reconnection is possible
+      sseClientsRef.current.delete(requestId);
     });
+
+    // Track in ref immediately to prevent duplicates even before state updates
+    sseClientsRef.current.set(requestId, sseClient);
 
     // Connect and add to state
     sseClient.connect();
     dispatch({ type: 'ADD_SSE_CLIENT', payload: { requestId, client: sseClient } });
-  }, []); // Remove state.sseClients dependency - the check inside will handle duplicates
+  }, []);
 
   const unsubscribeFrom = useCallback((requestId: string) => {
+    sseClientsRef.current.delete(requestId);
     dispatch({ type: 'REMOVE_SSE_CLIENT', payload: requestId });
   }, []);
 
@@ -312,14 +320,19 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
   }, [refreshJobs]);
   
   // Separate effect to adjust polling frequency based on running jobs
+  // SSE is the primary progress mechanism; polling is a fallback only
   useEffect(() => {
-    const hasRunningJobs = Array.from(state.jobs.values()).some(job => job.status === 'RUNNING');
-    const newFrequency = hasRunningJobs ? 3000 : 30000; // 3 seconds if active scans, 30 seconds otherwise
-    
+    const runningJobs = Array.from(state.jobs.values()).filter(job => job.status === 'RUNNING');
+    const hasRunningJobs = runningJobs.length > 0;
+    // Check if any running jobs lack an active SSE connection
+    const hasJobsWithoutSSE = runningJobs.some(job => !sseClientsRef.current.has(job.requestId));
+    // Poll at 15s when there are running jobs (as fallback to SSE), 30s otherwise
+    const newFrequency = hasRunningJobs && hasJobsWithoutSSE ? 15000 : 30000;
+
     // Only update if frequency needs to change
     if (newFrequency !== pollingFrequencyRef.current) {
       pollingFrequencyRef.current = newFrequency;
-      
+
       // Clear existing interval and start with new frequency
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
