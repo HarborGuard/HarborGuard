@@ -28,15 +28,6 @@ export function prismaToScanWithImage(prismaData: PrismaScan & {
 }
 
 /**
- * Serialize scan for JSON response (handle BigInt)
- */
-export function serializeScan(scan: any): any {
-  return JSON.parse(JSON.stringify(scan, (key, value) =>
-    typeof value === 'bigint' ? value.toString() : value
-  ));
-}
-
-/**
  * Serialize any data structure for JSON response (handle BigInt)
  */
 export function serializeForJson(data: any): any {
