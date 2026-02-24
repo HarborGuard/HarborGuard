@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { prismaToScanWithImage, serializeScan } from '@/lib/type-utils'
+import { prismaToScanWithImage, serializeForJson } from '@/lib/type-utils'
 import { apiError } from '@/lib/api-utils'
 
 export async function GET(request: NextRequest) {
@@ -231,7 +231,7 @@ export async function GET(request: NextRequest) {
     });
     
     return NextResponse.json({
-      scans: serializeScan(scansData),
+      scans: serializeForJson(scansData),
       pagination: {
         total,
         limit,
