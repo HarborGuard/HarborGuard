@@ -24,9 +24,10 @@ export class DatabaseCleanup {
 
       let cleanupCount = 0;
       let errorCount = 0;
+      const MAX_ITERATIONS = 1000; // Safety guard against infinite loops
 
       // Process in batches of 100 to prevent memory exhaustion
-      while (true) {
+      for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
         const batch = await prisma.scan.findMany({
           where: {
             createdAt: {
@@ -70,6 +71,8 @@ export class DatabaseCleanup {
           errorCount += batch.length;
           const errorMessage = error instanceof Error ? error.message : String(error);
           logger.error(`Failed to delete batch of ${batch.length} scans:`, errorMessage);
+          // Break on delete failure to prevent infinite loop retrying the same batch
+          break;
         }
       }
 
