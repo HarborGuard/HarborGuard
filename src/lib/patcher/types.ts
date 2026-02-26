@@ -1,5 +1,5 @@
 export interface PatchableVulnerability {
-  id?: string;
+  id: string;
   cveId: string;
   packageName: string;
   currentVersion: string;
