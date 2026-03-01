@@ -110,8 +110,12 @@ export function getSeverityHashColor(severity: string): string {
  * critical=90, high=70, medium=50, low=30, info=10
  */
 export function getSeverityScore(severity: string): number {
-  const level = normalizeSeverity(severity);
-  switch (level) {
+  const normalized = normalizeSeverity(severity);
+  // Don't inflate score for truly unknown values
+  if (normalized === 'info' && !['info', 'informational', 'note'].includes(severity.toLowerCase())) {
+    return 0;
+  }
+  switch (normalized) {
     case 'critical':
       return 90;
     case 'high':
