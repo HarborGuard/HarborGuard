@@ -5,7 +5,7 @@ import { prismaToScanWithImage, serializeForJson } from '@/lib/type-utils'
 import { apiError } from '@/lib/api-utils'
 
 const UpdateScanSchema = z.object({
-  status: z.enum(['PENDING', 'RUNNING', 'SUCCESS', 'FAILED', 'CANCELLED']).optional(),
+  status: z.enum(['PENDING', 'RUNNING', 'SUCCESS', 'PARTIAL', 'FAILED', 'CANCELLED']).optional(),
   errorMessage: z.string().optional().nullable(),
   riskScore: z.number().min(0).max(100).optional().nullable(),
   finishedAt: z.string().datetime().optional().nullable(),
