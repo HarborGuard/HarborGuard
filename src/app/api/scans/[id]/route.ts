@@ -466,8 +466,11 @@ export async function PATCH(
     
     // Convert Prisma data to properly typed scan
     const scanData = prismaToScanWithImage(updatedScan);
-    
-    return NextResponse.json(serializeForJson(scanData))
+
+    // Normalize scanner results on the server side so clients don't need fallback chains
+    const scannerData = normalizeScannerData(updatedScan.metadata);
+
+    return NextResponse.json(serializeForJson({ ...scanData, scannerData }))
   } catch (error) {
     return apiError(error, 'Error updating scan');
   }
