@@ -7,10 +7,10 @@ import { apiError } from '@/lib/api-utils'
 const CreateRepositorySchema = z.object({
   name: z.string().min(1).max(255),
   type: z.enum(['DOCKERHUB', 'GHCR', 'GITLAB', 'GENERIC', 'ECR', 'GCR', 'ACR', 'HARBOR', 'NEXUS', 'ARTIFACTORY', 'QUAY']),
-  registryUrl: z.string().url().optional(),
+  registryUrl: z.string().min(1).optional(),
   username: z.string().min(1),
   password: z.string().min(1),
-  organization: z.string().optional(),
+  organization: z.string().optional().nullable(),
   protocol: z.string().optional(),
   skipTlsVerify: z.boolean().optional(),
   registryPort: z.number().int().positive().optional().nullable(),
