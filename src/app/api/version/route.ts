@@ -6,7 +6,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { versionDetector } from '@/lib/version-detector';
 import { logger } from '@/lib/logger';
-import { apiError } from '@/lib/api-utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,7 +18,18 @@ export async function GET(request: NextRequest) {
       version: versionInfo
     });
   } catch (error) {
-    return apiError(error, 'Version check failed');
+    const errorMessage = error instanceof Error ? error.message : 'Version check failed';
+    logger.error('Version check failed:', errorMessage);
+
+    return NextResponse.json({
+      success: false,
+      error: 'Version check failed',
+      version: {
+        current: versionDetector.getCurrentVersion(),
+        hasUpdate: false,
+        lastChecked: new Date(),
+      },
+    });
   }
 }
 

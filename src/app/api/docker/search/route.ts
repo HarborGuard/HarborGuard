@@ -20,7 +20,8 @@ export async function GET(request: NextRequest) {
     })
 
     if (!response.ok) {
-      throw new Error(`Docker Hub API error: ${response.status}`)
+      console.error(`Docker Hub API error: ${response.status}`);
+      return NextResponse.json({ error: 'Docker not available', results: [] }, { status: 503 });
     }
 
     const data = await response.json()
