@@ -8,7 +8,7 @@ const UpdateScheduledScanSchema = z.object({
   description: z.string().max(1000).optional().nullable(),
   schedule: z.string().min(1).optional(),
   enabled: z.boolean().optional(),
-  imageSelectionMode: z.enum(['ALL', 'SELECTED', 'PATTERN']).optional(),
+  imageSelectionMode: z.enum(['ALL', 'SPECIFIC', 'PATTERN', 'REPOSITORY']).optional(),
   imagePattern: z.string().optional().nullable(),
   selectedImageIds: z.array(z.string()).optional(),
 })
