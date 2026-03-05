@@ -112,7 +112,7 @@ export function getSeverityHashColor(severity: string): string {
 export function getSeverityScore(severity: string): number {
   const normalized = normalizeSeverity(severity);
   // Don't inflate score for truly unknown values
-  if (normalized === 'info' && !['info', 'informational', 'note'].includes(severity.toLowerCase())) {
+  if (normalized === 'info' && !['info', 'informational', 'note'].includes((severity || '').toLowerCase())) {
     return 0;
   }
   switch (normalized) {
