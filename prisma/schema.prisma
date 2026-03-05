@@ -574,7 +574,7 @@ model AuditLog {
   @@index([userIp])
   @@index([timestamp])
   @@index([resource])
-  @@index([timestamp, category])
+  @@index([category, timestamp])
   @@map("audit_logs")
 }
 
