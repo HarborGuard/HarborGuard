@@ -232,6 +232,7 @@ export class PatchExecutor {
         
         if (packageManager && this.strategies.has(packageManager)) {
           patchable.push({
+            id: finding.id || finding.cveId,
             cveId: finding.cveId,
             packageName: finding.packageName,
             currentVersion: finding.installedVersion || 'unknown',
