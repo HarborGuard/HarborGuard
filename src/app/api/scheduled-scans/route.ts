@@ -7,8 +7,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const enabled = searchParams.get('enabled')
     const source = searchParams.get('source')
-    const limit = Math.min(parseInt(searchParams.get('limit') || '25'), 100)
-    const offset = parseInt(searchParams.get('offset') || '0')
+    const limit = Math.max(1, Math.min(parseInt(searchParams.get('limit') || '25') || 25, 100))
+    const offset = Math.max(0, parseInt(searchParams.get('offset') || '0') || 0)
 
     const where: any = {}
 

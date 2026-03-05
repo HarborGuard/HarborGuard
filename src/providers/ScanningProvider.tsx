@@ -220,6 +220,7 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
       console.error(`SSE error for scan ${requestId}:`, error);
       // Remove from ref on error so reconnection is possible
       sseClientsRef.current.delete(requestId);
+      dispatch({ type: 'REMOVE_SSE_CLIENT', payload: requestId });
     });
 
     // Track in ref immediately to prevent duplicates even before state updates
