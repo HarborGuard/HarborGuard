@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { getSwarmInfo, listSwarmServices } from '@/lib/docker';
-import { apiError } from '@/lib/api-utils';
 
 export async function GET() {
   try {
@@ -41,6 +40,13 @@ export async function GET() {
       },
     });
   } catch (error) {
-    return apiError(error, 'Failed to get Swarm services');
+    console.error('Failed to get Swarm services', error);
+    return NextResponse.json({
+      data: {
+        swarmMode: false,
+        services: [],
+        error: 'Failed to get Swarm services',
+      },
+    });
   }
 }
