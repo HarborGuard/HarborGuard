@@ -72,22 +72,24 @@ export function useBulkScan(open: boolean) {
         setScannerAvailability(result.scanners);
 
         // Update form data to pre-check available scanners
-        const updatedFormData = { ...formData };
-        result.scanners.forEach((scanner: ScannerInfo) => {
-          const key = `enable${scanner.name.charAt(0).toUpperCase()}${scanner.name.slice(1)}`;
-          // Type-safe update for boolean scanner fields
-          switch(key) {
-            case 'enableTrivy':
-            case 'enableGrype':
-            case 'enableSyft':
-            case 'enableDockle':
-            case 'enableOsv':
-            case 'enableDive':
-              updatedFormData[key] = scanner.available;
-              break;
-          }
+        setFormData(prev => {
+          const updated = { ...prev };
+          result.scanners.forEach((scanner: ScannerInfo) => {
+            const key = `enable${scanner.name.charAt(0).toUpperCase()}${scanner.name.slice(1)}`;
+            // Type-safe update for boolean scanner fields
+            switch(key) {
+              case 'enableTrivy':
+              case 'enableGrype':
+              case 'enableSyft':
+              case 'enableDockle':
+              case 'enableOsv':
+              case 'enableDive':
+                updated[key] = scanner.available;
+                break;
+            }
+          });
+          return updated;
         });
-        setFormData(updatedFormData);
       }
     } catch (error) {
       console.error("Error fetching scanner availability:", error);
