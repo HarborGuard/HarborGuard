@@ -85,8 +85,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const query = auditLogQuerySchema.parse(Object.fromEntries(searchParams));
     
-    const page = parseInt(query.page);
-    const limit = Math.min(parseInt(query.limit), 100);
+    const page = Math.max(1, parseInt(query.page) || 1);
+    const limit = Math.max(1, Math.min(parseInt(query.limit) || 50, 100));
     const offset = (page - 1) * limit;
 
     // Build where clause for filtering

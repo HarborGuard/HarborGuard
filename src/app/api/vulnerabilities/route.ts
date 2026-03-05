@@ -35,8 +35,8 @@ const SEVERITY_ORDER = `
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const limit = Math.max(1, Math.min(parseInt(searchParams.get('limit') || '50') || 50, 100));
+    const offset = Math.max(0, parseInt(searchParams.get('offset') || '0') || 0);
     const search = searchParams.get('search') || '';
     const severity = searchParams.get('severity') || '';
     const includeTotal = searchParams.get('includeTotal') !== 'false';
