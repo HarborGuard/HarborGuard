@@ -123,35 +123,40 @@ async function saveGrypeResults(metadataId: string, grypeData: any): Promise<voi
     },
   });
 
-  if (grypeData.matches && grypeData.matches.length > 0) {
-    const vulnerabilities = grypeData.matches.map((match: any) => ({
-      grypeResultsId: grypeResult.id,
-      vulnerabilityId: match.vulnerability?.id || 'UNKNOWN',
-      severity: match.vulnerability?.severity || 'INFO',
-      namespace: match.vulnerability?.namespace || null,
-      packageName: match.artifact?.name || 'unknown',
-      packageVersion: match.artifact?.version || '',
-      packageType: match.artifact?.type || 'unknown',
-      packagePath: match.artifact?.locations?.[0]?.path || null,
-      packageLanguage: match.artifact?.language || null,
-      fixState: match.vulnerability?.fix?.state || null,
-      fixVersions: match.vulnerability?.fix?.versions || null,
-      cvssV2Score:
-        match.vulnerability?.cvss?.[0]?.version === '2.0'
-          ? match.vulnerability.cvss[0].metrics?.baseScore
-          : null,
-      cvssV2Vector:
-        match.vulnerability?.cvss?.[0]?.version === '2.0' ? match.vulnerability.cvss[0].vector : null,
-      cvssV3Score:
-        match.vulnerability?.cvss?.find((c: any) => c.version?.startsWith('3'))?.metrics?.baseScore || null,
-      cvssV3Vector:
-        match.vulnerability?.cvss?.find((c: any) => c.version?.startsWith('3'))?.vector || null,
-      urls: match.vulnerability?.urls || null,
-      description: match.vulnerability?.description || null,
-    }));
+  // Delete existing vulnerabilities and insert new ones atomically
+  await prisma.$transaction(async (tx) => {
+    await tx.grypeVulnerability.deleteMany({ where: { grypeResultsId: grypeResult.id } });
 
-    await prisma.grypeVulnerability.createMany({ data: vulnerabilities });
-  }
+    if (grypeData.matches && grypeData.matches.length > 0) {
+      const vulnerabilities = grypeData.matches.map((match: any) => ({
+        grypeResultsId: grypeResult.id,
+        vulnerabilityId: match.vulnerability?.id || 'UNKNOWN',
+        severity: match.vulnerability?.severity || 'INFO',
+        namespace: match.vulnerability?.namespace || null,
+        packageName: match.artifact?.name || 'unknown',
+        packageVersion: match.artifact?.version || '',
+        packageType: match.artifact?.type || 'unknown',
+        packagePath: match.artifact?.locations?.[0]?.path || null,
+        packageLanguage: match.artifact?.language || null,
+        fixState: match.vulnerability?.fix?.state || null,
+        fixVersions: match.vulnerability?.fix?.versions || null,
+        cvssV2Score:
+          match.vulnerability?.cvss?.[0]?.version === '2.0'
+            ? match.vulnerability.cvss[0].metrics?.baseScore
+            : null,
+        cvssV2Vector:
+          match.vulnerability?.cvss?.[0]?.version === '2.0' ? match.vulnerability.cvss[0].vector : null,
+        cvssV3Score:
+          match.vulnerability?.cvss?.find((c: any) => c.version?.startsWith('3'))?.metrics?.baseScore || null,
+        cvssV3Vector:
+          match.vulnerability?.cvss?.find((c: any) => c.version?.startsWith('3'))?.vector || null,
+        urls: match.vulnerability?.urls || null,
+        description: match.vulnerability?.description || null,
+      }));
+
+      await tx.grypeVulnerability.createMany({ data: vulnerabilities });
+    }
+  });
 }
 
 async function saveTrivyResults(metadataId: string, trivyData: any): Promise<void> {
@@ -170,90 +175,97 @@ async function saveTrivyResults(metadataId: string, trivyData: any): Promise<voi
     },
   });
 
-  if (trivyData.Results && trivyData.Results.length > 0) {
-    for (const result of trivyData.Results) {
-      // Save vulnerabilities
-      if (result.Vulnerabilities && result.Vulnerabilities.length > 0) {
-        const vulnerabilities = result.Vulnerabilities.map((vuln: any) => ({
-          trivyResultsId: trivyResult.id,
-          targetName: result.Target || '',
-          targetClass: result.Class || null,
-          targetType: result.Type || null,
-          vulnerabilityId: vuln.VulnerabilityID || 'UNKNOWN',
-          pkgId: vuln.PkgID || null,
-          pkgName: vuln.PkgName || 'unknown',
-          pkgPath: vuln.PkgPath || null,
-          installedVersion: vuln.InstalledVersion || null,
-          fixedVersion: vuln.FixedVersion || null,
-          status: vuln.Status || null,
-          severity: vuln.Severity || 'INFO',
-          severitySource: vuln.SeveritySource || null,
-          primaryUrl: vuln.PrimaryURL || null,
-          cvssScore: vuln.CVSS?.nvd?.V2Score || null,
-          cvssVector: vuln.CVSS?.nvd?.V2Vector || null,
-          cvssScoreV3: vuln.CVSS?.nvd?.V3Score || vuln.CVSS?.redhat?.V3Score || null,
-          cvssVectorV3: vuln.CVSS?.nvd?.V3Vector || vuln.CVSS?.redhat?.V3Vector || null,
-          title: vuln.Title || null,
-          description: vuln.Description || null,
-          publishedDate: vuln.PublishedDate ? new Date(vuln.PublishedDate) : null,
-          lastModifiedDate: vuln.LastModifiedDate ? new Date(vuln.LastModifiedDate) : null,
-          references: vuln.References || null,
-        }));
+  // Delete existing child records and insert new ones atomically
+  await prisma.$transaction(async (tx) => {
+    await tx.trivyVulnerability.deleteMany({ where: { trivyResultsId: trivyResult.id } });
+    await tx.trivyMisconfiguration.deleteMany({ where: { trivyResultsId: trivyResult.id } });
+    await tx.trivySecret.deleteMany({ where: { trivyResultsId: trivyResult.id } });
 
-        await prisma.trivyVulnerability.createMany({ data: vulnerabilities });
-      }
+    if (trivyData.Results && trivyData.Results.length > 0) {
+      for (const result of trivyData.Results) {
+        // Save vulnerabilities
+        if (result.Vulnerabilities && result.Vulnerabilities.length > 0) {
+          const vulnerabilities = result.Vulnerabilities.map((vuln: any) => ({
+            trivyResultsId: trivyResult.id,
+            targetName: result.Target || '',
+            targetClass: result.Class || null,
+            targetType: result.Type || null,
+            vulnerabilityId: vuln.VulnerabilityID || 'UNKNOWN',
+            pkgId: vuln.PkgID || null,
+            pkgName: vuln.PkgName || 'unknown',
+            pkgPath: vuln.PkgPath || null,
+            installedVersion: vuln.InstalledVersion || null,
+            fixedVersion: vuln.FixedVersion || null,
+            status: vuln.Status || null,
+            severity: vuln.Severity || 'INFO',
+            severitySource: vuln.SeveritySource || null,
+            primaryUrl: vuln.PrimaryURL || null,
+            cvssScore: vuln.CVSS?.nvd?.V2Score || null,
+            cvssVector: vuln.CVSS?.nvd?.V2Vector || null,
+            cvssScoreV3: vuln.CVSS?.nvd?.V3Score || vuln.CVSS?.redhat?.V3Score || null,
+            cvssVectorV3: vuln.CVSS?.nvd?.V3Vector || vuln.CVSS?.redhat?.V3Vector || null,
+            title: vuln.Title || null,
+            description: vuln.Description || null,
+            publishedDate: vuln.PublishedDate ? new Date(vuln.PublishedDate) : null,
+            lastModifiedDate: vuln.LastModifiedDate ? new Date(vuln.LastModifiedDate) : null,
+            references: vuln.References || null,
+          }));
 
-      // Save misconfigurations
-      if (result.Misconfigurations && result.Misconfigurations.length > 0) {
-        const misconfigs = result.Misconfigurations.map((misconf: any) => ({
-          trivyResultsId: trivyResult.id,
-          targetName: result.Target || '',
-          targetClass: result.Class || null,
-          targetType: result.Type || null,
-          checkId: misconf.ID || '',
-          avdId: misconf.AVDID || null,
-          title: misconf.Title || '',
-          description: misconf.Description || '',
-          message: misconf.Message || '',
-          namespace: misconf.Namespace || null,
-          query: misconf.Query || null,
-          severity: misconf.Severity || 'INFO',
-          resolution: misconf.Resolution || null,
-          status: misconf.Status || 'FAIL',
-          startLine: misconf.CauseMetadata?.StartLine || null,
-          endLine: misconf.CauseMetadata?.EndLine || null,
-          code: misconf.CauseMetadata?.Code || null,
-          primaryUrl: misconf.PrimaryURL || null,
-          references: misconf.References || null,
-        }));
+          await tx.trivyVulnerability.createMany({ data: vulnerabilities });
+        }
 
-        await prisma.trivyMisconfiguration.createMany({ data: misconfigs });
-      }
+        // Save misconfigurations
+        if (result.Misconfigurations && result.Misconfigurations.length > 0) {
+          const misconfigs = result.Misconfigurations.map((misconf: any) => ({
+            trivyResultsId: trivyResult.id,
+            targetName: result.Target || '',
+            targetClass: result.Class || null,
+            targetType: result.Type || null,
+            checkId: misconf.ID || '',
+            avdId: misconf.AVDID || null,
+            title: misconf.Title || '',
+            description: misconf.Description || '',
+            message: misconf.Message || '',
+            namespace: misconf.Namespace || null,
+            query: misconf.Query || null,
+            severity: misconf.Severity || 'INFO',
+            resolution: misconf.Resolution || null,
+            status: misconf.Status || 'FAIL',
+            startLine: misconf.CauseMetadata?.StartLine || null,
+            endLine: misconf.CauseMetadata?.EndLine || null,
+            code: misconf.CauseMetadata?.Code || null,
+            primaryUrl: misconf.PrimaryURL || null,
+            references: misconf.References || null,
+          }));
 
-      // Save secrets
-      if (result.Secrets && result.Secrets.length > 0) {
-        const secrets = result.Secrets.map((secret: any) => ({
-          trivyResultsId: trivyResult.id,
-          targetName: result.Target || '',
-          ruleId: secret.RuleID || '',
-          category: secret.Category || '',
-          severity: secret.Severity || 'INFO',
-          title: secret.Title || '',
-          startLine: secret.StartLine || 0,
-          endLine: secret.EndLine || 0,
-          code: secret.Code || null,
-          match: secret.Match || null,
-          // Handle Layer being an object with DiffID
-          layer:
-            typeof secret.Layer === 'object' && secret.Layer
-              ? secret.Layer.DiffID || secret.Layer.Digest || JSON.stringify(secret.Layer)
-              : secret.Layer || null,
-        }));
+          await tx.trivyMisconfiguration.createMany({ data: misconfigs });
+        }
 
-        await prisma.trivySecret.createMany({ data: secrets });
+        // Save secrets
+        if (result.Secrets && result.Secrets.length > 0) {
+          const secrets = result.Secrets.map((secret: any) => ({
+            trivyResultsId: trivyResult.id,
+            targetName: result.Target || '',
+            ruleId: secret.RuleID || '',
+            category: secret.Category || '',
+            severity: secret.Severity || 'INFO',
+            title: secret.Title || '',
+            startLine: secret.StartLine || 0,
+            endLine: secret.EndLine || 0,
+            code: secret.Code || null,
+            match: secret.Match || null,
+            // Handle Layer being an object with DiffID
+            layer:
+              typeof secret.Layer === 'object' && secret.Layer
+                ? secret.Layer.DiffID || secret.Layer.Digest || JSON.stringify(secret.Layer)
+                : secret.Layer || null,
+          }));
+
+          await tx.trivySecret.createMany({ data: secrets });
+        }
       }
     }
-  }
+  });
 }
 
 async function saveDiveResults(metadataId: string, diveData: any): Promise<void> {
