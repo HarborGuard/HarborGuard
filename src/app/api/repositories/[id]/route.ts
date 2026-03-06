@@ -5,11 +5,12 @@ import { RegistryService } from '@/lib/registry/RegistryService'
 import { apiError } from '@/lib/api-utils'
 
 const UpdateRepositorySchema = z.object({
-  registryUrl: z.string().url().optional(),
+  registryUrl: z.string().min(1).optional(),
   skipTlsVerify: z.boolean().optional(),
   registryPort: z.number().int().positive().optional().nullable(),
   username: z.string().min(1).optional(),
   password: z.string().min(1).optional(),
+  organization: z.string().optional().nullable(),
 })
 
 const registryService = new RegistryService(prisma)
