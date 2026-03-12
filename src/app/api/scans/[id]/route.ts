@@ -460,7 +460,16 @@ export async function PATCH(
       },
       include: {
         image: true,
-        metadata: true
+        metadata: {
+          include: {
+            grypeResult: { include: { vulnerabilities: true } },
+            trivyResult: { include: { vulnerabilities: true, misconfigurations: true, secrets: true } },
+            diveResult: { include: { layers: true } },
+            syftResult: { include: { packages: { take: 100, orderBy: { name: 'asc' as const } } } },
+            dockleResult: { include: { violations: true } },
+            osvResult: { include: { vulnerabilities: true } },
+          }
+        }
       }
     })
     
