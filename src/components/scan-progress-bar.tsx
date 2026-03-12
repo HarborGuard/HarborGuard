@@ -1,6 +1,6 @@
 "use client"
 
-import { useScanning } from '@/providers/ScanningProvider';
+import { useScanning } from '@/contexts/ScanningContext';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { IconLoader2, IconCheck, IconX, IconWifi } from '@tabler/icons-react';

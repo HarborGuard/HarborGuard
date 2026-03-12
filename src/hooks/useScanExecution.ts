@@ -4,7 +4,7 @@ import * as React from "react"
 import { toast } from "sonner"
 import { buildScanRequest, parseImageString as parseImage } from "@/lib/registry/registry-utils"
 import { useApp } from "@/contexts/AppContext"
-import { useScanning } from "@/providers/ScanningProvider"
+import { useScanning } from "@/contexts/ScanningContext"
 import type { DockerImage, SwarmService } from "@/types"
 import type { Repository, RepositoryImage } from "@/hooks/useScanSources"
 
