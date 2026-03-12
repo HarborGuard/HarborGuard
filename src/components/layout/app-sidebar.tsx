@@ -11,7 +11,7 @@ import {
   IconCalendarEvent,
 } from "@tabler/icons-react";
 
-import { NavMain } from "@/components/nav-main";
+import { NavMain } from "@/components/layout/nav-main";
 import { VersionNotification } from "@/components/version-notification";
 import {
   Sidebar,

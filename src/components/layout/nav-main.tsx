@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/sidebar"
 import { NewScanModal } from "@/components/new-scan-modal"
 import { BulkScanModal } from "@/components/bulk-scan-modal"
-import { Separator } from "./ui/separator"
+import { Separator } from "../ui/separator"
 
 export function NavMain({
   items,

@@ -13,8 +13,8 @@ import {
   IconSortDescending,
 } from "@tabler/icons-react";
 
-import { AppSidebar } from "@/components/app-sidebar";
-import { SiteHeader } from "@/components/site-header";
+import { AppSidebar } from "@/components/layout/app-sidebar";
+import { SiteHeader } from "@/components/layout/site-header";
 import { Button } from "@/components/ui/button";
 import { VulnerabilityUrlMenu } from "@/components/vulnerability-url-menu";
 import {
