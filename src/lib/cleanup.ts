@@ -27,7 +27,10 @@ export class DatabaseCleanup {
       const MAX_ITERATIONS = 1000; // Safety guard against infinite loops
 
       // Process in batches of 100 to prevent memory exhaustion
+      let reachedLimit = false;
       for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+        if (iteration === MAX_ITERATIONS - 1) reachedLimit = true;
+
         const batch = await prisma.scan.findMany({
           where: {
             createdAt: {
@@ -76,6 +79,10 @@ export class DatabaseCleanup {
         }
       }
 
+      if (reachedLimit) {
+        logger.warn(`Cleanup reached max iteration limit (${MAX_ITERATIONS}); some old scans may remain`);
+      }
+
       // Clean up orphaned bulk scan items
       await this.cleanupOrphanedBulkScanItems(cutoffDate);
 
@@ -115,7 +122,7 @@ export class DatabaseCleanup {
       let totalCleaned = 0;
 
       // Process in batches of 100 to prevent memory exhaustion
-      while (true) {
+      for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
         const batch = await prisma.bulkScanBatch.findMany({
           where: {
             createdAt: {
