@@ -18,7 +18,7 @@ import {
 import { TabsContent } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import type { Repository, RepositoryImage, RepositoryTag } from "@/hooks/useScanSources"
-import { useScanning } from "@/providers/ScanningProvider"
+import { useScanning } from "@/contexts/ScanningContext"
 import { useApp } from "@/contexts/AppContext"
 
 interface PrivateRepositoriesTabProps {

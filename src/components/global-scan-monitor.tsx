@@ -6,7 +6,7 @@ import { ScanToast } from "@/components/scan-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { IconEye, IconX } from "@tabler/icons-react";
-import { useScanning } from "@/providers/ScanningProvider";
+import { useScanning } from "@/contexts/ScanningContext";
 import {
   Dialog,
   DialogContent,

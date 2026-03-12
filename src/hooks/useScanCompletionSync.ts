@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { useScanning } from '@/providers/ScanningProvider';
+import { useScanning } from '@/contexts/ScanningContext';
 
 /**
  * Hook that syncs scan completion events with app state refresh

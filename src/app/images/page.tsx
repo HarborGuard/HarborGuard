@@ -4,7 +4,7 @@ import { UnifiedTable } from "@/components/table/unified-table";
 import { ColumnDefinition, ContextMenuItem } from "@/components/table/types";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { useScanning } from "@/providers/ScanningProvider";
+import { useScanning } from "@/contexts/ScanningContext";
 import { DeleteImageDialog } from "@/components/delete-image-dialog";
 import { IconRefresh, IconTrash } from "@tabler/icons-react";
 import * as React from "react";

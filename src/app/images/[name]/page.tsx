@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { useDatabase } from "@/providers/DatabaseProvider";
+import { useDatabase } from "@/contexts/DatabaseProvider";
 import { useCveClassifications } from "@/hooks/useCveClassifications";
 import type { ScanWithImage } from "@/types";
 import { aggregateVulnerabilitiesWithClassifications } from "@/lib/scan-aggregations";
