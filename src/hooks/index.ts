@@ -9,4 +9,4 @@ export { useVulnerabilityLibrary } from './useVulnerabilityLibrary';
 export { useDockerImages } from './useDockerImages';
 export { useSwarmServices } from './useSwarmServices';
 export { useVersionCheck } from './useVersionCheck';
-export { useIsMobile } from './use-mobile';
+export { useIsMobile } from './useMobile';
