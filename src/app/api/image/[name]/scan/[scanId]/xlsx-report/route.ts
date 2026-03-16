@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { generateXlsxReport } from '@/lib/xlsx-report'
+import { generateXlsxReport } from '@/lib/reporting/xlsx-report'
 import { apiError } from '@/lib/api/api-utils'
 
 export async function GET(
