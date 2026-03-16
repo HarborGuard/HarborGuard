@@ -4,8 +4,8 @@ import "./globals.css";
 import { AppProvider } from "@/contexts/AppContext";
 import { ScanningProvider } from "@/contexts/ScanningContext";
 import { DatabaseProvider } from "@/contexts/DatabaseProvider";
-import { ScanCompletionSync } from "@/components/ScanCompletionSync";
-import { GlobalScanMonitor } from "@/components/global-scan-monitor";
+import { ScanCompletionSync } from "@/components/scan/monitor/ScanCompletionSync";
+import { GlobalScanMonitor } from "@/components/scan/monitor/global-scan-monitor";
 import { Toaster } from "@/components/ui/sonner";
 import {
   SidebarInset,

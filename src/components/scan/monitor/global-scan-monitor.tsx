@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { ScanProgressBarDetailed } from "@/components/scan-progress-bar";
-import { ScanToast } from "@/components/scan-toast";
+import { ScanProgressBarDetailed } from "@/components/scan/monitor/scan-progress-bar";
+import { ScanToast } from "@/components/scan/monitor/scan-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { IconEye, IconX } from "@tabler/icons-react";
