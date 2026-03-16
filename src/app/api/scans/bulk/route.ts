@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BulkScanService } from '@/lib/bulk/BulkScanService';
 import { z } from 'zod';
 import { config } from '@/lib/config';
-import { apiError } from '@/lib/api-utils';
+import { apiError } from '@/lib/api/api-utils';
 
 const BulkScanRequestSchema = z.object({
   name: z.string().optional(),

@@ -10,7 +10,7 @@ import {
 
 import { ScanDetailsNormalized } from "@/components/scan/ScanDetailsNormalized";
 import { Button } from "@/components/ui/button";
-import { VulnerabilityDetailsModal } from "@/components/vulnerability-details-modal";
+import { VulnerabilityDetailsModal } from "@/components/dialogs/vulnerability-details-modal";
 import {
   Card,
   CardContent,
@@ -19,7 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ScanDetailsSkeleton } from "@/components/image-loading";
-import { CveClassificationDialog } from "@/components/cve-classification-dialog";
+import { CveClassificationDialog } from "@/components/dialogs/cve-classification-dialog";
 import { PatchAnalysis } from "@/components/patch-analysis";
 import { useScanData } from "@/hooks/useScanData";
 import { useCveClassifications } from "@/hooks/useCveClassifications";

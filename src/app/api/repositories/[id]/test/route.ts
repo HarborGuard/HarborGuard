@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { RegistryService } from '@/lib/registry/RegistryService'
-import { apiError } from '@/lib/api-utils'
+import { apiError } from '@/lib/api/api-utils'
 
 const registryService = new RegistryService(prisma)
 

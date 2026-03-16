@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { EventType, LogCategory, LogAction } from '@/generated/prisma';
-import { apiError } from '@/lib/api-utils';
+import { apiError } from '@/lib/api/api-utils';
 
 const auditLogQuerySchema = z.object({
   page: z.string().optional().default('1'),

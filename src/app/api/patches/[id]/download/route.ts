@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import fs from 'fs/promises';
 import path from 'path';
-import { apiError } from '@/lib/api-utils';
+import { apiError } from '@/lib/api/api-utils';
 
 export async function GET(
   request: NextRequest,

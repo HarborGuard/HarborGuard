@@ -71,7 +71,7 @@ import { scannerService } from '@/lib/scanner'
 import { z } from 'zod'
 import type { ScanRequest } from '@/types'
 import { auditLogger } from '@/lib/audit-logger'
-import { apiError } from '@/lib/api-utils'
+import { apiError } from '@/lib/api/api-utils'
 
 // Single scan item schema
 const SingleScanSchema = z.object({

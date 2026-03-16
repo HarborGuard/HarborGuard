@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import puppeteer from 'puppeteer'
-import { apiError } from '@/lib/api-utils'
+import { apiError } from '@/lib/api/api-utils'
 
 function generateHtmlReport(scan: any, decodedImageName: string): string {
   const metadata = scan.metadata

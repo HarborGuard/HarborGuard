@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { RegistrySyncService } from '@/lib/registry/sync/RegistrySyncService';
-import { apiError } from '@/lib/api-utils';
+import { apiError } from '@/lib/api/api-utils';
 
 // Create a singleton instance
 let syncService: RegistrySyncService | null = null;

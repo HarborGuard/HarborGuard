@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { checkDockerAccess, getSwarmInfo } from '@/lib/docker';
-import { apiError } from '@/lib/api-utils';
+import { apiError } from '@/lib/api/api-utils';
 
 export async function GET() {
   try {
