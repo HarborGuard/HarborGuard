@@ -4,8 +4,8 @@ import {
   CardDescription, 
   CardHeader, 
   CardTitle 
-} from "./ui/card"
-import { Skeleton } from "./ui/skeleton"
+} from "../ui/card"
+import { Skeleton } from "../ui/skeleton"
 import { IconTag, IconShield } from "@tabler/icons-react"
 
 export function ImagePageSkeleton() {

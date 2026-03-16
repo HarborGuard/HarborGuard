@@ -16,7 +16,7 @@ import {
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Button } from "@/components/ui/button";
-import { VulnerabilityUrlMenu } from "@/components/vulnerability-url-menu";
+import { VulnerabilityUrlMenu } from "@/components/shared/vulnerability-url-menu";
 import {
   Card,
   CardContent,

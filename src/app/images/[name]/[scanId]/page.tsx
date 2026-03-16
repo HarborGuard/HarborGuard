@@ -18,9 +18,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ScanDetailsSkeleton } from "@/components/image-loading";
+import { ScanDetailsSkeleton } from "@/components/images/image-loading";
 import { CveClassificationDialog } from "@/components/dialogs/cve-classification-dialog";
-import { PatchAnalysis } from "@/components/patch-analysis";
+import { PatchAnalysis } from "@/components/analysis/patch-analysis";
 import { useScanData } from "@/hooks/useScanData";
 import { useCveClassifications } from "@/hooks/useCveClassifications";
 import { ScanSummaryCard, RawScannerTabs } from "@/components/scan-results";

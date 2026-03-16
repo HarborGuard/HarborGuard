@@ -32,7 +32,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ScheduleScanForm } from "@/components/schedule-scan-form";
+import { ScheduleScanForm } from "@/components/shared/schedule-scan-form";
 import { format } from "date-fns";
 
 interface ScheduledScan {
