@@ -11,8 +11,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { NewScanModal } from "@/components/new-scan-modal"
-import { BulkScanModal } from "@/components/bulk-scan-modal"
+import { NewScanModal } from "@/components/dialogs/new-scan-modal"
+import { BulkScanModal } from "@/components/dialogs/bulk-scan-modal"
 import { Separator } from "../ui/separator"
 
 export function NavMain({

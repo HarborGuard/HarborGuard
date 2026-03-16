@@ -25,7 +25,7 @@ import {
   IconLoader2,
 } from "@tabler/icons-react";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { AddRepositoryDialog } from "@/components/add-repository-dialog";
+import { AddRepositoryDialog } from "@/components/dialogs/add-repository-dialog";
 import { toast } from "sonner";
 
 interface Repository {

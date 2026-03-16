@@ -22,9 +22,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CveClassificationDialog } from "@/components/cve-classification-dialog";
-import { VulnerabilityDetailModal } from "./VulnerabilityDetailModal";
-import { PackageDetailModal } from "./PackageDetailModal";
+import { CveClassificationDialog } from "@/components/dialogs/cve-classification-dialog";
+import { VulnerabilityDetailModal } from "@/components/dialogs/VulnerabilityDetailModal";
+import { PackageDetailModal } from "@/components/dialogs/PackageDetailModal";
 import { VulnerabilitiesTab } from "./findings/VulnerabilitiesTab";
 import { PackagesTab } from "./findings/PackagesTab";
 import { ComplianceTab } from "./findings/ComplianceTab";

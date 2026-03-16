@@ -5,7 +5,7 @@ import { PatchExecutorTar } from '@/lib/patcher/PatchExecutorTar';
 import { PatchExecutorTarUnshare } from '@/lib/patcher/PatchExecutorTarUnshare';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
-import { apiError } from '@/lib/api-utils';
+import { apiError } from '@/lib/api/api-utils';
 
 const ExecutePatchSchema = z.object({
   sourceImageId: z.string().min(1),

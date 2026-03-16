@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { VulnerabilityAnalyzer } from '@/lib/patcher/VulnerabilityAnalyzer';
 import { logger } from '@/lib/logger';
-import { apiError } from '@/lib/api-utils';
+import { apiError } from '@/lib/api/api-utils';
 
 const AnalyzePatchSchema = z.object({
   scanId: z.string().min(1),

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { VulnerabilitySelectionModal } from '@/components/vulnerability-selection-modal';
+import { VulnerabilitySelectionModal } from '@/components/dialogs/vulnerability-selection-modal';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   Shield, 
