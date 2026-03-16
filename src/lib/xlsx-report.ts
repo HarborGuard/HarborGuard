@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import { getSeverityHexColor } from '@/lib/severity-utils'
+import { getSeverityHexColor } from '@/lib/utils/severity-utils'
 
 interface VulnerabilityData {
   package: string

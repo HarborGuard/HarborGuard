@@ -9,7 +9,7 @@ import { useState, useEffect } from "react";
 import { Loader2, Upload, AlertCircle, Server, Package } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { getImageName, getImageTag, parseImageRef } from "@/lib/image-utils";
+import { getImageName, getImageTag, parseImageRef } from "@/lib/utils/image-utils";
 
 interface Repository {
   id: string;

@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatLicense } from "@/lib/format-utils";
+import { formatLicense } from "@/lib/utils/format-utils";
 
 interface PackagesTabProps {
   packages: any[];

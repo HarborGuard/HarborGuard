@@ -4,7 +4,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
-import { getSeverityScore } from '@/lib/severity-utils';
+import { getSeverityScore } from '@/lib/utils/severity-utils';
 
 /**
  * Recalculate image risk scores based on vulnerabilities and CVE classifications

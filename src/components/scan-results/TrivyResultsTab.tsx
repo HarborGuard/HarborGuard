@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { TrivyReport } from "@/types";
-import { getSeverityBadgeVariant, getSeverityWeight } from "@/lib/severity-utils";
+import { getSeverityBadgeVariant, getSeverityWeight } from "@/lib/utils/severity-utils";
 
 interface TrivyResultsTabProps {
   trivyResults: TrivyReport | null;

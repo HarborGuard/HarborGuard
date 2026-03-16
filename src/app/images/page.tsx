@@ -5,13 +5,13 @@ import { ColumnDefinition, ContextMenuItem } from "@/components/table/types";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useScanning } from "@/contexts/ScanningContext";
-import { DeleteImageDialog } from "@/components/delete-image-dialog";
+import { DeleteImageDialog } from "@/components/dialogs/delete-image-dialog";
 import { IconRefresh, IconTrash } from "@tabler/icons-react";
 import * as React from "react";
 import { useScans } from "@/hooks/useScans";
 import { useApp } from "@/contexts/AppContext";
-import { getImageName } from "@/lib/image-utils";
-import { groupScansByImage } from "@/lib/scan-table-utils";
+import { getImageName } from "@/lib/utils/image-utils";
+import { groupScansByImage } from "@/lib/utils/scan-table-utils";
 import { FullPageLoading } from "@/components/ui/loading";
 import { Button } from "@/components/ui/button";
 

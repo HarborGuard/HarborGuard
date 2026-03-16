@@ -4,7 +4,7 @@ import React, { createContext, useContext, useReducer, useEffect, ReactNode, use
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import type { LegacyScan } from '@/types'
-import { getImageName } from '@/lib/image-utils'
+import { getImageName } from '@/lib/utils/image-utils'
 
 // Use LegacyScan for backward compatibility with existing UI components
 type Scan = LegacyScan

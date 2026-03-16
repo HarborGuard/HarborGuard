@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getSeverityCssClass } from "@/lib/severity-utils";
+import { getSeverityCssClass } from "@/lib/utils/severity-utils";
 
 interface ComplianceTabProps {
   compliance: any[];

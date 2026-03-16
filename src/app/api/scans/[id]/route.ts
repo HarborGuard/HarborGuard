@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { prismaToScanWithImage, serializeForJson } from '@/lib/type-utils'
+import { prismaToScanWithImage, serializeForJson } from '@/lib/utils/type-utils'
 import { apiError } from '@/lib/api-utils'
 
 const UpdateScanSchema = z.object({
