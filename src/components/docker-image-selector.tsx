@@ -5,7 +5,7 @@ import { IconServer, IconClock, IconSearch } from '@tabler/icons-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { formatDate as formatDateUtil } from '@/lib/format-utils'
+import { formatDate as formatDateUtil } from '@/lib/utils/format-utils'
 import type { DockerImage } from '@/types'
 
 interface DockerImageSelectorProps {

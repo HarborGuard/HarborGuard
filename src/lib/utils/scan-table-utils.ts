@@ -1,4 +1,4 @@
-import { getImageName, getImageTag } from '@/lib/image-utils';
+import { getImageName, getImageTag } from './image-utils';
 
 /**
  * Groups scans by image name, merges data for the same image,

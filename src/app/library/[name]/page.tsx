@@ -36,8 +36,8 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { useScans } from "@/hooks/useScans";
-import { getSeverityBadgeVariant, getSeverityWeight } from "@/lib/severity-utils";
-import { getImageName, getImageTag } from "@/lib/image-utils";
+import { getSeverityBadgeVariant, getSeverityWeight } from "@/lib/utils/severity-utils";
+import { getImageName, getImageTag } from "@/lib/utils/image-utils";
 
 interface LibraryVulnerability {
   id: string;

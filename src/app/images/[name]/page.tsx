@@ -27,8 +27,8 @@ import { ColumnDefinition, ContextMenuItem } from "@/components/table/types";
 import { ImagePageSkeleton } from "@/components/image-loading";
 import { toast } from "sonner";
 import { IconDownload, IconUpload, IconTrash } from "@tabler/icons-react";
-import { ExportImageDialogEnhanced } from "@/components/export-image-dialog-enhanced";
-import { getImageName } from "@/lib/image-utils";
+import { ExportImageDialogEnhanced } from "@/components/dialogs/export-image-dialog-enhanced";
+import { getImageName } from "@/lib/utils/image-utils";
 
 export default function ImageDetailsPage() {
   const params = useParams();

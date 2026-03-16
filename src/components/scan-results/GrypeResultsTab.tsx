@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { GrypeReport } from "@/types";
-import { getSeverityBadgeVariant, getSeverityWeight } from "@/lib/severity-utils";
+import { getSeverityBadgeVariant, getSeverityWeight } from "@/lib/utils/severity-utils";
 
 interface GrypeResultsTabProps {
   grypeResults: GrypeReport | null;

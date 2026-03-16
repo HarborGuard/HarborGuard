@@ -24,7 +24,7 @@ import {
   IconFolder,
   IconStack,
 } from "@tabler/icons-react";
-import { formatDate, renderValue, formatLicense } from "@/lib/format-utils";
+import { formatDate, renderValue, formatLicense } from "@/lib/utils/format-utils";
 import { copyToClipboard } from "@/lib/clipboard";
 
 interface PackageDetailModalProps {

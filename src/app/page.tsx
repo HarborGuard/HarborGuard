@@ -6,14 +6,14 @@ import { ColumnDefinition, ContextMenuItem } from "@/components/table/types";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useScanning } from "@/contexts/ScanningContext";
-import { DeleteImageDialog } from "@/components/delete-image-dialog";
+import { DeleteImageDialog } from "@/components/dialogs/delete-image-dialog";
 import { IconRefresh, IconTrash } from "@tabler/icons-react";
 import * as React from "react";
 import { SectionCards } from "@/components/section-cards";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useScans } from "@/hooks/useScans";
-import { getImageName } from "@/lib/image-utils";
-import { groupScansByImage } from "@/lib/scan-table-utils";
+import { getImageName } from "@/lib/utils/image-utils";
+import { groupScansByImage } from "@/lib/utils/scan-table-utils";
 
 export default function Page() {
   const { scans, stats, loading, dataReady, error } = useScans();
