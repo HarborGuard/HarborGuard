@@ -1,6 +1,6 @@
 "use client";
 
-import { VulnerabilityScatterplot } from "@/components/vulnerability-scatterplot";
+import { VulnerabilityScatterplot } from "@/components/analysis/vulnerability-scatterplot";
 import { UnifiedTable } from "@/components/table/unified-table";
 import { ColumnDefinition, ContextMenuItem } from "@/components/table/types";
 import { useRouter } from "next/navigation";
@@ -9,7 +9,7 @@ import { useScanning } from "@/contexts/ScanningContext";
 import { DeleteImageDialog } from "@/components/dialogs/delete-image-dialog";
 import { IconRefresh, IconTrash } from "@tabler/icons-react";
 import * as React from "react";
-import { SectionCards } from "@/components/section-cards";
+import { SectionCards } from "@/components/analysis/section-cards";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useScans } from "@/hooks/useScans";
 import { getImageName } from "@/lib/utils/image-utils";

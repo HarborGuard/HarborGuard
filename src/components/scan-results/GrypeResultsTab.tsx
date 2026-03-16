@@ -9,7 +9,7 @@ import {
 } from "@tabler/icons-react";
 
 import { Button } from "@/components/ui/button";
-import { VulnerabilityUrlMenu } from "@/components/vulnerability-url-menu";
+import { VulnerabilityUrlMenu } from "@/components/shared/vulnerability-url-menu";
 import {
   Card,
   CardContent,

@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { modalAction } from "@/lib/context-menu-utils";
 import { UnifiedTable } from "@/components/table/unified-table";
 import { ColumnDefinition, ContextMenuItem } from "@/components/table/types";
-import { ImagePageSkeleton } from "@/components/image-loading";
+import { ImagePageSkeleton } from "@/components/images/image-loading";
 import { toast } from "sonner";
 import { IconDownload, IconUpload, IconTrash } from "@tabler/icons-react";
 import { ExportImageDialogEnhanced } from "@/components/dialogs/export-image-dialog-enhanced";

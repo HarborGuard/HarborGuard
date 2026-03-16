@@ -12,7 +12,7 @@ import {
 } from "@tabler/icons-react";
 
 import { NavMain } from "@/components/layout/nav-main";
-import { VersionNotification } from "@/components/version-notification";
+import { VersionNotification } from "@/components/shared/version-notification";
 import {
   Sidebar,
   SidebarContent,

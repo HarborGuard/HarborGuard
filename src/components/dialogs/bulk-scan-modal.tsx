@@ -27,7 +27,7 @@ import {
   Layers2Icon,
 } from "lucide-react";
 import { useBulkScan } from "@/hooks/useBulkScan";
-import { BulkScanJobsList } from "@/components/bulk-scan-jobs-list";
+import { BulkScanJobsList } from "@/components/shared/bulk-scan-jobs-list";
 
 interface BulkScanModalProps {
   children: React.ReactNode;
