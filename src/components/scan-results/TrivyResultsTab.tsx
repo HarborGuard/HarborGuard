@@ -11,7 +11,7 @@ import {
 } from "@tabler/icons-react";
 
 import { Button } from "@/components/ui/button";
-import { VulnerabilityUrlMenu } from "@/components/vulnerability-url-menu";
+import { VulnerabilityUrlMenu } from "@/components/shared/vulnerability-url-menu";
 import {
   Card,
   CardContent,
@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { TrivyReport } from "@/types";
-import { getSeverityBadgeVariant, getSeverityWeight } from "@/lib/severity-utils";
+import { getSeverityBadgeVariant, getSeverityWeight } from "@/lib/utils/severity-utils";
 
 interface TrivyResultsTabProps {
   trivyResults: TrivyReport | null;

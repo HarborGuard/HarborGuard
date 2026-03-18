@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BulkScanService } from '@/lib/bulk/BulkScanService';
-import { apiError } from '@/lib/api-utils';
+import { apiError } from '@/lib/api/api-utils';
 
 interface RouteParams {
   params: Promise<{ batchId: string }>;

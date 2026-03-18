@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { useDatabase } from "@/providers/DatabaseProvider";
+import { useDatabase } from "@/contexts/DatabaseProvider";
 import { useCveClassifications } from "@/hooks/useCveClassifications";
 import type { ScanWithImage } from "@/types";
 import { aggregateVulnerabilitiesWithClassifications } from "@/lib/scan-aggregations";
@@ -24,11 +24,11 @@ import { Badge } from "@/components/ui/badge";
 import { modalAction } from "@/lib/context-menu-utils";
 import { UnifiedTable } from "@/components/table/unified-table";
 import { ColumnDefinition, ContextMenuItem } from "@/components/table/types";
-import { ImagePageSkeleton } from "@/components/image-loading";
+import { ImagePageSkeleton } from "@/components/images/image-loading";
 import { toast } from "sonner";
 import { IconDownload, IconUpload, IconTrash } from "@tabler/icons-react";
-import { ExportImageDialogEnhanced } from "@/components/export-image-dialog-enhanced";
-import { getImageName } from "@/lib/image-utils";
+import { ExportImageDialogEnhanced } from "@/components/dialogs/export-image-dialog-enhanced";
+import { getImageName } from "@/lib/utils/image-utils";
 
 export default function ImageDetailsPage() {
   const params = useParams();
@@ -564,7 +564,7 @@ export default function ImageDetailsPage() {
           if (!imageData?.name || !row.scanId) return;
 
           try {
-            const response = await fetch(`/api/image/${encodeURIComponent(imageData.name)}/scan/${row.scanId}/download`);
+            const response = await fetch(`/api/images/${encodeURIComponent(imageData.name)}/scan/${row.scanId}/download`);
             if (!response.ok) throw new Error('Download failed');
 
             const blob = await response.blob();

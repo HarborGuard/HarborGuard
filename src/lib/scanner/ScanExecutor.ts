@@ -9,7 +9,7 @@ import { prisma } from '@/lib/prisma';
 import type { ScanRequest, ScannerConfig } from '@/types';
 import { config } from '@/lib/config';
 import { logger } from '@/lib/logger';
-import { RepositoryService } from '@/services/RepositoryService';
+import { RepositoryService } from '@/lib/registry/RepositoryService';
 import { RegistryProviderFactory } from '@/lib/registry/providers/RegistryProviderFactory';
 import type { Repository } from '@/generated/prisma';
 

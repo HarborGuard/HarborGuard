@@ -2,7 +2,7 @@
 
 import { Label } from "@/components/ui/label"
 import { TabsContent } from "@/components/ui/tabs"
-import { SwarmServicesList } from "@/components/swarm-services-list"
+import { SwarmServicesList } from "@/components/images/swarm-services-list"
 import type { SwarmService } from "@/types"
 
 interface SwarmServicesTabProps {

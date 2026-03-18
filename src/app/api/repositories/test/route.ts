@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { RegistryService } from '@/lib/registry/RegistryService'
 import { RegistryProviderFactory } from '@/lib/registry/providers/RegistryProviderFactory'
 import type { Repository } from '@/generated/prisma'
-import { apiError } from '@/lib/api-utils'
+import { apiError } from '@/lib/api/api-utils'
 
 const registryService = new RegistryService(prisma)
 

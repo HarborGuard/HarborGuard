@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getOpenApiSpec } from '@/lib/openapi-dynamic';
+import { getOpenApiSpec } from '@/lib/api/openapi-dynamic';
 import fs from 'fs';
 import path from 'path';
 
@@ -25,7 +25,7 @@ export async function GET() {
   } catch (error) {
     console.error('Failed to generate OpenAPI spec:', error);
     // Fallback to static spec if everything fails
-    const { openApiSpec } = await import('@/lib/openapi-spec');
+    const { openApiSpec } = await import('@/lib/api/openapi-spec');
     return NextResponse.json(openApiSpec);
   }
 }

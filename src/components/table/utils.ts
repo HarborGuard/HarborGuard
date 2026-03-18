@@ -1,7 +1,7 @@
 import { ColumnDef } from "@tanstack/react-table"
 import { ColumnDefinition, CellRenderer } from "./types"
 import { flexRender } from "@tanstack/react-table"
-import { getSeverityBadgeVariant } from "@/lib/severity-utils"
+import { getSeverityBadgeVariant } from "@/lib/utils/severity-utils"
 
 export function createColumnDef<T>(
   column: ColumnDefinition<T>,

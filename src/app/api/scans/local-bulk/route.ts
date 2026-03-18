@@ -5,7 +5,7 @@ import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
 import { scannerService } from '@/lib/scanner';
 import type { ScanRequest } from '@/types';
-import { apiError } from '@/lib/api-utils';
+import { apiError } from '@/lib/api/api-utils';
 
 export async function POST(request: NextRequest) {
   try {

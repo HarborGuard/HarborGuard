@@ -10,7 +10,7 @@ import {
 
 import { ScanDetailsNormalized } from "@/components/scan/ScanDetailsNormalized";
 import { Button } from "@/components/ui/button";
-import { VulnerabilityDetailsModal } from "@/components/vulnerability-details-modal";
+import { VulnerabilityDetailsModal } from "@/components/dialogs/vulnerability-details-modal";
 import {
   Card,
   CardContent,
@@ -18,9 +18,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ScanDetailsSkeleton } from "@/components/image-loading";
-import { CveClassificationDialog } from "@/components/cve-classification-dialog";
-import { PatchAnalysis } from "@/components/patch-analysis";
+import { ScanDetailsSkeleton } from "@/components/images/image-loading";
+import { CveClassificationDialog } from "@/components/dialogs/cve-classification-dialog";
+import { PatchAnalysis } from "@/components/analysis/patch-analysis";
 import { useScanData } from "@/hooks/useScanData";
 import { useCveClassifications } from "@/hooks/useCveClassifications";
 import { ScanSummaryCard, RawScannerTabs } from "@/components/scan-results";
@@ -145,7 +145,7 @@ export default function ScanResultsPage() {
   const handleGeneratePdfReport = async () => {
     try {
       const response = await fetch(
-        `/api/image/${encodeURIComponent(decodedImageName)}/scan/${scanId}/pdf-report`
+        `/api/images/${encodeURIComponent(decodedImageName)}/scan/${scanId}/pdf-report`
       );
       if (!response.ok) throw new Error("PDF generation failed");
       downloadBlob(await response.blob(), `${decodedImageName.replace("/", "_")}_${scanId}_report.pdf`);
@@ -157,7 +157,7 @@ export default function ScanResultsPage() {
   const handleGenerateXlsxReport = async () => {
     try {
       const response = await fetch(
-        `/api/image/${encodeURIComponent(decodedImageName)}/scan/${scanId}/xlsx-report`
+        `/api/images/${encodeURIComponent(decodedImageName)}/scan/${scanId}/xlsx-report`
       );
       if (!response.ok) throw new Error("XLSX generation failed");
       downloadBlob(await response.blob(), `${decodedImageName.replace("/", "_")}_${scanId}_report.xlsx`);
@@ -169,7 +169,7 @@ export default function ScanResultsPage() {
   const handleDownloadZip = async () => {
     try {
       const response = await fetch(
-        `/api/image/${encodeURIComponent(decodedImageName)}/scan/${scanId}/download`
+        `/api/images/${encodeURIComponent(decodedImageName)}/scan/${scanId}/download`
       );
       if (!response.ok) throw new Error("Download failed");
       downloadBlob(await response.blob(), `${decodedImageName.replace("/", "_")}_${scanId}_reports.zip`);
@@ -181,7 +181,7 @@ export default function ScanResultsPage() {
   const handleDownloadReport = async (reportType: string) => {
     try {
       const response = await fetch(
-        `/api/image/${encodeURIComponent(decodedImageName)}/scan/${scanId}/${reportType}`
+        `/api/images/${encodeURIComponent(decodedImageName)}/scan/${scanId}/${reportType}`
       );
       if (!response.ok) throw new Error("Download failed");
       downloadBlob(await response.blob(), `${decodedImageName.replace("/", "_")}_${scanId}_${reportType}.json`);

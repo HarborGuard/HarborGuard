@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { AppSidebar } from "@/components/app-sidebar";
-import { SiteHeader } from "@/components/site-header";
+import { AppSidebar } from "@/components/layout/app-sidebar";
+import { SiteHeader } from "@/components/layout/site-header";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,7 +25,7 @@ import {
   IconLoader2,
 } from "@tabler/icons-react";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { AddRepositoryDialog } from "@/components/add-repository-dialog";
+import { AddRepositoryDialog } from "@/components/dialogs/add-repository-dialog";
 import { toast } from "sonner";
 
 interface Repository {
