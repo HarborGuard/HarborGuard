@@ -1,19 +1,19 @@
 "use client";
 
-import { VulnerabilityScatterplot } from "@/components/vulnerability-scatterplot";
+import { VulnerabilityScatterplot } from "@/components/analysis/vulnerability-scatterplot";
 import { UnifiedTable } from "@/components/table/unified-table";
 import { ColumnDefinition, ContextMenuItem } from "@/components/table/types";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useScanning } from "@/providers/ScanningProvider";
-import { DeleteImageDialog } from "@/components/delete-image-dialog";
+import { useScanning } from "@/contexts/ScanningContext";
+import { DeleteImageDialog } from "@/components/dialogs/delete-image-dialog";
 import { IconRefresh, IconTrash } from "@tabler/icons-react";
 import * as React from "react";
-import { SectionCards } from "@/components/section-cards";
+import { SectionCards } from "@/components/analysis/section-cards";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useScans } from "@/hooks/useScans";
-import { getImageName } from "@/lib/image-utils";
-import { groupScansByImage } from "@/lib/scan-table-utils";
+import { getImageName } from "@/lib/utils/image-utils";
+import { groupScansByImage } from "@/lib/utils/scan-table-utils";
 
 export default function Page() {
   const { scans, stats, loading, dataReady, error } = useScans();

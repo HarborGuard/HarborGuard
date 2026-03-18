@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { scannerService } from '@/lib/scanner'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
-import { apiError } from '@/lib/api-utils'
+import { apiError } from '@/lib/api/api-utils'
 
 export async function GET(request: NextRequest) {
   try {

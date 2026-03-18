@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSeverityWeight } from '@/lib/severity-utils'
-import { apiError } from '@/lib/api-utils'
+import { getSeverityWeight } from '@/lib/utils/severity-utils'
+import { apiError } from '@/lib/api/api-utils'
 
 export async function GET(request: NextRequest) {
   try {

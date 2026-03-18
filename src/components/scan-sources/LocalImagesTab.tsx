@@ -3,7 +3,7 @@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { TabsContent } from "@/components/ui/tabs"
-import { DockerImageSelector } from "@/components/docker-image-selector"
+import { DockerImageSelector } from "@/components/images/docker-image-selector"
 import type { DockerImage } from "@/types"
 
 interface LocalImagesTabProps {

@@ -7,7 +7,7 @@ import {
   IconSearch,
   IconExternalLink,
 } from "@tabler/icons-react";
-import { VulnerabilityDetailsModal } from "@/components/vulnerability-details-modal";
+import { VulnerabilityDetailsModal } from "@/components/dialogs/vulnerability-details-modal";
 import {
   Card,
   CardContent,
@@ -29,8 +29,8 @@ import {
   StatsLoadingSkeleton,
   TableLoadingSkeleton,
 } from "@/components/ui/loading";
-import { getSeverityBadgeVariant } from "@/lib/severity-utils";
-import { getImageName } from "@/lib/image-utils";
+import { getSeverityBadgeVariant } from "@/lib/utils/severity-utils";
+import { getImageName } from "@/lib/utils/image-utils";
 import { useVulnerabilityLibrary, VulnerabilityData } from "@/hooks/useVulnerabilityLibrary";
 
 export default function LibraryHomePage() {

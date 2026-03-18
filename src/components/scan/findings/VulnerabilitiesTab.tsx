@@ -26,8 +26,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { VulnerabilityUrlMenu } from "@/components/vulnerability-url-menu";
-import { getSeverityCssClass } from "@/lib/severity-utils";
+import { VulnerabilityUrlMenu } from "@/components/shared/vulnerability-url-menu";
+import { getSeverityCssClass } from "@/lib/utils/severity-utils";
 
 interface VulnerabilitiesTabProps {
   vulnerabilities: any[];

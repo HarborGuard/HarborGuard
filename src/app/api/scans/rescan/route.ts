@@ -5,7 +5,7 @@ import { logger } from '@/lib/logger';
 import { ScannerService } from '@/lib/scanner/ScannerService';
 import { auditLogger } from '@/lib/audit-logger';
 import type { ScanRequest } from '@/types';
-import { apiError } from '@/lib/api-utils';
+import { apiError } from '@/lib/api/api-utils';
 
 const RescanSchema = z.object({
   scanId: z.string().optional(),

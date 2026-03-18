@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { config } from '@/lib/config';
 import type { ScannerInfo } from '@/types';
-import { apiError } from '@/lib/api-utils';
+import { apiError } from '@/lib/api/api-utils';
 
 // Define all available scanners with descriptions
 const ALL_SCANNERS: ScannerInfo[] = [

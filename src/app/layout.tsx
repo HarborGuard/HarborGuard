@@ -2,18 +2,18 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AppProvider } from "@/contexts/AppContext";
-import { ScanningProvider } from "@/providers/ScanningProvider";
-import { DatabaseProvider } from "@/providers/DatabaseProvider";
-import { ScanCompletionSync } from "@/components/ScanCompletionSync";
-import { GlobalScanMonitor } from "@/components/global-scan-monitor";
+import { ScanningProvider } from "@/contexts/ScanningContext";
+import { DatabaseProvider } from "@/contexts/DatabaseProvider";
+import { ScanCompletionSync } from "@/components/scan/monitor/ScanCompletionSync";
+import { GlobalScanMonitor } from "@/components/scan/monitor/global-scan-monitor";
 import { Toaster } from "@/components/ui/sonner";
 import {
   SidebarInset,
   SidebarProvider,
 } from "@/components/ui/sidebar"
 
-import { AppSidebar } from "@/components/app-sidebar"
-import { SiteHeader } from "@/components/site-header"
+import { AppSidebar } from "@/components/layout/app-sidebar"
+import { SiteHeader } from "@/components/layout/site-header"
 
 
 const geistSans = Geist({

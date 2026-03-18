@@ -2,7 +2,7 @@
 
 import { Label } from "@/components/ui/label"
 import { TabsContent } from "@/components/ui/tabs"
-import { DockerImageAutocomplete } from "@/components/DockerImageAutocomplete"
+import { DockerImageAutocomplete } from "@/components/images/DockerImageAutocomplete"
 
 interface DockerHubTabProps {
   imageUrl: string

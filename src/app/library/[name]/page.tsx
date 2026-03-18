@@ -13,10 +13,10 @@ import {
   IconSortDescending,
 } from "@tabler/icons-react";
 
-import { AppSidebar } from "@/components/app-sidebar";
-import { SiteHeader } from "@/components/site-header";
+import { AppSidebar } from "@/components/layout/app-sidebar";
+import { SiteHeader } from "@/components/layout/site-header";
 import { Button } from "@/components/ui/button";
-import { VulnerabilityUrlMenu } from "@/components/vulnerability-url-menu";
+import { VulnerabilityUrlMenu } from "@/components/shared/vulnerability-url-menu";
 import {
   Card,
   CardContent,
@@ -36,8 +36,8 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { useScans } from "@/hooks/useScans";
-import { getSeverityBadgeVariant, getSeverityWeight } from "@/lib/severity-utils";
-import { getImageName, getImageTag } from "@/lib/image-utils";
+import { getSeverityBadgeVariant, getSeverityWeight } from "@/lib/utils/severity-utils";
+import { getImageName, getImageTag } from "@/lib/utils/image-utils";
 
 interface LibraryVulnerability {
   id: string;
