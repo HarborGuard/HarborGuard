@@ -521,147 +521,6 @@
         ]
       }
     },
-    "/api/images/{name}/scan/{scanId}/{reportType}": {
-      "get": {
-        "summary": "GET /api/images/{name}/scan/{scanId}/{reportType}",
-        "tags": [
-          "Images"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "name parameter"
-          },
-          {
-            "name": "scanId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "scanId parameter"
-          },
-          {
-            "name": "reportType",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "reportType parameter"
-          }
-        ]
-      }
-    },
-    "/api/images/{name}/scan/{scanId}/download": {
-      "get": {
-        "summary": "GET /api/images/{name}/scan/{scanId}/download",
-        "tags": [
-          "Images"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "name parameter"
-          },
-          {
-            "name": "scanId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "scanId parameter"
-          }
-        ]
-      }
-    },
-    "/api/images/{name}/scan/{scanId}/pdf-report": {
-      "get": {
-        "summary": "GET /api/images/{name}/scan/{scanId}/pdf-report",
-        "tags": [
-          "Images"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "name parameter"
-          },
-          {
-            "name": "scanId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "scanId parameter"
-          }
-        ]
-      }
-    },
-    "/api/images/{name}/scan/{scanId}/xlsx-report": {
-      "get": {
-        "summary": "GET /api/images/{name}/scan/{scanId}/xlsx-report",
-        "tags": [
-          "Images"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "name parameter"
-          },
-          {
-            "name": "scanId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "scanId parameter"
-          }
-        ]
-      }
-    },
     "/api/images/export": {
       "post": {
         "summary": "POST /api/images/export",
@@ -807,6 +666,147 @@
               "type": "string"
             },
             "description": "name parameter"
+          }
+        ]
+      }
+    },
+    "/api/images/name/{name}/scan/{scanId}/{reportType}": {
+      "get": {
+        "summary": "GET /api/images/name/{name}/scan/{scanId}/{reportType}",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "name parameter"
+          },
+          {
+            "name": "scanId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "scanId parameter"
+          },
+          {
+            "name": "reportType",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "reportType parameter"
+          }
+        ]
+      }
+    },
+    "/api/images/name/{name}/scan/{scanId}/download": {
+      "get": {
+        "summary": "GET /api/images/name/{name}/scan/{scanId}/download",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "name parameter"
+          },
+          {
+            "name": "scanId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "scanId parameter"
+          }
+        ]
+      }
+    },
+    "/api/images/name/{name}/scan/{scanId}/pdf-report": {
+      "get": {
+        "summary": "GET /api/images/name/{name}/scan/{scanId}/pdf-report",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "name parameter"
+          },
+          {
+            "name": "scanId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "scanId parameter"
+          }
+        ]
+      }
+    },
+    "/api/images/name/{name}/scan/{scanId}/xlsx-report": {
+      "get": {
+        "summary": "GET /api/images/name/{name}/scan/{scanId}/xlsx-report",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "name parameter"
+          },
+          {
+            "name": "scanId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "scanId parameter"
           }
         ]
       }
