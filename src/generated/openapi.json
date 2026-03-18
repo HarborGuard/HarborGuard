@@ -37,10 +37,6 @@
       "description": "Health check and status endpoints"
     },
     {
-      "name": "Image",
-      "description": "Individual image operations"
-    },
-    {
       "name": "Images",
       "description": "Container image management"
     },
@@ -225,6 +221,19 @@
         }
       }
     },
+    "/api/docker/services": {
+      "get": {
+        "summary": "GET /api/docker/services",
+        "tags": [
+          "Docker"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "summary": "Health check endpoint",
@@ -284,147 +293,6 @@
             "description": "Successful response"
           }
         }
-      }
-    },
-    "/api/image/{name}/scan/{scanId}/{reportType}": {
-      "get": {
-        "summary": "GET /api/image/{name}/scan/{scanId}/{reportType}",
-        "tags": [
-          "Image"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "name parameter"
-          },
-          {
-            "name": "scanId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "scanId parameter"
-          },
-          {
-            "name": "reportType",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "reportType parameter"
-          }
-        ]
-      }
-    },
-    "/api/image/{name}/scan/{scanId}/download": {
-      "get": {
-        "summary": "GET /api/image/{name}/scan/{scanId}/download",
-        "tags": [
-          "Image"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "name parameter"
-          },
-          {
-            "name": "scanId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "scanId parameter"
-          }
-        ]
-      }
-    },
-    "/api/image/{name}/scan/{scanId}/pdf-report": {
-      "get": {
-        "summary": "GET /api/image/{name}/scan/{scanId}/pdf-report",
-        "tags": [
-          "Image"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "name parameter"
-          },
-          {
-            "name": "scanId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "scanId parameter"
-          }
-        ]
-      }
-    },
-    "/api/image/{name}/scan/{scanId}/xlsx-report": {
-      "get": {
-        "summary": "GET /api/image/{name}/scan/{scanId}/xlsx-report",
-        "tags": [
-          "Image"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "name parameter"
-          },
-          {
-            "name": "scanId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "scanId parameter"
-          }
-        ]
       }
     },
     "/api/images/{id}/cve-classifications/{cveId}": {
@@ -653,6 +521,147 @@
         ]
       }
     },
+    "/api/images/{name}/scan/{scanId}/{reportType}": {
+      "get": {
+        "summary": "GET /api/images/{name}/scan/{scanId}/{reportType}",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "name parameter"
+          },
+          {
+            "name": "scanId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "scanId parameter"
+          },
+          {
+            "name": "reportType",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "reportType parameter"
+          }
+        ]
+      }
+    },
+    "/api/images/{name}/scan/{scanId}/download": {
+      "get": {
+        "summary": "GET /api/images/{name}/scan/{scanId}/download",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "name parameter"
+          },
+          {
+            "name": "scanId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "scanId parameter"
+          }
+        ]
+      }
+    },
+    "/api/images/{name}/scan/{scanId}/pdf-report": {
+      "get": {
+        "summary": "GET /api/images/{name}/scan/{scanId}/pdf-report",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "name parameter"
+          },
+          {
+            "name": "scanId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "scanId parameter"
+          }
+        ]
+      }
+    },
+    "/api/images/{name}/scan/{scanId}/xlsx-report": {
+      "get": {
+        "summary": "GET /api/images/{name}/scan/{scanId}/xlsx-report",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "name parameter"
+          },
+          {
+            "name": "scanId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "scanId parameter"
+          }
+        ]
+      }
+    },
     "/api/images/export": {
       "post": {
         "summary": "POST /api/images/export",
@@ -662,42 +671,6 @@
         "responses": {
           "200": {
             "description": "Successful response"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "tarPath": {
-                    "type": "string",
-                    "description": "tarPath parameter"
-                  },
-                  "imageName": {
-                    "type": "string",
-                    "description": "imageName parameter"
-                  },
-                  "imageTag": {
-                    "type": "string",
-                    "description": "imageTag parameter"
-                  },
-                  "sourceImage": {
-                    "type": "string",
-                    "description": "sourceImage parameter"
-                  },
-                  "scanId": {
-                    "type": "string",
-                    "description": "scanId parameter"
-                  },
-                  "digest": {
-                    "type": "string",
-                    "description": "digest parameter"
-                  }
-                }
-              }
-            }
           }
         }
       }
@@ -711,46 +684,6 @@
         "responses": {
           "200": {
             "description": "Successful response"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "sourceImage": {
-                    "type": "string",
-                    "description": "sourceImage parameter"
-                  },
-                  "targetRegistry": {
-                    "type": "string",
-                    "description": "targetRegistry parameter"
-                  },
-                  "targetImageName": {
-                    "type": "string",
-                    "description": "targetImageName parameter"
-                  },
-                  "targetImageTag = 'latest'": {
-                    "type": "string",
-                    "description": "targetImageTag = 'latest' parameter"
-                  },
-                  "repositoryId": {
-                    "type": "string",
-                    "description": "repositoryId parameter"
-                  },
-                  "patchedTarPath": {
-                    "type": "string",
-                    "description": "patchedTarPath parameter"
-                  },
-                  "scanId": {
-                    "type": "string",
-                    "description": "scanId parameter"
-                  }
-                }
-              }
-            }
           }
         }
       }
@@ -1057,50 +990,6 @@
           "200": {
             "description": "Successful response"
           }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "sourceImageId": {
-                    "type": "string",
-                    "description": "sourceImageId parameter"
-                  },
-                  "scanId": {
-                    "type": "string",
-                    "description": "scanId parameter"
-                  },
-                  "targetRegistry": {
-                    "type": "string",
-                    "description": "targetRegistry parameter"
-                  },
-                  "targetTag": {
-                    "type": "string",
-                    "description": "targetTag parameter"
-                  },
-                  "dryRun = false": {
-                    "type": "string",
-                    "description": "dryRun = false parameter"
-                  },
-                  "selectedVulnerabilityIds": {
-                    "type": "string",
-                    "description": "selectedVulnerabilityIds parameter"
-                  },
-                  "newImageName": {
-                    "type": "string",
-                    "description": "newImageName parameter"
-                  },
-                  "newImageTag": {
-                    "type": "string",
-                    "description": "newImageTag parameter"
-                  }
-                }
-              }
-            }
-          }
         }
       }
     },
@@ -1241,40 +1130,7 @@
             },
             "description": "id parameter"
           }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "registryUrl": {
-                    "type": "string",
-                    "description": "registryUrl parameter (optional)"
-                  },
-                  "skipTlsVerify": {
-                    "type": "string",
-                    "description": "skipTlsVerify parameter (optional)"
-                  },
-                  "registryPort": {
-                    "type": "string",
-                    "description": "registryPort parameter (optional)"
-                  },
-                  "username": {
-                    "type": "string",
-                    "description": "username parameter (optional)"
-                  },
-                  "password": {
-                    "type": "string",
-                    "description": "password parameter (optional)"
-                  }
-                },
-                "required": []
-              }
-            }
-          }
-        }
+        ]
       }
     },
     "/api/repositories/{id}/test": {
@@ -1321,54 +1177,6 @@
         "responses": {
           "200": {
             "description": "Successful response"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "description": "name parameter"
-                  },
-                  "type": {
-                    "type": "string",
-                    "description": "type parameter"
-                  },
-                  "registryUrl": {
-                    "type": "string",
-                    "description": "registryUrl parameter"
-                  },
-                  "username": {
-                    "type": "string",
-                    "description": "username parameter"
-                  },
-                  "password": {
-                    "type": "string",
-                    "description": "password parameter"
-                  },
-                  "organization": {
-                    "type": "string",
-                    "description": "organization parameter"
-                  },
-                  "protocol": {
-                    "type": "string",
-                    "description": "protocol parameter"
-                  },
-                  "skipTlsVerify": {
-                    "type": "string",
-                    "description": "skipTlsVerify parameter"
-                  },
-                  "testConnection = true": {
-                    "type": "string",
-                    "description": "testConnection = true parameter"
-                  }
-                }
-              }
-            }
           }
         }
       }
@@ -1959,30 +1767,6 @@
           "200": {
             "description": "Successful response"
           }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "scanId": {
-                    "type": "string",
-                    "description": "scanId parameter"
-                  },
-                  "imageId": {
-                    "type": "string",
-                    "description": "imageId parameter"
-                  },
-                  "tag": {
-                    "type": "string",
-                    "description": "tag parameter"
-                  }
-                }
-              }
-            }
-          }
         }
       }
     },
@@ -2290,47 +2074,7 @@
             },
             "description": "id parameter"
           }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "description": "name parameter"
-                  },
-                  "description": {
-                    "type": "string",
-                    "description": "description parameter"
-                  },
-                  "schedule": {
-                    "type": "string",
-                    "description": "schedule parameter"
-                  },
-                  "enabled": {
-                    "type": "string",
-                    "description": "enabled parameter"
-                  },
-                  "imageSelectionMode": {
-                    "type": "string",
-                    "description": "imageSelectionMode parameter"
-                  },
-                  "imagePattern": {
-                    "type": "string",
-                    "description": "imagePattern parameter"
-                  },
-                  "selectedImageIds": {
-                    "type": "string",
-                    "description": "selectedImageIds parameter"
-                  }
-                }
-              }
-            }
-          }
-        }
+        ]
       },
       "delete": {
         "summary": "DELETE /api/scheduled-scans/{id}",
