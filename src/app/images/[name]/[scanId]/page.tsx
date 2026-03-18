@@ -145,7 +145,7 @@ export default function ScanResultsPage() {
   const handleGeneratePdfReport = async () => {
     try {
       const response = await fetch(
-        `/api/images/${encodeURIComponent(decodedImageName)}/scan/${scanId}/pdf-report`
+        `/api/images/name/${encodeURIComponent(decodedImageName)}/scan/${scanId}/pdf-report`
       );
       if (!response.ok) throw new Error("PDF generation failed");
       downloadBlob(await response.blob(), `${decodedImageName.replace("/", "_")}_${scanId}_report.pdf`);
@@ -157,7 +157,7 @@ export default function ScanResultsPage() {
   const handleGenerateXlsxReport = async () => {
     try {
       const response = await fetch(
-        `/api/images/${encodeURIComponent(decodedImageName)}/scan/${scanId}/xlsx-report`
+        `/api/images/name/${encodeURIComponent(decodedImageName)}/scan/${scanId}/xlsx-report`
       );
       if (!response.ok) throw new Error("XLSX generation failed");
       downloadBlob(await response.blob(), `${decodedImageName.replace("/", "_")}_${scanId}_report.xlsx`);
@@ -169,7 +169,7 @@ export default function ScanResultsPage() {
   const handleDownloadZip = async () => {
     try {
       const response = await fetch(
-        `/api/images/${encodeURIComponent(decodedImageName)}/scan/${scanId}/download`
+        `/api/images/name/${encodeURIComponent(decodedImageName)}/scan/${scanId}/download`
       );
       if (!response.ok) throw new Error("Download failed");
       downloadBlob(await response.blob(), `${decodedImageName.replace("/", "_")}_${scanId}_reports.zip`);
@@ -181,7 +181,7 @@ export default function ScanResultsPage() {
   const handleDownloadReport = async (reportType: string) => {
     try {
       const response = await fetch(
-        `/api/images/${encodeURIComponent(decodedImageName)}/scan/${scanId}/${reportType}`
+        `/api/images/name/${encodeURIComponent(decodedImageName)}/scan/${scanId}/${reportType}`
       );
       if (!response.ok) throw new Error("Download failed");
       downloadBlob(await response.blob(), `${decodedImageName.replace("/", "_")}_${scanId}_${reportType}.json`);

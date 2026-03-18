@@ -564,7 +564,7 @@ export default function ImageDetailsPage() {
           if (!imageData?.name || !row.scanId) return;
 
           try {
-            const response = await fetch(`/api/images/${encodeURIComponent(imageData.name)}/scan/${row.scanId}/download`);
+            const response = await fetch(`/api/images/name/${encodeURIComponent(imageData.name)}/scan/${row.scanId}/download`);
             if (!response.ok) throw new Error('Download failed');
 
             const blob = await response.blob();
