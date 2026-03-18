@@ -120,9 +120,10 @@ export class DatabaseCleanup {
   private async cleanupOrphanedBulkScanItems(cutoffDate: Date): Promise<void> {
     try {
       let totalCleaned = 0;
+      const MAX_BATCH_ITERATIONS = 1000;
 
       // Process in batches of 100 to prevent memory exhaustion
-      for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+      for (let iteration = 0; iteration < MAX_BATCH_ITERATIONS; iteration++) {
         const batch = await prisma.bulkScanBatch.findMany({
           where: {
             createdAt: {

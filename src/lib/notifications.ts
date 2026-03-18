@@ -5,7 +5,7 @@
 
 import { config } from './config';
 import { logger } from './logger';
-import { getSeverityHashColor } from './severity-utils';
+import { getSeverityHashColor } from './utils/severity-utils';
 
 interface NotificationPayload {
   title: string;
