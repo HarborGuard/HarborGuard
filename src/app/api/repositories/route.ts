@@ -48,10 +48,10 @@ export async function POST(request: NextRequest) {
       registryUrl,
       username,
       password,
-      organization,
+      organization: organization ?? undefined,
       protocol,
       skipTlsVerify,
-      registryPort,
+      registryPort: registryPort ?? undefined,
       testConnection
     })
 
