@@ -68,3 +68,61 @@ export interface IScanExecutor {
   executeRegistryScan(requestId: string, request: any, scanId: string, imageId: string): Promise<void>;
   loadScanResults(requestId: string): Promise<ScanReports>;
 }
+
+// ---------------------------------------------------------------------------
+// Normalized finding types
+// ---------------------------------------------------------------------------
+
+export interface NormalizedVulnerability {
+  cveId: string;
+  source: string;
+  severity: string;
+  cvssScore?: number;
+  title?: string;
+  description?: string;
+  packageName?: string;
+  installedVersion?: string;
+  fixedVersion?: string;
+  vulnerabilityUrl?: string;
+  targetName?: string;
+}
+
+export interface NormalizedPackage {
+  name: string;
+  version: string;
+  type: string;
+  source: string;
+  license?: string;
+  purl?: string;
+}
+
+export interface NormalizedCompliance {
+  checkId: string;
+  title: string;
+  severity: string;
+  source: string;
+  category?: string;
+  description?: string;
+}
+
+export interface NormalizedEfficiency {
+  findingType: string;
+  title: string;
+  severity: string;
+  source: string;
+  sizeBytes?: number;
+  details?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Scanner adapter interface
+// ---------------------------------------------------------------------------
+
+export interface IScannerAdapter {
+  readonly name: string;
+  saveResults(metadataId: string, report: any): Promise<void>;
+  extractVulnerabilities(report: any): NormalizedVulnerability[];
+  extractPackages(report: any): NormalizedPackage[];
+  extractCompliance(report: any): NormalizedCompliance[];
+  extractEfficiency(report: any): NormalizedEfficiency[];
+}
