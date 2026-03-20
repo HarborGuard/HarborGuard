@@ -1,9 +1,10 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useDatabase } from "@/providers/DatabaseProvider";
 import { useCveClassifications } from "@/hooks/useCveClassifications";
+import type { ScanWithImage } from "@/types";
 import { aggregateVulnerabilitiesWithClassifications } from "@/lib/scan-aggregations";
 import {
   IconCalendarClock,
@@ -43,17 +44,50 @@ export default function ImageDetailsPage() {
     digest?: string;
   }>({ imageName: "", tag: "" });
 
-  // Use DatabaseProvider instead of local state
+  // Use DatabaseProvider for images (scans are fetched locally for this image)
   const {
     images,
-    scans,
     imagesLoading,
-    scansLoading,
     imagesError,
-    scansError,
     refreshImages,
-    refreshScans,
   } = useDatabase();
+
+  // Fetch scans locally for this specific image instead of loading all scans globally
+  const [scans, setScans] = useState<ScanWithImage[]>([]);
+  const [scansLoading, setScansLoading] = useState(true);
+  const [scansError, setScansError] = useState<string | null>(null);
+
+  // Get image IDs for the current image name
+  const imageIds = useMemo(() =>
+    images.filter((img) => img.name === imageName).map((img) => img.id),
+    [images, imageName]
+  );
+
+  const refreshScans = useCallback(async () => {
+    if (imageIds.length === 0) {
+      setScans([]);
+      setScansLoading(false);
+      return;
+    }
+    try {
+      setScansLoading(true);
+      setScansError(null);
+      // Fetch scans for each imageId in parallel
+      const results = await Promise.all(
+        imageIds.map(async (imageId) => {
+          const res = await fetch(`/api/scans?imageId=${imageId}&limit=100`);
+          if (!res.ok) throw new Error(`Failed to fetch scans: ${res.status}`);
+          const data = await res.json();
+          return data.scans || [];
+        })
+      );
+      setScans(results.flat());
+    } catch (error) {
+      setScansError((error as Error).message);
+    } finally {
+      setScansLoading(false);
+    }
+  }, [imageIds]);
 
   // Filter data for the specific image name
   const imageData = useMemo(() => {
@@ -179,11 +213,14 @@ export default function ImageDetailsPage() {
     fetchConsolidatedClassifications();
   }, [imageName]); // Only depend on imageName to prevent imageData refresh loops
 
-  // Refresh data when component mounts
+  // Refresh images on mount; refresh scans when imageIds are available
   useEffect(() => {
     refreshImages();
+  }, []);
+
+  useEffect(() => {
     refreshScans();
-  }, []); // Remove dependencies to prevent infinite loop
+  }, [refreshScans]);
 
   if (loading || (imageData && classificationsLoading)) {
     return (
