@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auditLogger } from '@/lib/audit-logger'
+import { apiError } from '@/lib/api-utils'
 
 export async function GET(
   request: NextRequest,
@@ -154,11 +155,7 @@ export async function GET(
     return NextResponse.json(serializedResponse)
     
   } catch (error) {
-    console.error('Error fetching image by name:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return apiError(error, 'Error fetching image by name');
   }
 }
 
@@ -228,10 +225,6 @@ export async function DELETE(
     })
     
   } catch (error) {
-    console.error('Error deleting image by name:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return apiError(error, 'Error deleting image by name');
   }
 }

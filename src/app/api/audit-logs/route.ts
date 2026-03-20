@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { EventType, LogCategory, LogAction } from '@/generated/prisma';
+import { apiError } from '@/lib/api-utils';
 
 const auditLogQuerySchema = z.object({
   page: z.string().optional().default('1'),
@@ -147,11 +148,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error fetching audit logs:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch audit logs' },
-      { status: 500 }
-    );
+    return apiError(error, 'Failed to fetch audit logs');
   }
 }
 
@@ -188,11 +185,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(auditLog, { status: 201 });
   } catch (error) {
-    console.error('Error creating audit log:', error);
-
-    return NextResponse.json(
-      { error: 'Failed to create audit log' },
-      { status: 500 }
-    );
+    return apiError(error, 'Failed to create audit log');
   }
 }

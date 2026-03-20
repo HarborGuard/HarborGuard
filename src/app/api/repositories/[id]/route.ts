@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { RegistryService } from '@/lib/registry/RegistryService'
+import { apiError } from '@/lib/api-utils'
 
 const registryService = new RegistryService(prisma)
 
@@ -13,11 +14,7 @@ export async function DELETE(
     await registryService.deleteRepository(id)
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Failed to delete repository:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete repository' },
-      { status: 500 }
-    )
+    return apiError(error, 'Failed to delete repository');
   }
 }
 
@@ -47,10 +44,6 @@ export async function PATCH(
     
     return NextResponse.json(updated)
   } catch (error) {
-    console.error('Failed to update repository:', error)
-    return NextResponse.json(
-      { error: 'Failed to update repository' },
-      { status: 500 }
-    )
+    return apiError(error, 'Failed to update repository');
   }
 }
