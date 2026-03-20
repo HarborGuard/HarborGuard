@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { prismaToScanWithImage, serializeScan } from '@/lib/type-utils'
+import { prismaToScanWithImage, serializeForJson } from '@/lib/type-utils'
 import { apiError } from '@/lib/api-utils'
 
 const UpdateScanSchema = z.object({
@@ -191,7 +191,7 @@ export async function GET(
     // Convert Prisma data to properly typed scan
     const scanData = prismaToScanWithImage(scan);
     
-    return NextResponse.json(serializeScan(scanData))
+    return NextResponse.json(serializeForJson(scanData))
   } catch (error) {
     return apiError(error, 'Error retrieving scan');
   }
@@ -244,7 +244,7 @@ export async function PATCH(
     // Convert Prisma data to properly typed scan
     const scanData = prismaToScanWithImage(updatedScan);
     
-    return NextResponse.json(serializeScan(scanData))
+    return NextResponse.json(serializeForJson(scanData))
   } catch (error) {
     return apiError(error, 'Error updating scan');
   }
