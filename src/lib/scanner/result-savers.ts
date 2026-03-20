@@ -43,33 +43,34 @@ export async function createOrUpdateScanMetadata(scanId: string, reports: ScanRe
     diveResults: reports.dive || null,
 
     // Scanner versions
-    scannerVersions: metadata.scannerVersions || null
+    scannerVersions: metadata.scannerVersions || null,
   };
 
-  const scan = await prisma.scan.findUnique({
-    where: { id: scanId },
-    select: { metadataId: true }
-  });
-
-  let metadataId: string;
-
-  if (scan?.metadataId) {
-    await prisma.scanMetadata.update({
-      where: { id: scan.metadataId },
-      data: scanMetadataData
-    });
-    metadataId = scan.metadataId;
-  } else {
-    const newMetadata = await prisma.scanMetadata.create({
-      data: scanMetadataData
-    });
-    metadataId = newMetadata.id;
-
-    await prisma.scan.update({
+  const metadataId = await prisma.$transaction(async (tx) => {
+    const scan = await tx.scan.findUnique({
       where: { id: scanId },
-      data: { metadataId }
+      select: { metadataId: true },
     });
-  }
+
+    if (scan?.metadataId) {
+      await tx.scanMetadata.update({
+        where: { id: scan.metadataId },
+        data: scanMetadataData,
+      });
+      return scan.metadataId;
+    } else {
+      const newMetadata = await tx.scanMetadata.create({
+        data: scanMetadataData,
+      });
+
+      await tx.scan.update({
+        where: { id: scanId },
+        data: { metadataId: newMetadata.id },
+      });
+
+      return newMetadata.id;
+    }
+  });
 
   return metadataId;
 }
@@ -119,7 +120,7 @@ async function saveGrypeResults(metadataId: string, grypeData: any): Promise<voi
     update: {
       matchesCount: grypeData.matches?.length || 0,
       dbStatus: grypeData.db || null,
-    }
+    },
   });
 
   if (grypeData.matches && grypeData.matches.length > 0) {
@@ -135,12 +136,16 @@ async function saveGrypeResults(metadataId: string, grypeData: any): Promise<voi
       packageLanguage: match.artifact?.language || null,
       fixState: match.vulnerability?.fix?.state || null,
       fixVersions: match.vulnerability?.fix?.versions || null,
-      cvssV2Score: match.vulnerability?.cvss?.[0]?.version === '2.0' ?
-        match.vulnerability.cvss[0].metrics?.baseScore : null,
-      cvssV2Vector: match.vulnerability?.cvss?.[0]?.version === '2.0' ?
-        match.vulnerability.cvss[0].vector : null,
-      cvssV3Score: match.vulnerability?.cvss?.find((c: any) => c.version?.startsWith('3'))?.metrics?.baseScore || null,
-      cvssV3Vector: match.vulnerability?.cvss?.find((c: any) => c.version?.startsWith('3'))?.vector || null,
+      cvssV2Score:
+        match.vulnerability?.cvss?.[0]?.version === '2.0'
+          ? match.vulnerability.cvss[0].metrics?.baseScore
+          : null,
+      cvssV2Vector:
+        match.vulnerability?.cvss?.[0]?.version === '2.0' ? match.vulnerability.cvss[0].vector : null,
+      cvssV3Score:
+        match.vulnerability?.cvss?.find((c: any) => c.version?.startsWith('3'))?.metrics?.baseScore || null,
+      cvssV3Vector:
+        match.vulnerability?.cvss?.find((c: any) => c.version?.startsWith('3'))?.vector || null,
       urls: match.vulnerability?.urls || null,
       description: match.vulnerability?.description || null,
     }));
@@ -162,7 +167,7 @@ async function saveTrivyResults(metadataId: string, trivyData: any): Promise<voi
       schemaVersion: trivyData.SchemaVersion || null,
       artifactName: trivyData.ArtifactName || null,
       artifactType: trivyData.ArtifactType || null,
-    }
+    },
   });
 
   if (trivyData.Results && trivyData.Results.length > 0) {
@@ -239,9 +244,10 @@ async function saveTrivyResults(metadataId: string, trivyData: any): Promise<voi
           code: secret.Code || null,
           match: secret.Match || null,
           // Handle Layer being an object with DiffID
-          layer: typeof secret.Layer === 'object' && secret.Layer ?
-                 (secret.Layer.DiffID || secret.Layer.Digest || JSON.stringify(secret.Layer)) :
-                 secret.Layer || null,
+          layer:
+            typeof secret.Layer === 'object' && secret.Layer
+              ? secret.Layer.DiffID || secret.Layer.Digest || JSON.stringify(secret.Layer)
+              : secret.Layer || null,
         }));
 
         await prisma.trivySecret.createMany({ data: secrets });
@@ -254,7 +260,7 @@ async function saveDiveResults(metadataId: string, diveData: any): Promise<void>
   const efficiencyScore = diveData.image?.efficiencyScore || 0;
   const sizeBytes = BigInt(diveData.image?.sizeBytes || 0);
   const wastedBytes = BigInt(diveData.image?.inefficientBytes || 0);
-  const wastedPercent = sizeBytes > 0 ? Number(wastedBytes) / Number(sizeBytes) * 100 : 0;
+  const wastedPercent = sizeBytes > 0 ? (Number(wastedBytes) / Number(sizeBytes)) * 100 : 0;
 
   const diveResult = await prisma.diveResults.upsert({
     where: { scanMetadataId: metadataId },
@@ -274,29 +280,31 @@ async function saveDiveResults(metadataId: string, diveData: any): Promise<void>
       wastedPercent,
       inefficientFiles: diveData.image?.inefficientFiles || null,
       duplicateFiles: diveData.image?.duplicateFiles || null,
-    }
+    },
   });
 
-  // Delete existing layers before inserting new ones
-  await prisma.diveLayer.deleteMany({ where: { diveResultsId: diveResult.id } });
+  // Delete existing layers and insert new ones atomically
+  await prisma.$transaction(async (tx) => {
+    await tx.diveLayer.deleteMany({ where: { diveResultsId: diveResult.id } });
 
-  if (diveData.layer && diveData.layer.length > 0) {
-    const layers = diveData.layer.map((layer: any, index: number) => ({
-      diveResultsId: diveResult.id,
-      layerId: layer.id || '',
-      layerIndex: index,
-      digest: layer.digest || '',
-      sizeBytes: BigInt(layer.sizeBytes || 0),
-      command: layer.command || null,
-      addedFiles: layer.addedFiles || 0,
-      modifiedFiles: layer.modifiedFiles || 0,
-      removedFiles: layer.removedFiles || 0,
-      wastedBytes: BigInt(layer.wastedBytes || 0),
-      fileDetails: layer.fileDetails || null,
-    }));
+    if (diveData.layer && diveData.layer.length > 0) {
+      const layers = diveData.layer.map((layer: any, index: number) => ({
+        diveResultsId: diveResult.id,
+        layerId: layer.id || '',
+        layerIndex: index,
+        digest: layer.digest || '',
+        sizeBytes: BigInt(layer.sizeBytes || 0),
+        command: layer.command || null,
+        addedFiles: layer.addedFiles || 0,
+        modifiedFiles: layer.modifiedFiles || 0,
+        removedFiles: layer.removedFiles || 0,
+        wastedBytes: BigInt(layer.wastedBytes || 0),
+        fileDetails: layer.fileDetails || null,
+      }));
 
-    await prisma.diveLayer.createMany({ data: layers });
-  }
+      await tx.diveLayer.createMany({ data: layers });
+    }
+  });
 }
 
 async function saveSyftResults(metadataId: string, syftData: any): Promise<void> {
@@ -322,47 +330,49 @@ async function saveSyftResults(metadataId: string, syftData: any): Promise<void>
       filesAnalyzed: syftData.source?.target?.imageSize || 0,
       source: syftData.source || null,
       distro: syftData.distro || null,
-    }
+    },
   });
 
-  // Delete existing packages before inserting new ones
-  await prisma.syftPackage.deleteMany({ where: { syftResultsId: syftResult.id } });
+  // Delete existing packages and insert new ones atomically
+  await prisma.$transaction(async (tx) => {
+    await tx.syftPackage.deleteMany({ where: { syftResultsId: syftResult.id } });
 
-  if (syftData.artifacts && syftData.artifacts.length > 0) {
-    const packages = syftData.artifacts.map((artifact: any) => {
-      // Extract CPE string - handle various formats
-      let cpeString: string | null = null;
-      if (artifact.cpes && artifact.cpes.length > 0) {
-        const firstCpe = artifact.cpes[0];
-        if (typeof firstCpe === 'string') {
-          cpeString = firstCpe;
-        } else if (typeof firstCpe === 'object' && firstCpe.cpe) {
-          cpeString = firstCpe.cpe;
-        } else if (typeof firstCpe === 'object' && firstCpe.value) {
-          cpeString = firstCpe.value;
+    if (syftData.artifacts && syftData.artifacts.length > 0) {
+      const packages = syftData.artifacts.map((artifact: any) => {
+        // Extract CPE string - handle various formats
+        let cpeString: string | null = null;
+        if (artifact.cpes && artifact.cpes.length > 0) {
+          const firstCpe = artifact.cpes[0];
+          if (typeof firstCpe === 'string') {
+            cpeString = firstCpe;
+          } else if (typeof firstCpe === 'object' && firstCpe.cpe) {
+            cpeString = firstCpe.cpe;
+          } else if (typeof firstCpe === 'object' && firstCpe.value) {
+            cpeString = firstCpe.value;
+          }
         }
-      }
 
-      return {
-        syftResultsId: syftResult.id,
-        packageId: artifact.id || '',
-        name: artifact.name || 'unknown',
-        version: artifact.version || '',
-        type: artifact.type || 'unknown',
-        foundBy: artifact.foundBy || null,
-        purl: artifact.purl || null,
-        cpe: cpeString,
-        language: artifact.language || null,
-        licenses: artifact.licenses || null,
-        size: artifact.metadata?.installedSize ? BigInt(artifact.metadata.installedSize) : null,
-        locations: artifact.locations || null,
-        layerId: artifact.locations?.[0]?.layerID || null,
-        metadata: artifact.metadata || null,
-      };
-    });
+        return {
+          syftResultsId: syftResult.id,
+          packageId: artifact.id || '',
+          name: artifact.name || 'unknown',
+          version: artifact.version || '',
+          type: artifact.type || 'unknown',
+          foundBy: artifact.foundBy || null,
+          purl: artifact.purl || null,
+          cpe: cpeString,
+          language: artifact.language || null,
+          licenses: artifact.licenses || null,
+          size: artifact.metadata?.installedSize ? BigInt(artifact.metadata.installedSize) : null,
+          locations: artifact.locations || null,
+          layerId: artifact.locations?.[0]?.layerID || null,
+          metadata: artifact.metadata || null,
+        };
+      });
 
-    await prisma.syftPackage.createMany({ data: packages });
-  }
+      await tx.syftPackage.createMany({ data: packages });
+    }
+  });
 }
 
 async function saveDockleResults(metadataId: string, dockleData: any): Promise<void> {
@@ -374,23 +384,25 @@ async function saveDockleResults(metadataId: string, dockleData: any): Promise<v
     },
     update: {
       summary: dockleData.summary || null,
-    }
+    },
   });
 
-  // Delete existing violations before inserting new ones
-  await prisma.dockleViolation.deleteMany({ where: { dockleResultsId: dockleResult.id } });
+  // Delete existing violations and insert new ones atomically
+  await prisma.$transaction(async (tx) => {
+    await tx.dockleViolation.deleteMany({ where: { dockleResultsId: dockleResult.id } });
 
-  if (dockleData.details && dockleData.details.length > 0) {
-    const violations = dockleData.details.map((detail: any) => ({
-      dockleResultsId: dockleResult.id,
-      code: detail.code || '',
-      title: detail.title || '',
-      level: detail.level || 'INFO',
-      alerts: detail.alerts || null,
-    }));
+    if (dockleData.details && dockleData.details.length > 0) {
+      const violations = dockleData.details.map((detail: any) => ({
+        dockleResultsId: dockleResult.id,
+        code: detail.code || '',
+        title: detail.title || '',
+        level: detail.level || 'INFO',
+        alerts: detail.alerts || null,
+      }));
 
-    await prisma.dockleViolation.createMany({ data: violations });
-  }
+      await tx.dockleViolation.createMany({ data: violations });
+    }
+  });
 }
 
 async function saveOsvResults(metadataId: string, osvData: any): Promise<void> {
@@ -401,11 +413,8 @@ async function saveOsvResults(metadataId: string, osvData: any): Promise<void> {
     },
     update: {
       scanMetadataId: metadataId,
-    }
+    },
   });
-
-  // Delete existing vulnerabilities before inserting new ones
-  await prisma.osvVulnerability.deleteMany({ where: { osvResultsId: osvResult.id } });
 
   const vulnerabilities: any[] = [];
 
@@ -426,7 +435,8 @@ async function saveOsvResults(metadataId: string, osvData: any): Promise<void> {
                 summary: vuln.summary || null,
                 details: vuln.details || null,
                 severity: vuln.severity || null,
-                fixed: vuln.affected?.[0]?.ranges?.[0]?.events?.find((e: any) => e.fixed)?.fixed || null,
+                fixed:
+                  vuln.affected?.[0]?.ranges?.[0]?.events?.find((e: any) => e.fixed)?.fixed || null,
                 affected: vuln.affected || null,
                 published: vuln.published ? new Date(vuln.published) : null,
                 modified: vuln.modified ? new Date(vuln.modified) : null,
@@ -441,7 +451,12 @@ async function saveOsvResults(metadataId: string, osvData: any): Promise<void> {
     }
   }
 
-  if (vulnerabilities.length > 0) {
-    await prisma.osvVulnerability.createMany({ data: vulnerabilities });
-  }
+  // Delete existing vulnerabilities and insert new ones atomically
+  await prisma.$transaction(async (tx) => {
+    await tx.osvVulnerability.deleteMany({ where: { osvResultsId: osvResult.id } });
+
+    if (vulnerabilities.length > 0) {
+      await tx.osvVulnerability.createMany({ data: vulnerabilities });
+    }
+  });
 }
