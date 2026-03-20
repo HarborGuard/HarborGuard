@@ -1,7 +1,7 @@
 "use client"
 
 import { Label } from "@/components/ui/label"
-import { TabsContent } from "@/components/ui/tabs"
+
 import { DockerImageAutocomplete } from "@/components/images/DockerImageAutocomplete"
 
 interface DockerHubTabProps {
@@ -11,7 +11,7 @@ interface DockerHubTabProps {
 
 export function DockerHubTab({ imageUrl, setImageUrl }: DockerHubTabProps) {
   return (
-    <TabsContent value="dockerhub" className="space-y-3">
+    <div className="space-y-3">
       <Label htmlFor="dockerhub-image">Docker Hub Image</Label>
       <DockerImageAutocomplete
         value={imageUrl}
@@ -21,6 +21,6 @@ export function DockerHubTab({ imageUrl, setImageUrl }: DockerHubTabProps) {
       <p className="text-xs text-muted-foreground">
         Start typing to search Docker Hub images. Official images don't need 'library/' prefix.
       </p>
-    </TabsContent>
+    </div>
   )
 }

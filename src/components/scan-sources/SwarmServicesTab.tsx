@@ -1,7 +1,7 @@
 "use client"
 
 import { Label } from "@/components/ui/label"
-import { TabsContent } from "@/components/ui/tabs"
+
 import { SwarmServicesList } from "@/components/images/swarm-services-list"
 import type { SwarmService } from "@/types"
 
@@ -17,7 +17,7 @@ export function SwarmServicesTab({
   isLoading,
 }: SwarmServicesTabProps) {
   return (
-    <TabsContent value="swarm" className="space-y-3">
+    <div className="space-y-3">
       <Label>Select Swarm Service</Label>
       <SwarmServicesList
         onServiceSelect={(service) => {
@@ -29,6 +29,6 @@ export function SwarmServicesTab({
       <p className="text-xs text-muted-foreground">
         Select a service from your Docker Swarm cluster to scan its image.
       </p>
-    </TabsContent>
+    </div>
   )
 }

@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
-import { TabsContent } from "@/components/ui/tabs"
+
 import {
   Select,
   SelectContent,
@@ -114,19 +114,19 @@ export function KubernetesTab({
   // Loading status check
   if (loadingStatus) {
     return (
-      <TabsContent value="kubernetes" className="space-y-3">
+      <div className="space-y-3">
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
           <span className="ml-2 text-sm text-muted-foreground">Checking Kubernetes availability...</span>
         </div>
-      </TabsContent>
+      </div>
     )
   }
 
   // Not available
   if (!available) {
     return (
-      <TabsContent value="kubernetes" className="space-y-3">
+      <div className="space-y-3">
         <div className="text-center py-8">
           <IconBox className="mx-auto h-12 w-12 text-muted-foreground" />
           <h3 className="mt-2 text-sm font-medium">Kubernetes Not Detected</h3>
@@ -134,12 +134,12 @@ export function KubernetesTab({
             Kubernetes not detected. Deploy HarborGuard in a Kubernetes cluster or set KUBECONFIG.
           </p>
         </div>
-      </TabsContent>
+      </div>
     )
   }
 
   return (
-    <TabsContent value="kubernetes" className="space-y-3">
+    <div className="space-y-3">
       {/* Cluster info and controls */}
       <div className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -262,6 +262,6 @@ export function KubernetesTab({
       <p className="text-xs text-muted-foreground">
         Select a container image from your Kubernetes cluster to scan.
       </p>
-    </TabsContent>
+    </div>
   )
 }
