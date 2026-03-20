@@ -42,7 +42,8 @@ export async function PATCH(
     // Invalidate cache after update
     await registryService.invalidateCache(id)
     
-    return NextResponse.json(updated)
+    const { encryptedPassword, ...safeUpdated } = updated
+    return NextResponse.json(safeUpdated)
   } catch (error) {
     return apiError(error, 'Failed to update repository');
   }
