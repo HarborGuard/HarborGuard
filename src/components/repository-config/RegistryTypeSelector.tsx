@@ -2,9 +2,9 @@
 
 import React from "react"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { IconBrandDocker, IconBrandGithub, IconBrandGitlab, IconServer, IconPackage } from "@tabler/icons-react"
+import { IconBrandDocker, IconBrandGithub, IconBrandGitlab, IconServer, IconPackage, IconCloud, IconBrandGoogle } from "@tabler/icons-react"
 
-type RepositoryType = 'dockerhub' | 'ghcr' | 'gitlab' | 'generic' | 'nexus'
+type RepositoryType = 'dockerhub' | 'ghcr' | 'gitlab' | 'generic' | 'nexus' | 'acr' | 'gcr'
 
 interface RegistryTypeSelectorProps {
   onTypeSelect: (type: RepositoryType) => void;
@@ -44,6 +44,20 @@ const repositoryTypes = [
     title: 'Sonatype Nexus3',
     description: 'Connect to Nexus3 Docker repositories',
     icon: <IconPackage className="h-8 w-8" />,
+    registryUrl: '',
+  },
+  {
+    type: 'acr' as const,
+    title: 'Azure Container Registry',
+    description: 'Connect to Azure Container Registry (azurecr.io)',
+    icon: <IconCloud className="h-8 w-8" />,
+    registryUrl: '',
+  },
+  {
+    type: 'gcr' as const,
+    title: 'Google Artifact Registry',
+    description: 'Connect to Google Artifact Registry (pkg.dev)',
+    icon: <IconBrandGoogle className="h-8 w-8" />,
     registryUrl: '',
   },
 ]

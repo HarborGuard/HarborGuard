@@ -47,6 +47,28 @@ export function RegistryConfigForm({
         />
       </div>
 
+      {config.type === 'acr' && (
+        <div className="space-y-2">
+          <Label htmlFor="registryUrl">Registry Name</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id="registryUrl"
+              value={config.registryUrl.replace(/\.azurecr\.io$/, '')}
+              onChange={(e) => {
+                const name = e.target.value.replace(/\.azurecr\.io$/, '')
+                onConfigChange(prev => ({ ...prev, registryUrl: name ? `${name}.azurecr.io` : '' }))
+              }}
+              placeholder="myregistry"
+              className="flex-1"
+            />
+            <span className="text-sm text-muted-foreground whitespace-nowrap">.azurecr.io</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Enter just the registry name. The full URL will be {config.registryUrl || '{name}.azurecr.io'}.
+          </p>
+        </div>
+      )}
+
       {(config.type === 'generic' || config.type === 'gitlab' || config.type === 'nexus') && (
         <>
           <div className="space-y-2">
@@ -116,13 +138,17 @@ export function RegistryConfigForm({
           {config.type === 'dockerhub' ? 'Docker Hub Username' :
            config.type === 'ghcr' ? 'GitHub Username' :
            config.type === 'gitlab' ? 'GitLab Username' :
-           config.type === 'nexus' ? 'Nexus Username' : 'Username'}
+           config.type === 'nexus' ? 'Nexus Username' :
+           config.type === 'acr' ? 'Username' : 'Username'}
         </Label>
         <Input
           id="username"
           value={config.username}
           onChange={(e) => onConfigChange(prev => ({ ...prev, username: e.target.value }))}
-          placeholder="Enter username"
+          placeholder={
+            config.type === 'acr' ? 'Admin username or service principal client ID' :
+            'Enter username'
+          }
         />
       </div>
 
@@ -131,7 +157,8 @@ export function RegistryConfigForm({
           {config.type === 'dockerhub' ? 'Personal Access Token' :
            config.type === 'ghcr' ? 'GitHub Personal Access Token' :
            config.type === 'gitlab' ? 'GitLab Password' :
-           config.type === 'nexus' ? 'Nexus Password' : 'Password/Token'}
+           config.type === 'nexus' ? 'Nexus Password' :
+           config.type === 'acr' ? 'Password' : 'Password/Token'}
         </Label>
         <Input
           id="password"
@@ -143,6 +170,7 @@ export function RegistryConfigForm({
             config.type === 'ghcr' ? 'Enter GitHub PAT with packages:read scope' :
             config.type === 'gitlab' ? 'Enter GitLab admin password' :
             config.type === 'nexus' ? 'Enter Nexus password' :
+            config.type === 'acr' ? 'Admin password or service principal client secret' :
             'Enter password or token'
           }
         />
