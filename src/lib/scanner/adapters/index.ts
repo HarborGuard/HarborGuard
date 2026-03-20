@@ -1,4 +1,10 @@
 import { IScannerAdapter } from '../types';
+import { TrivyAdapter } from './TrivyAdapter';
+import { GrypeAdapter } from './GrypeAdapter';
+import { SyftAdapter } from './SyftAdapter';
+import { DockleAdapter } from './DockleAdapter';
+import { OsvAdapter } from './OsvAdapter';
+import { DiveAdapter } from './DiveAdapter';
 
 class ScannerAdapterRegistry {
   private static adapters = new Map<string, IScannerAdapter>();
@@ -16,4 +22,18 @@ class ScannerAdapterRegistry {
   }
 }
 
+// Register all built-in scanner adapters
+ScannerAdapterRegistry.register(new TrivyAdapter());
+ScannerAdapterRegistry.register(new GrypeAdapter());
+ScannerAdapterRegistry.register(new SyftAdapter());
+ScannerAdapterRegistry.register(new DockleAdapter());
+ScannerAdapterRegistry.register(new OsvAdapter());
+ScannerAdapterRegistry.register(new DiveAdapter());
+
 export { ScannerAdapterRegistry };
+export { TrivyAdapter } from './TrivyAdapter';
+export { GrypeAdapter } from './GrypeAdapter';
+export { SyftAdapter } from './SyftAdapter';
+export { DockleAdapter } from './DockleAdapter';
+export { OsvAdapter } from './OsvAdapter';
+export { DiveAdapter } from './DiveAdapter';
