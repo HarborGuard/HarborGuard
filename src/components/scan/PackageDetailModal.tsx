@@ -24,8 +24,8 @@ import {
   IconFolder,
   IconStack,
 } from "@tabler/icons-react";
-import { toast } from "sonner";
 import { formatDate, renderValue, formatLicense } from "@/lib/format-utils";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface PackageDetailModalProps {
   isOpen: boolean;
@@ -39,11 +39,6 @@ export function PackageDetailModal({
   packageData
 }: PackageDetailModalProps) {
   if (!packageData) return null;
-
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copied to clipboard`);
-  };
 
   const getTypeColor = (type: string) => {
     const colors: Record<string, string> = {

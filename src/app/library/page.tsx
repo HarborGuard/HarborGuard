@@ -30,6 +30,7 @@ import {
   TableLoadingSkeleton,
 } from "@/components/ui/loading";
 import { getSeverityBadgeVariant } from "@/lib/severity-utils";
+import { getImageName } from "@/lib/image-utils";
 
 interface VulnerabilityData {
   cveId: string;
@@ -165,25 +166,6 @@ export default function LibraryHomePage() {
     } else {
       setSortField(field);
       setSortOrder("desc");
-    }
-  };
-
-  const getSeverityColor = (
-    severity: string
-  ) => {
-    switch (severity.toUpperCase()) {
-      case "CRITICAL":
-        return "destructive";
-      case "HIGH":
-        return "destructive";
-      case "MEDIUM":
-        return "secondary";
-      case "LOW":
-        return "outline";
-      case "INFO":
-        return "outline";
-      default:
-        return "outline";
     }
   };
 
