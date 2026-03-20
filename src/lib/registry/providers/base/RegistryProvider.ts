@@ -9,7 +9,7 @@ import type {
   RegistryCapability,
   RateLimit,
   RegistryConfig,
-  Vulnerability
+  RegistryVulnerability
 } from '../../types';
 
 export abstract class RegistryProvider {
@@ -45,7 +45,7 @@ export abstract class RegistryProvider {
     namespace: string | null, 
     imageName: string, 
     tag: string
-  ): Promise<Vulnerability[]> {
+  ): Promise<RegistryVulnerability[]> {
     // Default: empty array - not all registries provide vulnerability scanning
     return [];
   }

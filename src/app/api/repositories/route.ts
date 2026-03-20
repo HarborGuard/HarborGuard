@@ -1,33 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { RegistryService } from '@/lib/registry/RegistryService'
+import { apiError } from '@/lib/api/api-utils'
+
+const CreateRepositorySchema = z.object({
+  name: z.string().min(1).max(255),
+  type: z.enum(['DOCKERHUB', 'GHCR', 'GITLAB', 'GENERIC', 'ECR', 'GCR', 'ACR', 'HARBOR', 'NEXUS', 'ARTIFACTORY', 'QUAY']),
+  registryUrl: z.string().min(1).optional(),
+  username: z.string().min(1),
+  password: z.string().min(1),
+  organization: z.string().optional().nullable(),
+  protocol: z.string().optional(),
+  skipTlsVerify: z.boolean().optional(),
+  registryPort: z.number().int().positive().optional().nullable(),
+  testConnection: z.boolean().optional().default(true),
+})
 
 const registryService = new RegistryService(prisma)
 
 export async function GET() {
   try {
     const repositories = await registryService.listRepositories()
-    return NextResponse.json(repositories)
+    return NextResponse.json({ data: repositories })
   } catch (error) {
-    console.error('Failed to fetch repositories:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch repositories' },
-      { status: 500 }
-    )
+    return apiError(error, 'Failed to fetch repositories');
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, type, registryUrl, username, password, organization, protocol, skipTlsVerify, registryPort, testConnection = true } = body
+    const parsed = CreateRepositorySchema.safeParse(body)
 
-    if (!name || !type || !username || !password) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Missing required fields: name, type, username, password' },
+        { error: parsed.error.issues },
         { status: 400 }
       )
     }
+
+    const { name, type, registryUrl, username, password, organization, protocol, skipTlsVerify, registryPort, testConnection } = parsed.data
 
     const { repository, testResult } = await registryService.createRepository({
       name,
@@ -35,10 +48,10 @@ export async function POST(request: NextRequest) {
       registryUrl,
       username,
       password,
-      organization,
+      organization: organization ?? undefined,
       protocol,
       skipTlsVerify,
-      registryPort,
+      registryPort: registryPort ?? undefined,
       testConnection
     })
 
@@ -56,11 +69,6 @@ export async function POST(request: NextRequest) {
       testResult
     })
   } catch (error) {
-    console.error('Failed to create repository:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create repository'
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    )
+    return apiError(error, 'Failed to create repository');
   }
 }

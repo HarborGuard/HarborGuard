@@ -1,15 +1,12 @@
 import { NextResponse } from 'next/server';
 import { listDockerImages } from '@/lib/docker';
+import { apiError } from '@/lib/api/api-utils';
 
 export async function GET() {
   try {
     const images = await listDockerImages();
-    return NextResponse.json(images);
+    return NextResponse.json({ data: images });
   } catch (error) {
-    console.error('Failed to list Docker images:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to list Docker images' },
-      { status: 500 }
-    );
+    return apiError(error, 'Failed to list Docker images');
   }
 }

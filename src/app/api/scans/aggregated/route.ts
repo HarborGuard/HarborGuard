@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getSeverityWeight } from '@/lib/utils/severity-utils'
+import { apiError } from '@/lib/api/api-utils'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const imageId = searchParams.get('imageId')
-    const limit = Math.min(parseInt(searchParams.get('limit') || '25'), 100)
-    const offset = parseInt(searchParams.get('offset') || '0')
+    const limit = Math.max(1, Math.min(parseInt(searchParams.get('limit') || '25') || 25, 100))
+    const offset = Math.max(0, parseInt(searchParams.get('offset') || '0') || 0)
     
     const where: any = {}
     
@@ -92,18 +94,6 @@ export async function GET(request: NextRequest) {
         // Track unique CVEs and their highest severity
         const cveTracker = new Map<string, string>() // CVE ID -> highest severity
         
-        // Helper function to get severity priority (higher number = higher severity)
-        const getSeverityPriority = (severity: string) => {
-          switch (severity) {
-            case 'CRITICAL': return 4
-            case 'HIGH': return 3
-            case 'MEDIUM': return 2
-            case 'LOW': 
-            case 'INFO': return 1
-            default: return 0
-          }
-        }
-        
         // Process all vulnerability findings
         for (const finding of scan.vulnerabilityFindings) {
           const cveId = finding.cveId
@@ -111,7 +101,7 @@ export async function GET(request: NextRequest) {
           
           // Track or update to highest severity
           const existingSeverity = cveTracker.get(cveId)
-          if (!existingSeverity || getSeverityPriority(severity) > getSeverityPriority(existingSeverity)) {
+          if (!existingSeverity || getSeverityWeight(severity) > getSeverityWeight(existingSeverity)) {
             cveTracker.set(cveId, severity)
           }
         }
@@ -149,19 +139,6 @@ export async function GET(request: NextRequest) {
         // Track unique CVEs and their highest severity
         const cveTracker = new Map<string, string>() // CVE ID -> highest severity
         
-        // Helper function to get severity priority (higher number = higher severity)
-        const getSeverityPriority = (severity: string) => {
-          switch (severity.toUpperCase()) {
-            case 'CRITICAL': return 4
-            case 'HIGH': return 3
-            case 'MEDIUM': return 2
-            case 'LOW': 
-            case 'NEGLIGIBLE':
-            case 'INFO': return 1
-            default: return 0
-          }
-        }
-        
         // Process Trivy vulnerabilities
         const trivyResults = scanResults?.trivy
         if (trivyResults?.Results) {
@@ -173,7 +150,7 @@ export async function GET(request: NextRequest) {
                 
                 // Track or update to highest severity
                 const existingSeverity = cveTracker.get(cveId)
-                if (!existingSeverity || getSeverityPriority(severity) > getSeverityPriority(existingSeverity)) {
+                if (!existingSeverity || getSeverityWeight(severity) > getSeverityWeight(existingSeverity)) {
                   cveTracker.set(cveId, severity)
                 }
               }
@@ -190,7 +167,7 @@ export async function GET(request: NextRequest) {
             
             // Track or update to highest severity
             const existingSeverity = cveTracker.get(cveId)
-            if (!existingSeverity || getSeverityPriority(severity) > getSeverityPriority(existingSeverity)) {
+            if (!existingSeverity || getSeverityWeight(severity) > getSeverityWeight(existingSeverity)) {
               cveTracker.set(cveId, severity)
             }
           }
@@ -278,10 +255,6 @@ export async function GET(request: NextRequest) {
       }
     })
   } catch (error) {
-    console.error('Error retrieving aggregated scans:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return apiError(error, 'Error retrieving aggregated scans');
   }
 }

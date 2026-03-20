@@ -3,107 +3,11 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import type { LegacyScan, ScanWithImage } from '@/types'
-import { 
-  aggregateVulnerabilities,
-  calculateRiskScore,
-  aggregateCompliance,
-  countMisconfigurations,
-  countSecrets,
-  calculateScanDuration,
-  getHighestCVSS,
-  getOSVPackageStats,
-  countOSVVulnerabilities,
-} from '@/lib/scan-aggregations'
+import type { LegacyScan } from '@/types'
+import { getImageName } from '@/lib/utils/image-utils'
 
 // Use LegacyScan for backward compatibility with existing UI components
 type Scan = LegacyScan
-
-// Transform database scans to legacy UI format
-function transformScansForUI(scans: ScanWithImage[]): LegacyScan[] {
-  return scans.map(scan => {
-    const vulnerabilities = aggregateVulnerabilities(scan)
-    const compliance = aggregateCompliance(scan)
-    const riskScore = calculateRiskScore(scan)
-    const duration = calculateScanDuration(scan)
-    
-    return {
-      id: Math.abs(scan.id.split('').reduce((a, b) => ((a << 5) - a + b.charCodeAt(0)) | 0, 0)), // Convert cuid to stable number
-      imageId: scan.image.id, // Add imageId for navigation
-      imageName: scan.image.name, // Add image name for new navigation
-      uid: scan.requestId,
-      image: `${scan.image.name}:${scan.tag}`, // Full image name with scan tag
-      source: scan.source || undefined, // Add source information
-      digestShort: scan.image.digest?.slice(7, 19) || '',
-      platform: scan.image.platform || 'unknown',
-      sizeMb: scan.image.sizeBytes ? Math.round(Number(scan.image.sizeBytes) / 1024 / 1024) : 0,
-      riskScore,
-      
-      severities: {
-        crit: vulnerabilities.critical,
-        high: vulnerabilities.high,
-        med: vulnerabilities.medium,
-        low: vulnerabilities.low,
-      },
-      
-      highestCvss: getHighestCVSS(scan),
-      misconfigs: countMisconfigurations(scan),
-      secrets: countSecrets(scan),
-      
-      // OSV-specific metrics
-      osvPackages: getOSVPackageStats(scan).totalPackages,
-      osvVulnerable: getOSVPackageStats(scan).vulnerablePackages,
-      osvEcosystems: Object.keys(getOSVPackageStats(scan).ecosystemCounts),
-      
-      compliance: {
-        dockle: compliance.dockle?.grade,
-      },
-      
-      policy: riskScore > 75 ? "Blocked" : riskScore > 50 ? "Warn" : "Pass",
-      
-      delta: {
-        newCrit: 0, // Would need comparison with previous scan
-        resolvedTotal: 0,
-      },
-      
-      inUse: {
-        clusters: 0, // Would need K8s integration
-        pods: 0,
-      },
-      
-      baseImage: extractBaseImage(scan.image.name),
-      baseUpdate: undefined,
-      signed: false,
-      attested: false,
-      sbomFormat: "spdx",
-      dbAge: duration,
-      registry: undefined,
-      project: undefined,
-      lastScan: typeof scan.finishedAt === 'string' ? scan.finishedAt : scan.finishedAt?.toISOString() || (typeof scan.createdAt === 'string' ? scan.createdAt : scan.createdAt.toISOString()),
-      status: mapScanStatus(scan.status),
-      header: undefined,
-      type: undefined,
-      target: undefined,
-      limit: undefined,
-      
-      scannerReports: undefined, // TODO: Extract from scan.scanResults in new schema
-      digest: scan.image.digest,
-      layers: [], // Would extract from metadata
-      osInfo: extractOsInfo(scan),
-    }
-  })
-}
-
-// Helper functions
-function extractBaseImage(imageName: string): string | undefined {
-  if (imageName.includes('node')) return 'node'
-  if (imageName.includes('python')) return 'python'
-  if (imageName.includes('nginx')) return 'nginx'
-  if (imageName.includes('alpine')) return 'alpine'
-  if (imageName.includes('ubuntu')) return 'ubuntu'
-  if (imageName.includes('debian')) return 'debian'
-  return imageName.split(':')[0]
-}
 
 function mapScanStatus(status: string): "Complete" | "Queued" | "Error" | "Prior" {
   switch (status) {
@@ -114,11 +18,6 @@ function mapScanStatus(status: string): "Complete" | "Queued" | "Error" | "Prior
     case 'CANCELLED': return 'Error'
     default: return 'Prior'
   }
-}
-
-function extractOsInfo(scan: ScanWithImage): { family: string; name: string } | undefined {
-  // TODO: Extract OS info from scan.scanResults.rawOutput in new schema
-  return undefined
 }
 
 
@@ -290,7 +189,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           osvPackages: 0,
           osvVulnerable: 0,
           osvEcosystems: [],
-          baseImage: scan.image?.name?.split(':')[0] || 'unknown', // Simplified extraction
+          baseImage: getImageName(scan.image?.name || '') || 'unknown', // Simplified extraction
           osInfo: undefined,
           lastScan: scan.finishedAt || scan.startedAt,
           registry: scan.image.registry

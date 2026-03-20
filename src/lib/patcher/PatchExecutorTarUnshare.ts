@@ -5,14 +5,17 @@ import fs from 'fs/promises';
 import { existsSync } from 'fs';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import type { 
-  PatchOperation, 
-  PatchOperationStatus, 
+import type {
+  PatchOperation,
+  PatchOperationStatus,
   PatchResult,
-  PatchStrategy as PatchStrategyType 
+  PatchStrategy as PatchStrategyType
 } from '@/generated/prisma';
+import type { PatchableVulnerability } from './types';
 
 const execAsync = promisify(exec);
+
+export type { PatchableVulnerability };
 
 export interface PatchRequest {
   sourceImageId: string;
@@ -23,15 +26,6 @@ export interface PatchRequest {
   selectedVulnerabilityIds?: string[];
   newImageName?: string;
   newImageTag?: string;
-}
-
-export interface PatchableVulnerability {
-  id: string;
-  cveId: string;
-  packageName: string;
-  currentVersion: string;
-  fixedVersion: string;
-  packageManager: string;
 }
 
 export class PatchExecutorTarUnshare {

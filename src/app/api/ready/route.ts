@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { config } from '@/lib/config';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
+import { apiError } from '@/lib/api/api-utils';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   // Check if health checks are enabled
@@ -37,17 +38,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     });
 
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error('Readiness check failed:', errorMessage);
-    
-    return NextResponse.json(
-      {
-        status: 'not ready',
-        timestamp: new Date().toISOString(),
-        error: errorMessage
-      },
-      { status: 503 }
-    );
+    return apiError(error, 'Readiness check failed', 503);
   }
 }
 

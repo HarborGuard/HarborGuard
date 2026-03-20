@@ -18,22 +18,18 @@ export async function GET(request: NextRequest) {
       version: versionInfo
     });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('Version check API failed:', errorMessage);
-    
-    return NextResponse.json(
-      {
-        success: false,
-        error: errorMessage,
-        version: {
-          current: versionDetector.getCurrentVersion(),
-          hasUpdate: false,
-          lastChecked: new Date(),
-          error: errorMessage
-        }
+    const errorMessage = error instanceof Error ? error.message : 'Version check failed';
+    logger.error('Version check failed:', errorMessage);
+
+    return NextResponse.json({
+      success: false,
+      error: 'Version check failed',
+      version: {
+        current: versionDetector.getCurrentVersion(),
+        hasUpdate: false,
+        lastChecked: new Date(),
       },
-      { status: 500 }
-    );
+    });
   }
 }
 

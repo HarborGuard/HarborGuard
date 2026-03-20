@@ -59,13 +59,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { serializeForJson } from '@/lib/type-utils';
+import { serializeForJson } from '@/lib/utils/type-utils';
+import { apiError } from '@/lib/api/api-utils';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '25');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const limit = Math.max(1, Math.min(parseInt(searchParams.get('limit') || '25') || 25, 100));
+    const offset = Math.max(0, parseInt(searchParams.get('offset') || '0') || 0);
     const includeScans = searchParams.get('includeScans') === 'true';
     const includeVulnerabilities = searchParams.get('includeVulnerabilities') === 'true';
 
@@ -94,10 +95,6 @@ export async function GET(request: NextRequest) {
     }));
 
   } catch (error) {
-    console.error('Failed to fetch images:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch images' },
-      { status: 500 }
-    );
+    return apiError(error, 'Failed to fetch images');
   }
 }

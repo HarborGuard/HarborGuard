@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { apiError } from '@/lib/api/api-utils';
 
 export async function GET(
   request: NextRequest,
@@ -33,37 +34,39 @@ export async function GET(
         ]
       });
       
-      // Get detailed findings for each correlation
-      const groupedFindings = await Promise.all(
-        correlations.map(async (corr) => {
-          const findings = await prisma.scanVulnerabilityFinding.findMany({
-            where: {
-              scanId: id,
-              cveId: corr.correlationKey
-            },
-            select: {
-              source: true,
-              packageName: true,
-              installedVersion: true,
-              fixedVersion: true,
-              severity: true,
-              cvssScore: true,
-              title: true,
-              description: true,
-              vulnerabilityUrl: true
-            }
-          });
-          
-          return {
-            cveId: corr.correlationKey,
-            sources: corr.sources,
-            sourceCount: corr.sourceCount,
-            confidenceScore: corr.confidenceScore,
-            severity: corr.severity,
-            findings
-          };
-        })
-      );
+      // Batch-fetch all findings for correlated CVEs in a single query
+      const allCveIds = correlations.map(c => c.correlationKey);
+      const allFindings = await prisma.scanVulnerabilityFinding.findMany({
+        where: { scanId: id, cveId: { in: allCveIds } },
+        select: {
+          cveId: true,
+          source: true,
+          packageName: true,
+          installedVersion: true,
+          fixedVersion: true,
+          severity: true,
+          cvssScore: true,
+          title: true,
+          description: true,
+          vulnerabilityUrl: true
+        }
+      });
+
+      // Group findings in memory by cveId
+      const findingsByCve = new Map<string, typeof allFindings>();
+      allFindings.forEach(f => {
+        if (!findingsByCve.has(f.cveId)) findingsByCve.set(f.cveId, []);
+        findingsByCve.get(f.cveId)!.push(f);
+      });
+
+      const groupedFindings = correlations.map((corr) => ({
+        cveId: corr.correlationKey,
+        sources: corr.sources,
+        sourceCount: corr.sourceCount,
+        confidenceScore: corr.confidenceScore,
+        severity: corr.severity,
+        findings: findingsByCve.get(corr.correlationKey) || []
+      }));
       
       return NextResponse.json({
         total: correlations.length,
@@ -104,10 +107,6 @@ export async function GET(
       });
     }
   } catch (error) {
-    console.error('Error fetching vulnerability findings:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch vulnerability findings' },
-      { status: 500 }
-    );
+    return apiError(error, 'Failed to fetch vulnerability findings');
   }
 }

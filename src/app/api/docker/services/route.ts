@@ -7,41 +7,46 @@ export async function GET() {
 
     if (!swarmInfo.active) {
       return NextResponse.json({
-        swarmMode: false,
-        message: 'Docker is not running in Swarm mode',
-        services: [],
+        data: {
+          swarmMode: false,
+          message: 'Docker is not running in Swarm mode',
+          services: [],
+        },
       });
     }
 
     if (!swarmInfo.isManager) {
       return NextResponse.json({
-        swarmMode: true,
-        isManager: false,
-        message: 'This node is not a Swarm manager. Service listing requires manager access.',
-        services: [],
+        data: {
+          swarmMode: true,
+          isManager: false,
+          message: 'This node is not a Swarm manager. Service listing requires manager access.',
+          services: [],
+        },
       });
     }
 
     const services = await listSwarmServices();
 
     return NextResponse.json({
-      swarmMode: true,
-      isManager: true,
-      swarmInfo: {
-        ...swarmInfo,
-        services: services.length,
+      data: {
+        swarmMode: true,
+        isManager: true,
+        swarmInfo: {
+          ...swarmInfo,
+          services: services.length,
+        },
+        services,
       },
-      services,
     });
   } catch (error) {
-    console.error('Failed to get Swarm services:', error);
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : 'Failed to get Swarm services',
+    console.error('Failed to get Swarm services', error);
+    return NextResponse.json({
+      data: {
         swarmMode: false,
         services: [],
+        error: 'Failed to get Swarm services',
       },
-      { status: 500 }
-    );
+    });
   }
 }

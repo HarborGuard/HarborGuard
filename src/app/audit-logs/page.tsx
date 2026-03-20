@@ -7,7 +7,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Eye, RefreshCw } from "lucide-react";
-import { AuditLogFilters } from "@/components/audit-log-filters";
+import { AuditLogFilters } from "@/components/shared/audit-log-filters";
 import {
   Card,
   CardContent,

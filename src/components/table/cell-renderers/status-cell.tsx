@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { IconCircleCheckFilled, IconLoader } from "@tabler/icons-react"
 import { CellRendererProps } from "../types"
-import { useScanning } from "@/providers/ScanningProvider"
+import { useScanning } from "@/contexts/ScanningContext"
 
 interface StatusCellData {
   imageName?: string

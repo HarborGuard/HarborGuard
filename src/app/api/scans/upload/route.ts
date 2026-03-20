@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import type { ScanUploadRequest } from '@/types'
+import { apiError } from '@/lib/api/api-utils'
 
 // Validation schema for scan upload
 const ScanUploadSchema = z.object({
@@ -118,19 +119,14 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error) {
-    console.error('Error uploading scan data:', error)
-    
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: 'Validation error', details: error.issues },
         { status: 400 }
       )
     }
-    
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+
+    return apiError(error, 'Error uploading scan data');
   }
 }
 

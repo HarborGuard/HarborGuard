@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { RegistryService } from '@/lib/registry/RegistryService'
 import { RegistryProviderFactory } from '@/lib/registry/providers/RegistryProviderFactory'
 import type { Repository } from '@/generated/prisma'
+import { apiError } from '@/lib/api/api-utils'
 
 const registryService = new RegistryService(prisma)
 
@@ -130,17 +131,9 @@ export async function POST(request: NextRequest) {
         error: result.success ? undefined : result.message
       })
     } catch (connectionError) {
-      const errorMessage = connectionError instanceof Error ? connectionError.message : 'Connection test failed'
-      return NextResponse.json({
-        success: false,
-        error: errorMessage,
-      })
+      return apiError(connectionError, 'Connection test failed')
     }
   } catch (error) {
-    console.error('Failed to test repository connection:', error)
-    return NextResponse.json(
-      { error: 'Failed to test connection' },
-      { status: 500 }
-    )
+    return apiError(error, 'Failed to test connection');
   }
 }

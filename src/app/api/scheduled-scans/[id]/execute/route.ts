@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { scannerService } from '@/lib/scanner'
+import { apiError } from '@/lib/api/api-utils'
 
 export async function POST(
   request: NextRequest,
@@ -138,11 +139,7 @@ export async function POST(
     }, { status: 202 })
 
   } catch (error) {
-    console.error('Error executing scheduled scan:', error)
-    return NextResponse.json(
-      { error: 'Failed to execute scheduled scan' },
-      { status: 500 }
-    )
+    return apiError(error, 'Failed to execute scheduled scan');
   }
 }
 

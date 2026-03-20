@@ -77,6 +77,7 @@ model Scan {
   @@index([imageId, status])
   @@index([imageId, startedAt])
   @@index([status, startedAt])
+  @@index([status, finishedAt])
   @@index([metadataId])
   @@index([tag])
   @@index([imageId, tag])
@@ -573,6 +574,7 @@ model AuditLog {
   @@index([userIp])
   @@index([timestamp])
   @@index([resource])
+  @@index([category, timestamp])
   @@map("audit_logs")
 }
 
@@ -628,6 +630,7 @@ model RepositoryImage {
   @@unique([repositoryId, namespace, imageName])
   @@index([repositoryId])
   @@index([imageId])
+  @@index([repositoryId, syncStatus])
   @@map("repository_images")
 }
 
@@ -682,6 +685,7 @@ model ScanVulnerabilityFinding {
   @@index([severity])
   @@index([packageName])
   @@index([scanId, cveId, source])
+  @@index([scanId, severity])
   @@map("scan_vulnerability_findings")
 }
 

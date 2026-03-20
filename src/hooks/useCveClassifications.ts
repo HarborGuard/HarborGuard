@@ -1,102 +1,190 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { CveClassification } from "@/types"
+import { useState, useEffect, useCallback } from "react";
 
-export function useCveClassifications(imageId: string) {
-  const [classifications, setClassifications] = useState<CveClassification[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+/**
+ * Shared hook for accessing CVE classifications.
+ *
+ * Always tries the consolidated endpoint first:
+ *   /api/images/name/{imageName}/cve-classifications
+ *
+ * Falls back to per-imageId if the consolidated endpoint returns 404:
+ *   /api/images/{imageId}/cve-classifications
+ *
+ * @param imageName  - The decoded image name (e.g. "library/nginx")
+ * @param scanDataOrImageId - Either scan data object with image.id, or a direct imageId string for fallback
+ */
+export function useCveClassifications(
+  imageName: string,
+  scanDataOrImageId?: any | string
+) {
+  const [consolidatedClassifications, setConsolidatedClassifications] =
+    useState<any[]>([]);
+  const [classificationsLoading, setClassificationsLoading] = useState(true);
 
-  // Fetch all classifications for the image
-  const fetchClassifications = async () => {
+  // Resolve the fallback imageId from either a scanData object or a direct string
+  const fallbackImageId =
+    typeof scanDataOrImageId === "string"
+      ? scanDataOrImageId
+      : scanDataOrImageId?.image?.id || undefined;
+
+  // Helper functions for classifications
+  const getClassification = useCallback(
+    (cveId: string) => {
+      return consolidatedClassifications.find((c) => {
+        // Check both direct cveId and nested structure
+        const directCveId = c.cveId;
+        const nestedCveId = c.imageVulnerability?.vulnerability?.cveId;
+        return directCveId === cveId || nestedCveId === cveId;
+      });
+    },
+    [consolidatedClassifications]
+  );
+
+  const isFalsePositive = useCallback(
+    (cveId: string) => {
+      const classification = getClassification(cveId);
+      return classification?.isFalsePositive ?? false;
+    },
+    [getClassification]
+  );
+
+  const getComment = useCallback(
+    (cveId: string) => {
+      const classification = getClassification(cveId);
+      return classification?.comment || undefined;
+    },
+    [getClassification]
+  );
+
+  const fetchConsolidatedClassifications = useCallback(async () => {
+    if (!imageName) return;
+
     try {
-      setLoading(true)
-      const response = await fetch(`/api/images/${imageId}/cve-classifications`)
-      if (!response.ok) {
-        throw new Error("Failed to fetch CVE classifications")
+      setClassificationsLoading(true);
+
+      // Always try the consolidated endpoint first
+      const response = await fetch(
+        `/api/images/name/${encodeURIComponent(
+          imageName
+        )}/cve-classifications`
+      );
+      if (response.ok) {
+        const consolidated = await response.json();
+        console.log(
+          `Loaded ${consolidated.length} consolidated CVE classifications for ${imageName}`
+        );
+        setConsolidatedClassifications(consolidated);
+        return;
       }
-      const data = await response.json()
-      setClassifications(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error")
+
+      // Only fall back to per-imageId if the consolidated endpoint returned 404
+      if (response.status === 404 && fallbackImageId) {
+        const fallbackResponse = await fetch(
+          `/api/images/${fallbackImageId}/cve-classifications`
+        );
+        if (fallbackResponse.ok) {
+          const classifications = await fallbackResponse.json();
+          console.log(
+            `Fallback: Loaded ${classifications.length} CVE classifications for image ${fallbackImageId}`
+          );
+          setConsolidatedClassifications(classifications);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching consolidated classifications:", error);
     } finally {
-      setLoading(false)
+      setClassificationsLoading(false);
     }
-  }
+  }, [imageName, fallbackImageId]);
 
-  // Save or update a classification
-  const saveClassification = async (
-    classification: Partial<CveClassification>
-  ): Promise<void> => {
-    const response = await fetch(`/api/images/${imageId}/cve-classifications`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(classification),
-    })
+  const saveClassification = useCallback(
+    async (classification: any) => {
+      try {
+        // Save to all tags of this image name using the consolidated endpoint
+        const response = await fetch(
+          `/api/images/name/${encodeURIComponent(
+            imageName
+          )}/cve-classifications`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(classification),
+          }
+        );
 
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || "Failed to save classification")
-    }
+        if (!response.ok && fallbackImageId) {
+          // Fallback: save to the specific image only
+          const fallbackResponse = await fetch(
+            `/api/images/${fallbackImageId}/cve-classifications`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(classification),
+            }
+          );
 
-    // Refresh the classifications
-    await fetchClassifications()
-  }
+          if (!fallbackResponse.ok) {
+            throw new Error("Failed to save classification");
+          }
+        }
 
-  // Delete a classification
-  const deleteClassification = async (cveId: string): Promise<void> => {
-    const response = await fetch(
-      `/api/images/${imageId}/cve-classifications/${encodeURIComponent(cveId)}`,
-      {
-        method: "DELETE",
+        // Refresh classifications
+        fetchConsolidatedClassifications();
+      } catch (error) {
+        console.error("Failed to save CVE classification:", error);
+        throw error;
       }
-    )
+    },
+    [imageName, fallbackImageId, fetchConsolidatedClassifications]
+  );
 
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || "Failed to delete classification")
-    }
+  const deleteClassification = useCallback(
+    async (cveId: string) => {
+      if (!fallbackImageId) {
+        console.error("Cannot delete classification: no imageId available");
+        return;
+      }
+      try {
+        const response = await fetch(
+          `/api/images/${fallbackImageId}/cve-classifications/${encodeURIComponent(cveId)}`,
+          {
+            method: "DELETE",
+          }
+        );
 
-    // Refresh the classifications
-    await fetchClassifications()
-  }
+        if (!response.ok) {
+          throw new Error("Failed to delete classification");
+        }
 
-  // Get classification for a specific CVE
-  const getClassification = (cveId: string): CveClassification | undefined => {
-    // TODO: Update to work with new schema where CVE ID is in imageVulnerability.vulnerability.cveId
-    return undefined
-  }
+        // Refresh classifications
+        fetchConsolidatedClassifications();
+      } catch (error) {
+        console.error("Failed to delete CVE classification:", error);
+        throw error;
+      }
+    },
+    [fallbackImageId, fetchConsolidatedClassifications]
+  );
 
-  // Check if a CVE is marked as false positive
-  const isFalsePositive = (cveId: string): boolean => {
-    const classification = getClassification(cveId)
-    return classification?.isFalsePositive ?? false
-  }
-
-  // Get comment for a CVE
-  const getComment = (cveId: string): string | undefined => {
-    const classification = getClassification(cveId)
-    return classification?.comment || undefined
-  }
-
+  // Fetch consolidated classifications when image name is available
   useEffect(() => {
-    if (imageId && imageId.trim() !== "") {
-      fetchClassifications()
+    if (imageName) {
+      fetchConsolidatedClassifications();
     }
-  }, [imageId])
+  }, [imageName, fetchConsolidatedClassifications]);
 
   return {
-    classifications,
-    loading,
-    error,
-    saveClassification,
-    deleteClassification,
+    consolidatedClassifications,
+    classificationsLoading,
+    // Legacy alias for backward compatibility
+    classifications: consolidatedClassifications,
+    loading: classificationsLoading,
     getClassification,
     isFalsePositive,
     getComment,
-    refetch: fetchClassifications,
-  }
+    saveClassification,
+    deleteClassification,
+    fetchConsolidatedClassifications,
+  };
 }

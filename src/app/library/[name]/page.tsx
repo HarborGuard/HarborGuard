@@ -13,10 +13,10 @@ import {
   IconSortDescending,
 } from "@tabler/icons-react";
 
-import { AppSidebar } from "@/components/app-sidebar";
-import { SiteHeader } from "@/components/site-header";
+import { AppSidebar } from "@/components/layout/app-sidebar";
+import { SiteHeader } from "@/components/layout/site-header";
 import { Button } from "@/components/ui/button";
-import { VulnerabilityUrlMenu } from "@/components/vulnerability-url-menu";
+import { VulnerabilityUrlMenu } from "@/components/shared/vulnerability-url-menu";
 import {
   Card,
   CardContent,
@@ -36,6 +36,8 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { useScans } from "@/hooks/useScans";
+import { getSeverityBadgeVariant, getSeverityWeight } from "@/lib/utils/severity-utils";
+import { getImageName, getImageTag } from "@/lib/utils/image-utils";
 
 interface LibraryVulnerability {
   id: string;
@@ -67,12 +69,12 @@ export default function LibraryDetailsPage() {
 
     scans.forEach((scan) => {
       // Handle both string and object formats for scan.image
-      const imageName = scan.imageName || 
-        (typeof scan.image === 'string' 
-          ? scan.image.split(":")[0] 
+      const imageName = scan.imageName ||
+        (typeof scan.image === 'string'
+          ? getImageName(scan.image)
           : (scan.image as any)?.name) || "unknown";
       const imageTag = typeof scan.image === 'string'
-        ? scan.image.split(":")[1] || "latest"
+        ? getImageTag(scan.image)
         : (scan.image as any)?.tag || "latest";
       const fullImageName = `${imageName}:${imageTag}`;
 
@@ -159,21 +161,8 @@ export default function LibraryDetailsPage() {
               const existing = vulnMap.get(cveId)!;
               const grypeSevertiy = match.vulnerability.severity?.toUpperCase() || "UNKNOWN";
               
-              // Helper to get severity priority
-              const getSeverityPriority = (sev: string) => {
-                const priorities: Record<string, number> = {
-                  CRITICAL: 5,
-                  HIGH: 4,
-                  MEDIUM: 3,
-                  LOW: 2,
-                  INFO: 1,
-                  UNKNOWN: 0
-                };
-                return priorities[sev] || 0;
-              };
-              
               // Update to highest severity
-              if (getSeverityPriority(grypeSevertiy) > getSeverityPriority(existing.severity)) {
+              if (getSeverityWeight(grypeSevertiy) > getSeverityWeight(existing.severity)) {
                 existing.severity = grypeSevertiy;
               }
               
@@ -227,22 +216,8 @@ export default function LibraryDetailsPage() {
 
       switch (sortField) {
         case "severity":
-          const severityWeight = (s: string) => {
-            switch (s.toLowerCase()) {
-              case "critical":
-                return 4;
-              case "high":
-                return 3;
-              case "medium":
-                return 2;
-              case "low":
-                return 1;
-              default:
-                return 0;
-            }
-          };
-          aValue = severityWeight(a.severity);
-          bValue = severityWeight(b.severity);
+          aValue = getSeverityWeight(a.severity);
+          bValue = getSeverityWeight(b.severity);
           break;
         case "cvss":
           aValue = a.cvss || 0;
@@ -277,21 +252,6 @@ export default function LibraryDetailsPage() {
     }
   };
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity.toLowerCase()) {
-      case "critical":
-        return "destructive";
-      case "high":
-        return "destructive";
-      case "medium":
-        return "secondary";
-      case "low":
-        return "outline";
-      default:
-        return "outline";
-    }
-  };
-
   const breadcrumbs = [
     { label: "Dashboard", href: "/" },
     { label: "Library", href: "/library" },
@@ -322,12 +282,12 @@ export default function LibraryDetailsPage() {
     const affectedImagesSet = new Set<string>();
     scans.forEach((scan) => {
       // Handle both string and object formats for scan.image
-      const imageName = scan.imageName || 
-        (typeof scan.image === 'string' 
-          ? scan.image.split(":")[0] 
+      const imageName = scan.imageName ||
+        (typeof scan.image === 'string'
+          ? getImageName(scan.image)
           : (scan.image as any)?.name) || "unknown";
       const imageTag = typeof scan.image === 'string'
-        ? scan.image.split(":")[1] || "latest"
+        ? getImageTag(scan.image)
         : (scan.image as any)?.tag || "latest";
       const fullImageName = `${imageName}:${imageTag}`;
 
@@ -543,7 +503,7 @@ export default function LibraryDetailsPage() {
                         <TableRow key={`${vuln.id}-${vuln.scanId}-${index}`}>
                           <TableCell>
                             <Badge
-                              variant={getSeverityColor(vuln.severity) as any}
+                              variant={getSeverityBadgeVariant(vuln.severity) as any}
                             >
                               {vuln.severity}
                             </Badge>

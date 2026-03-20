@@ -7,7 +7,7 @@ import {
   IconSearch,
   IconExternalLink,
 } from "@tabler/icons-react";
-import { VulnerabilityDetailsModal } from "@/components/vulnerability-details-modal";
+import { VulnerabilityDetailsModal } from "@/components/dialogs/vulnerability-details-modal";
 import {
   Card,
   CardContent,
@@ -29,207 +29,45 @@ import {
   StatsLoadingSkeleton,
   TableLoadingSkeleton,
 } from "@/components/ui/loading";
-
-interface VulnerabilityData {
-  cveId: string;
-  severity: string;
-  description?: string;
-  cvssScore?: number;
-  packageName?: string;
-  affectedImages: Array<{
-    imageName: string;
-    imageId: string;
-    isFalsePositive: boolean;
-  }>;
-  totalAffectedImages: number;
-  falsePositiveImages: string[];
-  fixedVersion?: string;
-  publishedDate?: string;
-  references?: string[];
-}
+import { getSeverityBadgeVariant } from "@/lib/utils/severity-utils";
+import { getImageName } from "@/lib/utils/image-utils";
+import { useVulnerabilityLibrary, VulnerabilityData } from "@/hooks/useVulnerabilityLibrary";
 
 export default function LibraryHomePage() {
   const router = useRouter();
 
-  const [vulnerabilities, setVulnerabilities] = React.useState<
-    VulnerabilityData[]
-  >([]);
-  const [loading, setLoading] = React.useState(true);
-  const [search, setSearch] = React.useState("");
-  const [severityFilter, setSeverityFilter] = React.useState<string>("");
-  const [sortField, setSortField] = React.useState<string>("severity");
-  const [sortOrder, setSortOrder] = React.useState<"asc" | "desc">("desc");
-  const [page, setPage] = React.useState(1);
-  const [pageSize, setPageSize] = React.useState(50);
-  const [pagination, setPagination] = React.useState({
-    total: 0,
-    limit: 50,
-    offset: 0,
-    hasMore: false,
-  });
-  
+  const {
+    vulnerabilities,
+    loading,
+    stats,
+    page,
+    pageSize,
+    totalPages,
+    pagination,
+    setPage,
+    sortField,
+    sortOrder,
+    handleSort,
+    search,
+    setSearch,
+    severityFilter,
+    setSeverityFilter,
+  } = useVulnerabilityLibrary();
+
   // Modal state
   const [selectedVulnerability, setSelectedVulnerability] = React.useState<VulnerabilityData | null>(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
-
-  // Fetch vulnerabilities from API
-  const fetchVulnerabilities = React.useCallback(async () => {
-    try {
-      setLoading(true);
-      const offset = (page - 1) * pageSize;
-      const params = new URLSearchParams({
-        limit: pageSize.toString(),
-        offset: offset.toString(),
-      });
-
-      if (search) params.append("search", search);
-      if (severityFilter) params.append("severity", severityFilter);
-
-      const response = await fetch(`/api/vulnerabilities?${params}`);
-      if (!response.ok) throw new Error("Failed to fetch vulnerabilities");
-
-      const data = await response.json();
-      setVulnerabilities(data.vulnerabilities);
-      setPagination(data.pagination);
-    } catch (error) {
-      console.error("Failed to fetch vulnerabilities:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [search, severityFilter, page, pageSize]);
-
-  // Reset to page 1 when search or filter changes
-  React.useEffect(() => {
-    setPage(1);
-  }, [search, severityFilter]);
-
-  React.useEffect(() => {
-    fetchVulnerabilities();
-  }, [fetchVulnerabilities]);
-
-  const sortedVulnerabilities = React.useMemo(() => {
-    return [...vulnerabilities].sort((a, b) => {
-      let aValue: any, bValue: any;
-
-      switch (sortField) {
-        case "cveId":
-          aValue = a.cveId;
-          bValue = b.cveId;
-          break;
-        case "severity":
-          const severityPriority = {
-            CRITICAL: 5,
-            HIGH: 4,
-            MEDIUM: 3,
-            LOW: 2,
-            INFO: 1,
-            UNKNOWN: 0,
-          };
-          aValue =
-            severityPriority[a.severity.toUpperCase() as keyof typeof severityPriority] || 0;
-          bValue =
-            severityPriority[b.severity.toUpperCase() as keyof typeof severityPriority] || 0;
-          break;
-        case "cvssScore":
-          aValue = a.cvssScore || 0;
-          bValue = b.cvssScore || 0;
-          break;
-        case "affectedImages":
-          aValue = a.totalAffectedImages;
-          bValue = b.totalAffectedImages;
-          break;
-        case "falsePositives":
-          aValue = a.falsePositiveImages.length;
-          bValue = b.falsePositiveImages.length;
-          break;
-        case "packageName":
-          aValue = a.packageName || "";
-          bValue = b.packageName || "";
-          break;
-        default:
-          return 0;
-      }
-
-      if (sortOrder === "asc") {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
-    });
-  }, [vulnerabilities, sortField, sortOrder]);
-
-  const handleSort = (field: string) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortOrder("desc");
-    }
-  };
-
-  const getSeverityColor = (
-    severity: string
-  ) => {
-    switch (severity.toUpperCase()) {
-      case "CRITICAL":
-        return "destructive";
-      case "HIGH":
-        return "destructive";
-      case "MEDIUM":
-        return "secondary";
-      case "LOW":
-        return "outline";
-      case "INFO":
-        return "outline";
-      default:
-        return "outline";
-    }
-  };
 
   const breadcrumbs = [
     { label: "Dashboard", href: "/" },
     { label: "Vulnerability Library" },
   ];
-  
+
   // Handle vulnerability click
   const handleVulnerabilityClick = (vuln: VulnerabilityData) => {
     setSelectedVulnerability(vuln);
     setIsModalOpen(true);
   };
-
-  // Calculate overall statistics
-  const stats = React.useMemo(() => {
-    const totalCves = vulnerabilities.length;
-    const criticalCves = vulnerabilities.filter(
-      (v) => v.severity.toUpperCase() === "CRITICAL"
-    ).length;
-    const highCves = vulnerabilities.filter(
-      (v) => v.severity.toUpperCase() === "HIGH"
-    ).length;
-    const fixableCves = vulnerabilities.filter((v) => v.fixedVersion).length;
-    const totalFalsePositives = vulnerabilities.reduce(
-      (sum, v) => sum + v.falsePositiveImages.length,
-      0
-    );
-    const cvesWithFalsePositives = vulnerabilities.filter(
-      (v) => v.falsePositiveImages.length > 0
-    ).length;
-    const highRiskCves = vulnerabilities.filter(
-      (v) => (v.cvssScore || 0) >= 7.0
-    ).length;
-
-    return {
-      totalCves,
-      criticalCves,
-      highCves,
-      fixableCves,
-      totalFalsePositives,
-      cvesWithFalsePositives,
-      highRiskCves,
-      fixablePercent:
-        totalCves > 0 ? Math.round((fixableCves / totalCves) * 100) : 0,
-    };
-  }, [vulnerabilities]);
 
   if (loading) {
     return (
@@ -379,7 +217,7 @@ export default function LibraryHomePage() {
 
                 {/* Table */}
                 <UnifiedTable
-                  data={sortedVulnerabilities}
+                  data={vulnerabilities}
                   columns={getLibraryTableColumns()}
                   features={{
                     sorting: false,
@@ -390,7 +228,7 @@ export default function LibraryHomePage() {
                   }}
                   serverPagination={{
                     currentPage: page,
-                    totalPages: pagination.total ? Math.ceil(pagination.total / pageSize) : 1,
+                    totalPages: totalPages,
                     pageSize: pageSize,
                     totalItems: pagination.total || 0,
                     onPageChange: (newPage) => setPage(newPage),
@@ -415,7 +253,7 @@ export default function LibraryHomePage() {
           </Card>
         </div>
       </div>
-      
+
       {/* Vulnerability Details Modal */}
       <VulnerabilityDetailsModal
         vulnerability={selectedVulnerability}
@@ -465,7 +303,7 @@ export default function LibraryHomePage() {
           onClick: (row: VulnerabilityData, value: any) => {
             const firstImage = row.affectedImages[0];
             if (firstImage) {
-              const imageName = firstImage.imageName.split(':')[0];
+              const imageName = getImageName(firstImage.imageName);
               router.push(`/images/${encodeURIComponent(imageName)}`);
             }
           },
@@ -482,7 +320,7 @@ export default function LibraryHomePage() {
           onClick: (row: VulnerabilityData, value: any) => {
             const firstFp = row.falsePositiveImages[0];
             if (firstFp) {
-              const imageName = firstFp.split(':')[0];
+              const imageName = getImageName(firstFp);
               router.push(`/images/${encodeURIComponent(imageName)}`);
             }
           },

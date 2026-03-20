@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { RegistryService } from '@/lib/registry/RegistryService'
+import { apiError } from '@/lib/api/api-utils'
 
 const registryService = new RegistryService(prisma)
 
@@ -12,8 +13,8 @@ export async function GET(
     const { id } = await params
     const { searchParams } = new URL(request.url)
     
-    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!, 10) : undefined
-    const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!, 10) : undefined
+    const limit = searchParams.get('limit') ? Math.max(1, Math.min(parseInt(searchParams.get('limit')!, 10) || 25, 100)) : undefined
+    const offset = searchParams.get('offset') ? Math.max(0, parseInt(searchParams.get('offset')!, 10) || 0) : undefined
     const namespace = searchParams.get('namespace') || undefined
     const query = searchParams.get('query') || undefined
     const forceRefresh = searchParams.get('forceRefresh') === 'true'
@@ -28,12 +29,7 @@ export async function GET(
 
     return NextResponse.json(images)
   } catch (error) {
-    console.error('Failed to fetch repository images:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch repository images'
-    
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: error instanceof Error && error.message.includes('not found') ? 404 : 500 }
-    )
+    const status = error instanceof Error && error.message.includes('not found') ? 404 : 500;
+    return apiError(error, 'Failed to fetch repository images', status);
   }
 }

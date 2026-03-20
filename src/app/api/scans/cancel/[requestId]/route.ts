@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { scannerService } from '@/lib/scanner'
+import { apiError } from '@/lib/api/api-utils'
 
 export async function POST(
   request: NextRequest,
@@ -23,10 +24,6 @@ export async function POST(
     })
     
   } catch (error) {
-    console.error('Error cancelling scan:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return apiError(error, 'Error cancelling scan');
   }
 }

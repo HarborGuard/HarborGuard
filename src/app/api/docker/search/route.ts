@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { apiError } from '@/lib/api/api-utils'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -19,7 +20,8 @@ export async function GET(request: NextRequest) {
     })
 
     if (!response.ok) {
-      throw new Error(`Docker Hub API error: ${response.status}`)
+      console.error(`Docker Hub API error: ${response.status}`);
+      return NextResponse.json({ error: 'Docker not available', results: [] }, { status: 503 });
     }
 
     const data = await response.json()
@@ -39,10 +41,6 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Docker Hub search error:', error)
-    return NextResponse.json(
-      { error: 'Failed to search Docker Hub', results: [] },
-      { status: 500 }
-    )
+    return apiError(error, 'Failed to search Docker Hub');
   }
 }

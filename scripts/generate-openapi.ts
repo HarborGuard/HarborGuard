@@ -6,7 +6,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { generateDynamicOpenApiSpec } from '../src/lib/openapi-dynamic';
+import { generateDynamicOpenApiSpec } from '../src/lib/api/openapi-dynamic';
 
 async function generateStaticSpec() {
   try {

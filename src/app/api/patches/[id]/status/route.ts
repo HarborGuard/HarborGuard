@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { serializeForJson } from '@/lib/type-utils';
+import { serializeForJson } from '@/lib/utils/type-utils';
+import { apiError } from '@/lib/api/api-utils';
 
 export async function GET(
   request: NextRequest,
@@ -45,10 +46,6 @@ export async function GET(
     }));
 
   } catch (error) {
-    console.error('Failed to fetch patch operation status:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch patch operation status' },
-      { status: 500 }
-    );
+    return apiError(error, 'Failed to fetch patch operation status');
   }
 }

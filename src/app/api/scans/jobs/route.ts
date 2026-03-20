@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { scannerService } from '@/lib/scanner'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { apiError } from '@/lib/api/api-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -65,9 +66,6 @@ export async function GET(request: NextRequest) {
     
   } catch (error) {
     logger.error('Error getting scan jobs:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return apiError(error, 'Failed to get scan jobs')
   }
 }

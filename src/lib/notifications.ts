@@ -5,6 +5,7 @@
 
 import { config } from './config';
 import { logger } from './logger';
+import { getSeverityHashColor } from './utils/severity-utils';
 
 interface NotificationPayload {
   title: string;
@@ -210,14 +211,7 @@ export class NotificationService {
    * Get color for severity level
    */
   private getSeverityColor(severity: string): string {
-    switch (severity) {
-      case 'critical': return '#FF0000';  // Red
-      case 'high': return '#FF8C00';      // Dark Orange
-      case 'medium': return '#FFD700';    // Gold
-      case 'low': return '#32CD32';       // Lime Green
-      case 'info': return '#1E90FF';      // Dodger Blue
-      default: return '#808080';          // Gray
-    }
+    return getSeverityHashColor(severity);
   }
 
   /**

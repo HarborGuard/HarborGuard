@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Home, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';

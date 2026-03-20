@@ -4,12 +4,14 @@ import { UnifiedTable } from "@/components/table/unified-table";
 import { ColumnDefinition, ContextMenuItem } from "@/components/table/types";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { useScanning } from "@/providers/ScanningProvider";
-import { DeleteImageDialog } from "@/components/delete-image-dialog";
+import { useScanning } from "@/contexts/ScanningContext";
+import { DeleteImageDialog } from "@/components/dialogs/delete-image-dialog";
 import { IconRefresh, IconTrash } from "@tabler/icons-react";
 import * as React from "react";
 import { useScans } from "@/hooks/useScans";
 import { useApp } from "@/contexts/AppContext";
+import { getImageName } from "@/lib/utils/image-utils";
+import { groupScansByImage } from "@/lib/utils/scan-table-utils";
 import { FullPageLoading } from "@/components/ui/loading";
 import { Button } from "@/components/ui/button";
 
@@ -107,7 +109,7 @@ export default function ImageRepositoryPage() {
         type: 'multi-text',
         sortable: true,
         accessorFn: (row: any) => ({
-          primary: row.imageName || row.image.split(':')[0],
+          primary: row.imageName || getImageName(row.image),
           secondary: row._tagCount > 1 ? `${row._tagCount} tags: ${row._allTags}` : undefined
         })
       },
@@ -151,58 +153,7 @@ export default function ImageRepositoryPage() {
   }
 
   function processScansForTable(scans: any[]) {
-    const grouped = new Map<string, any[]>()
-
-    scans.forEach(item => {
-      const imageName = typeof item.image === 'string'
-        ? item.image.split(':')[0]
-        : item.imageName
-      if (!grouped.has(imageName)) {
-        grouped.set(imageName, [])
-      }
-      grouped.get(imageName)!.push(item)
-    })
-
-    return Array.from(grouped.entries()).map(([imageName, items]) => {
-      const baseItem = items.reduce((latest, current) =>
-        new Date(current.lastScan) > new Date(latest.lastScan) ? current : latest
-      )
-
-      const aggregatedSeverities = baseItem.severities
-      const totalVulns = items.reduce((sum, item) =>
-        sum + item.severities.crit + item.severities.high + item.severities.med + item.severities.low, 0
-      )
-      const weightedRiskScore = totalVulns > 0
-        ? Math.round(items.reduce((sum, item) => {
-            const itemTotal = item.severities.crit + item.severities.high + item.severities.med + item.severities.low
-            return sum + (item.riskScore * itemTotal)
-          }, 0) / totalVulns)
-        : baseItem.riskScore
-
-      return {
-        ...baseItem,
-        imageName,
-        severities: aggregatedSeverities,
-        riskScore: weightedRiskScore,
-        misconfigs: items.reduce((sum, item) => sum + item.misconfigs, 0),
-        secrets: items.reduce((sum, item) => sum + item.secrets, 0),
-        lastScan: items.reduce((latest, current) =>
-          new Date(current.lastScan) > new Date(latest) ? current.lastScan : latest
-        , baseItem.lastScan),
-        _tagCount: [...new Set(items.map(item => {
-          const tag = typeof item.image === 'string'
-            ? item.image.split(':')[1] || 'latest'
-            : 'latest'
-          return tag
-        }))].length,
-        _allTags: [...new Set(items.map(item => {
-          const tag = typeof item.image === 'string'
-            ? item.image.split(':')[1] || 'latest'
-            : 'latest'
-          return tag
-        }))].join(', '),
-      }
-    })
+    return groupScansByImage(scans);
   }
 
   function handleRowClick(row: any) {

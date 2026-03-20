@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { getSeverityScore } from '@/lib/utils/severity-utils';
 
 /**
  * Recalculate image risk scores based on vulnerabilities and CVE classifications
@@ -102,17 +103,5 @@ export async function recalculateImageRiskScores(imageId: string): Promise<void>
   } catch (error) {
     console.error('Error recalculating image risk scores:', error);
     throw error;
-  }
-}
-
-// Helper function to get numeric score for severity levels
-function getSeverityScore(severity: string): number {
-  switch (severity?.toLowerCase()) {
-    case 'critical': return 90;
-    case 'high': return 70;
-    case 'medium': return 50;
-    case 'low': return 30;
-    case 'info': return 10;
-    default: return 0;
   }
 }

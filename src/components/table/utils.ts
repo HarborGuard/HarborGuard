@@ -1,6 +1,7 @@
 import { ColumnDef } from "@tanstack/react-table"
 import { ColumnDefinition, CellRenderer } from "./types"
 import { flexRender } from "@tanstack/react-table"
+import { getSeverityBadgeVariant } from "@/lib/utils/severity-utils"
 
 export function createColumnDef<T>(
   column: ColumnDefinition<T>,
@@ -69,21 +70,7 @@ export function formatRelativeTime(date: string | Date): string {
 }
 
 export function getSeverityVariant(severity: string): string {
-  const normalizedSeverity = severity.toLowerCase()
-  switch (normalizedSeverity) {
-    case 'critical':
-    case 'crit':
-    case 'high':
-      return 'destructive'
-    case 'medium':
-    case 'med':
-      return 'secondary'
-    case 'low':
-    case 'info':
-      return 'outline'
-    default:
-      return 'default'
-  }
+  return getSeverityBadgeVariant(severity)
 }
 
 export function getRiskScoreVariant(score: number): string {

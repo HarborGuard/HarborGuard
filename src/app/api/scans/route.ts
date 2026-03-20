@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { prismaToScanWithImage, serializeScan } from '@/lib/type-utils'
+import { prismaToScanWithImage, serializeForJson } from '@/lib/utils/type-utils'
+import { apiError } from '@/lib/api/api-utils'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const imageId = searchParams.get('imageId')
-    const limit = Math.min(parseInt(searchParams.get('limit') || '25'), 100) // Cap at 100
-    const offset = parseInt(searchParams.get('offset') || '0')
+    const limit = Math.max(1, Math.min(parseInt(searchParams.get('limit') || '25') || 25, 100)) // Cap at 100
+    const offset = Math.max(0, parseInt(searchParams.get('offset') || '0') || 0)
     const includeReports = searchParams.get('includeReports') === 'true'
     const fields = searchParams.get('fields')?.split(',').filter(Boolean) // Support ?fields=id,status,vulnerabilityCount
     
@@ -230,7 +231,7 @@ export async function GET(request: NextRequest) {
     });
     
     return NextResponse.json({
-      scans: serializeScan(scansData),
+      scans: serializeForJson(scansData),
       pagination: {
         total,
         limit,
@@ -239,10 +240,6 @@ export async function GET(request: NextRequest) {
       }
     })
   } catch (error) {
-    console.error('Error retrieving scans:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return apiError(error, 'Error retrieving scans');
   }
 }

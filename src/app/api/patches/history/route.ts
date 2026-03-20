@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { apiError } from '@/lib/api/api-utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -82,10 +83,6 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Failed to fetch patch history:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch patch history' },
-      { status: 500 }
-    );
+    return apiError(error, 'Failed to fetch patch history');
   }
 }

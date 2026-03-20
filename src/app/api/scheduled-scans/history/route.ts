@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { apiError } from '@/lib/api/api-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,8 +8,8 @@ export async function GET(request: NextRequest) {
     const scheduledScanId = searchParams.get('scheduledScanId')
     const status = searchParams.get('status')
     const triggerSource = searchParams.get('triggerSource')
-    const limit = Math.min(parseInt(searchParams.get('limit') || '25'), 100)
-    const offset = parseInt(searchParams.get('offset') || '0')
+    const limit = Math.max(1, Math.min(parseInt(searchParams.get('limit') || '25') || 25, 100))
+    const offset = Math.max(0, parseInt(searchParams.get('offset') || '0') || 0)
 
     const where: any = {}
 
@@ -118,10 +119,6 @@ export async function GET(request: NextRequest) {
       }
     })
   } catch (error) {
-    console.error('Error fetching scheduled scan history:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch scheduled scan history' },
-      { status: 500 }
-    )
+    return apiError(error, 'Failed to fetch scheduled scan history');
   }
 }

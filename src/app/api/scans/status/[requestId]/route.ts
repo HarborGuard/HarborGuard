@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { scannerService } from '@/lib/scanner'
+import { apiError } from '@/lib/api/api-utils'
 
 export async function GET(
   request: NextRequest,
@@ -28,10 +29,6 @@ export async function GET(
     })
     
   } catch (error) {
-    console.error('Error getting scan status:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return apiError(error, 'Error getting scan status');
   }
 }
