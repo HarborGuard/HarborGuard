@@ -116,6 +116,12 @@ export interface NexusConfig extends RegistryConfig {
   skipTlsVerify?: boolean;
 }
 
+export interface ACRConfig extends RegistryConfig {
+  registryName: string;
+  authMethod: 'admin' | 'servicePrincipal';
+  tenantId?: string;
+}
+
 export interface CacheEntry<T = any> {
   data: T;
   cachedAt: Date;
