@@ -1,7 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useReducer, useCallback, useRef } from 'react';
-import { SSEClient, ConnectionStatus, ScanProgressEvent } from '@/lib/sse-client';
+import { SSEClient, ScanProgressEvent } from '@/lib/sse-client';
 
 export interface ScanJob {
   requestId: string;
