@@ -29,6 +29,7 @@ import {
   StatsLoadingSkeleton,
   TableLoadingSkeleton,
 } from "@/components/ui/loading";
+import { getSeverityBadgeVariant } from "@/lib/severity-utils";
 
 interface VulnerabilityData {
   cveId: string;
