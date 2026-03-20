@@ -45,7 +45,9 @@ next-env.d.ts
 
 /src/generated/prisma
 /.claude
-/docs
+/docs/*
+!/docs/ADDING-A-REGISTRY.md
+!/docs/ADDING-A-SCANNER.md
 
 # Speckit
 /.specify
