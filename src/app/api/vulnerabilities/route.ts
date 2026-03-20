@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getSeverityWeight } from '@/lib/severity-utils';
+import { apiError } from '@/lib/api-utils';
 
 interface VulnerabilityData {
   cveId: string;
@@ -18,19 +20,6 @@ interface VulnerabilityData {
   publishedDate?: string;
   references?: string[];
 }
-
-// Helper function to get severity priority (higher number = higher severity)
-const getSeverityPriority = (severity: string) => {
-  const priority: { [key: string]: number } = {
-    'CRITICAL': 5,
-    'HIGH': 4,
-    'MEDIUM': 3,
-    'LOW': 2,
-    'INFO': 1,
-    'UNKNOWN': 0
-  };
-  return priority[severity] || 0;
-};
 
 // Severity order for SQL sorting (maps to numeric priority)
 const SEVERITY_ORDER = `
@@ -333,10 +322,6 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Failed to fetch vulnerabilities:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch vulnerabilities' },
-      { status: 500 }
-    );
+    return apiError(error, 'Failed to fetch vulnerabilities');
   }
 }

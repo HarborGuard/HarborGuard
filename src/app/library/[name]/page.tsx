@@ -161,21 +161,8 @@ export default function LibraryDetailsPage() {
               const existing = vulnMap.get(cveId)!;
               const grypeSevertiy = match.vulnerability.severity?.toUpperCase() || "UNKNOWN";
               
-              // Helper to get severity priority
-              const getSeverityPriority = (sev: string) => {
-                const priorities: Record<string, number> = {
-                  CRITICAL: 5,
-                  HIGH: 4,
-                  MEDIUM: 3,
-                  LOW: 2,
-                  INFO: 1,
-                  UNKNOWN: 0
-                };
-                return priorities[sev] || 0;
-              };
-              
               // Update to highest severity
-              if (getSeverityPriority(grypeSevertiy) > getSeverityPriority(existing.severity)) {
+              if (getSeverityWeight(grypeSevertiy) > getSeverityWeight(existing.severity)) {
                 existing.severity = grypeSevertiy;
               }
               
