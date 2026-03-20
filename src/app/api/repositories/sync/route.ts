@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { RegistrySyncService } from '@/lib/registry/sync/RegistrySyncService';
+import { apiError } from '@/lib/api-utils';
 
 // Create a singleton instance
 let syncService: RegistrySyncService | null = null;
@@ -82,11 +83,7 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   } catch (error) {
-    console.error('Sync operation failed:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Sync operation failed' },
-      { status: 500 }
-    );
+    return apiError(error, 'Sync operation failed');
   }
 }
 
@@ -119,10 +116,6 @@ export async function GET(request: NextRequest) {
       });
     }
   } catch (error) {
-    console.error('Failed to get sync status:', error);
-    return NextResponse.json(
-      { error: 'Failed to get sync status' },
-      { status: 500 }
-    );
+    return apiError(error, 'Failed to get sync status');
   }
 }

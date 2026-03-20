@@ -51,6 +51,7 @@ import { CveClassificationDialog } from "@/components/cve-classification-dialog"
 import { VulnerabilityDetailModal } from "./VulnerabilityDetailModal";
 import { PackageDetailModal } from "./PackageDetailModal";
 import { formatLicense } from "@/lib/format-utils";
+import { getSeverityCssClass } from "@/lib/severity-utils";
 
 interface ScanDetailsNormalizedProps {
   scanId: string;
@@ -221,15 +222,8 @@ export function ScanDetailsNormalized({
   };
 
   const getSeverityBadge = (severity: string) => {
-    const colors: Record<string, string> = {
-      CRITICAL: 'bg-red-500',
-      HIGH: 'bg-orange-500',
-      MEDIUM: 'bg-yellow-500',
-      LOW: 'bg-blue-500',
-      INFO: 'bg-gray-500'
-    };
     return (
-      <Badge className={`${colors[severity] || 'bg-gray-500'} text-white`}>
+      <Badge className={`${getSeverityCssClass(severity)} text-white`}>
         {severity}
       </Badge>
     );

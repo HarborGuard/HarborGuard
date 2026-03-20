@@ -12,13 +12,6 @@ export async function GET() {
       swarm: swarmInfo,
     });
   } catch (error) {
-    console.error('Failed to check Docker access:', error);
-    return NextResponse.json(
-      {
-        hasAccess: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
+    return apiError(error, 'Failed to check Docker access');
   }
 }

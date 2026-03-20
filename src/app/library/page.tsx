@@ -448,7 +448,7 @@ export default function LibraryHomePage() {
           onClick: (row: VulnerabilityData, value: any) => {
             const firstImage = row.affectedImages[0];
             if (firstImage) {
-              const imageName = firstImage.imageName.split(':')[0];
+              const imageName = getImageName(firstImage.imageName);
               router.push(`/images/${encodeURIComponent(imageName)}`);
             }
           },
@@ -465,7 +465,7 @@ export default function LibraryHomePage() {
           onClick: (row: VulnerabilityData, value: any) => {
             const firstFp = row.falsePositiveImages[0];
             if (firstFp) {
-              const imageName = firstFp.split(':')[0];
+              const imageName = getImageName(firstFp);
               router.push(`/images/${encodeURIComponent(imageName)}`);
             }
           },

@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { copyToClipboard } from '@/lib/clipboard';
 import { useSwarmServices } from '@/hooks/useSwarmServices';
 import type { SwarmService } from '@/types';
 
@@ -34,7 +35,7 @@ export function SwarmServicesList({
   const copyImageName = (service: SwarmService, e: React.MouseEvent) => {
     e.stopPropagation();
     const fullName = `${service.image}:${service.imageTag}`;
-    navigator.clipboard.writeText(fullName);
+    copyToClipboard(fullName, 'Image name');
     setCopiedId(service.id);
     setTimeout(() => setCopiedId(null), 2000);
   };
