@@ -5,6 +5,7 @@ import {
   IconBrandDocker,
   IconBrandGithub,
   IconDeviceDesktop,
+  IconHexagonLetterK,
   IconLink,
   IconGitBranch,
   IconStack2,
@@ -38,10 +39,12 @@ import {
   CustomRegistryTab,
   LocalImagesTab,
   SwarmServicesTab,
+  KubernetesTab,
   PrivateRepositoriesTab,
   ExistingImagesSection,
 } from "@/components/scan-sources"
 import type { DockerImage, SwarmService } from "@/types"
+import type { KubeImage } from "@/lib/kubernetes/types"
 
 
 interface NewScanModalProps {
@@ -65,6 +68,7 @@ export function NewScanModal({ children }: NewScanModalProps) {
   const [selectedDockerImage, setSelectedDockerImage] = React.useState<DockerImage | null>(null)
   const [selectedExistingImage, setSelectedExistingImage] = React.useState<{source: string, name: string} | null>(null)
   const [selectedSwarmService, setSelectedSwarmService] = React.useState<SwarmService | null>(null)
+  const [selectedKubeImage, setSelectedKubeImage] = React.useState<KubeImage | null>(null)
   const [scanAllLocalImages, setScanAllLocalImages] = React.useState(false)
 
   const { isLoading, setIsLoading, showProgress, scanProgress, handleStartScan } = useScanExecution(
@@ -77,6 +81,7 @@ export function NewScanModal({ children }: NewScanModalProps) {
       selectedDockerImage,
       selectedExistingImage,
       selectedSwarmService,
+      selectedKubeImage,
       scanAllLocalImages,
       selectedRepository: scanSources.selectedRepository,
       selectedImages: scanSources.selectedImages,
@@ -91,6 +96,7 @@ export function NewScanModal({ children }: NewScanModalProps) {
       setCustomRegistry,
       setSelectedDockerImage,
       setSelectedSwarmService,
+      setSelectedKubeImage,
       setSearchQuery,
       setScanAllLocalImages,
       setLocalImageCount: scanSources.setLocalImageCount,
@@ -145,6 +151,7 @@ export function NewScanModal({ children }: NewScanModalProps) {
     (selectedSource === 'custom' && !customRegistry) ||
     (selectedSource === 'existing' && !imageUrl) ||
     (selectedSource === 'swarm' && !selectedSwarmService) ||
+    (selectedSource === 'kubernetes' && !selectedKubeImage) ||
     (selectedSource === 'private' && (!scanSources.selectedRepository || !scanSources.selectedImages[scanSources.selectedRepository?.id] || !scanSources.selectedTags[scanSources.selectedRepository?.id]))
 
   const scanButtonLabel = isLoading
@@ -183,7 +190,7 @@ export function NewScanModal({ children }: NewScanModalProps) {
             <h3 className="text-lg font-semibold">Scan New Image</h3>
 
             <Tabs value={selectedSource} onValueChange={setSelectedSource}>
-              <TabsList className={`grid w-full ${dockerInfo?.hasAccess && isSwarmMode ? 'grid-cols-6' : dockerInfo?.hasAccess ? 'grid-cols-5' : 'grid-cols-4'}`}>
+              <TabsList className={`grid w-full ${dockerInfo?.hasAccess && isSwarmMode ? 'grid-cols-7' : dockerInfo?.hasAccess ? 'grid-cols-6' : 'grid-cols-5'}`}>
                 <TabsTrigger value="dockerhub" className="flex items-center gap-1">
                   <IconBrandDocker className="h-4 w-4" />
                   <span className="hidden sm:inline">Docker Hub</span>
@@ -204,6 +211,10 @@ export function NewScanModal({ children }: NewScanModalProps) {
                     <span className="hidden sm:inline">Swarm</span>
                   </TabsTrigger>
                 )}
+                <TabsTrigger value="kubernetes" className="flex items-center gap-1">
+                  <IconHexagonLetterK className="h-4 w-4" />
+                  <span className="hidden sm:inline">K8s</span>
+                </TabsTrigger>
                 <TabsTrigger value="custom" className="flex items-center gap-1">
                   <IconLink className="h-4 w-4" />
                   <span className="hidden sm:inline">Custom</span>
@@ -238,6 +249,12 @@ export function NewScanModal({ children }: NewScanModalProps) {
                   isLoading={isLoading}
                 />
               )}
+
+              <KubernetesTab
+                selectedKubeImage={selectedKubeImage}
+                setSelectedKubeImage={setSelectedKubeImage}
+                isLoading={isLoading}
+              />
 
               <PrivateRepositoriesTab
                 repositories={scanSources.repositories}
