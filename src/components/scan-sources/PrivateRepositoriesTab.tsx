@@ -1,5 +1,6 @@
 "use client"
 
+import React from "react"
 import {
   IconBrandDocker,
   IconBrandGithub,
@@ -7,6 +8,7 @@ import {
   IconGitBranch,
 } from "@tabler/icons-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -58,6 +60,8 @@ export function PrivateRepositoriesTab({
 }: PrivateRepositoriesTabProps) {
   const { addScanJob } = useScanning()
   const { refreshData } = useApp()
+  const [manualImageRefs, setManualImageRefs] = React.useState<Record<string, string>>({})
+  const [manualScanLoading, setManualScanLoading] = React.useState<Record<string, boolean>>({})
 
   const handleScanAllImages = async (repo: Repository) => {
     setIsLoading(true)
@@ -202,6 +206,73 @@ export function PrivateRepositoriesTab({
     }
   }
 
+  const handleManualImageScan = async (repo: Repository) => {
+    const ref = (manualImageRefs[repo.id] || '').trim()
+    if (!ref) {
+      toast.error('Please enter an image reference')
+      return
+    }
+
+    // Parse image:tag from the manual input
+    let imageName: string
+    let imageTag: string
+    const colonIdx = ref.lastIndexOf(':')
+    if (colonIdx > 0 && !ref.substring(colonIdx).includes('/')) {
+      imageName = ref.substring(0, colonIdx)
+      imageTag = ref.substring(colonIdx + 1)
+    } else {
+      imageName = ref
+      imageTag = 'latest'
+    }
+
+    setManualScanLoading(prev => ({ ...prev, [repo.id]: true }))
+    try {
+      const response = await fetch('/api/scans/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scans: [{
+            image: imageName,
+            tag: imageTag,
+            source: 'registry',
+            repositoryId: repo.id
+          }]
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        toast.error(`Failed to start scan: ${errorData.error || 'Unknown error'}`)
+        return
+      }
+
+      const batchResult = await response.json()
+      const result = batchResult.results?.[0]
+
+      if (result?.success) {
+        addScanJob({
+          requestId: result.requestId,
+          scanId: result.scanId || '',
+          imageId: result.imageId || '',
+          imageName: `${imageName}:${imageTag}`,
+          status: 'RUNNING' as const,
+          progress: 0
+        })
+        toast.success(`Scan started for ${imageName}:${imageTag}`)
+        setManualImageRefs(prev => ({ ...prev, [repo.id]: '' }))
+        setIsOpen(false)
+        await refreshData()
+      } else {
+        toast.error(`Failed to start scan: ${result?.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Failed to start manual scan:', error)
+      toast.error('Failed to start scan')
+    } finally {
+      setManualScanLoading(prev => ({ ...prev, [repo.id]: false }))
+    }
+  }
+
   return (
     <TabsContent value="private" className="space-y-3">
       {repositories.length === 0 ? (
@@ -323,7 +394,34 @@ export function PrivateRepositoriesTab({
                     )}
 
                     {repositoryImages[repo.id] && repositoryImages[repo.id].length === 0 && (
-                      <div className="text-sm text-muted-foreground">No images found</div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">
+                            Catalog unavailable. Enter image reference manually:
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              placeholder="namespace/image:tag"
+                              value={manualImageRefs[repo.id] || ''}
+                              onChange={(e) => setManualImageRefs(prev => ({
+                                ...prev,
+                                [repo.id]: e.target.value
+                              }))}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleManualImageScan(repo)
+                              }}
+                              className="w-[250px] h-8 text-sm"
+                            />
+                            <Button
+                              size="sm"
+                              onClick={() => handleManualImageScan(repo)}
+                              disabled={manualScanLoading[repo.id] || !(manualImageRefs[repo.id] || '').trim()}
+                            >
+                              {manualScanLoading[repo.id] ? 'Scanning...' : 'Scan'}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
