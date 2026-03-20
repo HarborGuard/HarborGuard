@@ -73,7 +73,7 @@ export function RegistryConfigForm({
         </div>
       )}
 
-      {(config.type === 'generic' || config.type === 'gitlab' || config.type === 'nexus') && (
+      {(config.type === 'generic' || config.type === 'gitlab' || config.type === 'nexus' || config.type === 'gitea') && (
         <>
           <div className="space-y-2">
             <Label htmlFor="registryUrl">Registry URL</Label>
@@ -226,6 +226,7 @@ export function RegistryConfigForm({
                config.type === 'ghcr' ? 'GitHub Username' :
                config.type === 'gitlab' ? 'GitLab Username' :
                config.type === 'nexus' ? 'Nexus Username' :
+               config.type === 'gitea' ? 'Username' :
                config.type === 'acr' ? 'Username' : 'Username'}
             </Label>
             <Input
@@ -245,6 +246,7 @@ export function RegistryConfigForm({
                config.type === 'ghcr' ? 'GitHub Personal Access Token' :
                config.type === 'gitlab' ? 'GitLab Password' :
                config.type === 'nexus' ? 'Nexus Password' :
+               config.type === 'gitea' ? 'Personal Access Token' :
                config.type === 'acr' ? 'Password' : 'Password/Token'}
             </Label>
             <Input
@@ -257,6 +259,7 @@ export function RegistryConfigForm({
                 config.type === 'ghcr' ? 'Enter GitHub PAT with packages:read scope' :
                 config.type === 'gitlab' ? 'Enter GitLab admin password' :
                 config.type === 'nexus' ? 'Enter Nexus password' :
+                config.type === 'gitea' ? 'Enter Gitea/Forgejo PAT with package:read scope' :
                 config.type === 'acr' ? 'Admin password or service principal client secret' :
                 'Enter password or token'
               }
@@ -274,6 +277,21 @@ export function RegistryConfigForm({
             onChange={(e) => onConfigChange(prev => ({ ...prev, organization: e.target.value }))}
             placeholder="Enter organization name for org packages"
           />
+        </div>
+      )}
+
+      {config.type === 'gitea' && (
+        <div className="space-y-2">
+          <Label htmlFor="organization">Package Owner <span className="text-red-500">*</span></Label>
+          <Input
+            id="organization"
+            value={config.organization}
+            onChange={(e) => onConfigChange(prev => ({ ...prev, organization: e.target.value }))}
+            placeholder="Enter Gitea user or organization name"
+          />
+          <p className="text-xs text-muted-foreground">
+            The Gitea/Forgejo user or organization that owns the container packages.
+          </p>
         </div>
       )}
 

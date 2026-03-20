@@ -2,9 +2,9 @@
 
 import React from "react"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { IconBrandDocker, IconBrandGithub, IconBrandGitlab, IconServer, IconPackage, IconCloud, IconBrandGoogle } from "@tabler/icons-react"
+import { IconBrandDocker, IconBrandGithub, IconBrandGitlab, IconServer, IconPackage, IconCloud, IconBrandGoogle, IconBrandGit } from "@tabler/icons-react"
 
-type RepositoryType = 'dockerhub' | 'ghcr' | 'gitlab' | 'generic' | 'nexus' | 'acr' | 'gcr'
+type RepositoryType = 'dockerhub' | 'ghcr' | 'gitlab' | 'generic' | 'nexus' | 'acr' | 'gcr' | 'gitea'
 
 interface RegistryTypeSelectorProps {
   onTypeSelect: (type: RepositoryType) => void;
@@ -30,6 +30,13 @@ const repositoryTypes = [
     title: 'GitLab Container Registry',
     description: 'Connect to GitLab Container Registry with JWT authentication',
     icon: <IconBrandGitlab className="h-8 w-8" />,
+    registryUrl: '',
+  },
+  {
+    type: 'gitea' as const,
+    title: 'Gitea / Forgejo',
+    description: 'Connect to Gitea or Forgejo container registry',
+    icon: <IconBrandGit className="h-8 w-8" />,
     registryUrl: '',
   },
   {
