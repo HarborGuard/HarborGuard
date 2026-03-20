@@ -9,13 +9,9 @@ import { prisma } from '@/lib/prisma';
 import type { ScanReports, AggregatedData } from './types';
 import type { VulnerabilityCount } from '@/types';
 import {
-  mapSeverity,
-  mapOsvSeverity,
-  extractOsvScore,
-  mapDockleCategory,
-  mapDockleSeverity,
   getHighestSeverity,
 } from './severity-mappers';
+import { ScannerAdapterRegistry } from './adapters';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -207,241 +203,78 @@ export async function calculateAggregatedData(
 // ---------------------------------------------------------------------------
 
 async function populateVulnerabilityFindings(scanId: string, reports: ScanReports): Promise<void> {
-  const findings: any[] = [];
+  const allFindings: any[] = [];
 
-  // Process Trivy results
-  if (reports.trivy?.Results) {
-    for (const result of reports.trivy.Results) {
-      if (result.Vulnerabilities) {
-        for (const vuln of result.Vulnerabilities) {
-          findings.push({
-            scanId,
-            source: 'trivy',
-            cveId: vuln.VulnerabilityID || vuln.PkgID,
-            packageName: vuln.PkgName || vuln.PkgID,
-            installedVersion: vuln.InstalledVersion || null,
-            fixedVersion: vuln.FixedVersion || null,
-            severity: mapSeverity(vuln.Severity),
-            cvssScore: vuln.CVSS?.nvd?.V3Score || vuln.CVSS?.redhat?.V3Score || null,
-            dataSource: vuln.DataSource?.Name || null,
-            vulnerabilityUrl: vuln.PrimaryURL || null,
-            title: vuln.Title || null,
-            description: vuln.Description || null,
-            publishedDate: vuln.PublishedDate ? new Date(vuln.PublishedDate) : null,
-            lastModified: vuln.LastModifiedDate ? new Date(vuln.LastModifiedDate) : null,
-            filePath: result.Target || null,
-            packageType: result.Type || null,
-            rawFinding: vuln
-          });
-        }
-      }
+  for (const [name, report] of Object.entries(reports)) {
+    if (!report) continue;
+    const adapter = ScannerAdapterRegistry.get(name);
+    if (adapter) {
+      const findings = adapter.extractVulnerabilities(report);
+      allFindings.push(...findings);
     }
   }
 
-  // Process Grype results
-  if (reports.grype?.matches) {
-    for (const match of reports.grype.matches) {
-      const vuln = match.vulnerability;
-      findings.push({
-        scanId,
-        source: 'grype',
-        cveId: vuln.id,
-        packageName: match.artifact.name,
-        installedVersion: match.artifact.version || null,
-        fixedVersion: vuln.fix?.versions?.[0] || null,
-        severity: mapSeverity(vuln.severity),
-        cvssScore: vuln.cvss?.[0]?.metrics?.baseScore || null,
-        dataSource: vuln.dataSource || null,
-        vulnerabilityUrl: vuln.urls?.[0] || null,
-        title: null,
-        description: vuln.description || null,
-        filePath: match.artifact.locations?.[0]?.path || null,
-        layerId: match.artifact.locations?.[0]?.layerID || null,
-        packageType: match.artifact.type || null,
-        rawFinding: match
-      });
-    }
+  if (allFindings.length > 0) {
+    await prisma.scanVulnerabilityFinding.createMany({
+      data: allFindings.map(f => ({ scanId, ...f }))
+    });
   }
-
-  // Process OSV results
-  if (reports.osv?.results) {
-    for (const result of reports.osv.results) {
-      for (const pkg of result.packages || []) {
-        for (const vuln of pkg.vulnerabilities || []) {
-          findings.push({
-            scanId,
-            source: 'osv',
-            cveId: vuln.id,
-            packageName: pkg.package.name,
-            installedVersion: pkg.package.version || null,
-            fixedVersion: null,
-            severity: mapOsvSeverity(vuln.severity),
-            cvssScore: extractOsvScore(vuln.severity),
-            dataSource: vuln.database_specific?.source || 'osv',
-            vulnerabilityUrl: vuln.references?.[0]?.url || null,
-            title: vuln.summary || null,
-            description: vuln.details || null,
-            publishedDate: vuln.published ? new Date(vuln.published) : null,
-            lastModified: vuln.modified ? new Date(vuln.modified) : null,
-            filePath: result.source?.path || null,
-            packageType: pkg.package.ecosystem || null,
-            rawFinding: vuln
-          });
-        }
-      }
-    }
-  }
-
-  if (findings.length > 0) {
-    await prisma.scanVulnerabilityFinding.createMany({ data: findings });
-  }
-}
-
-/**
- * Format a license value that may be a string, array, or object.
- */
-function formatLicense(license: any): string | null {
-  if (!license) return null;
-  if (typeof license === 'string') return license;
-  if (Array.isArray(license)) {
-    const formatted = license.map(l => formatLicense(l)).filter(Boolean);
-    if (formatted.length > 0) {
-      return formatted.join(', ');
-    }
-    return null;
-  }
-  if (typeof license === 'object') {
-    if (license.value) return license.value;
-    if (license.spdxExpression) return license.spdxExpression;
-    if (license.name) return license.name;
-    if (license.license) return license.license;
-    if (license.expression) return license.expression;
-    const values = Object.values(license);
-    const firstString = values.find(v => typeof v === 'string' && v !== 'declared');
-    if (firstString) return firstString as string;
-  }
-  return null;
 }
 
 async function populatePackageFindings(scanId: string, reports: ScanReports): Promise<void> {
-  const findings: any[] = [];
+  const allFindings: any[] = [];
 
-  // Process Syft results
-  if (reports.syft?.artifacts) {
-    for (const artifact of reports.syft.artifacts) {
-      const formattedLicense = formatLicense(artifact.licenses);
-
-      findings.push({
-        scanId,
-        source: 'syft',
-        packageName: artifact.name,
-        version: artifact.version || null,
-        type: artifact.type || 'unknown',
-        purl: artifact.purl || null,
-        license: formattedLicense || null,
-        vendor: artifact.vendor || null,
-        publisher: artifact.publisher || null,
-        ecosystem: artifact.language || null,
-        language: artifact.language || null,
-        filePath: artifact.locations?.[0]?.path || null,
-        layerId: artifact.locations?.[0]?.layerID || null,
-        metadata: artifact.metadata || null,
-        dependencies: artifact.upstreams || null
-      });
+  for (const [name, report] of Object.entries(reports)) {
+    if (!report) continue;
+    const adapter = ScannerAdapterRegistry.get(name);
+    if (adapter) {
+      const findings = adapter.extractPackages(report);
+      allFindings.push(...findings);
     }
   }
 
-  // Extract packages from Trivy SBOM data
-  if (reports.trivy?.Results) {
-    for (const result of reports.trivy.Results) {
-      if (result.Packages) {
-        for (const pkg of result.Packages) {
-          findings.push({
-            scanId,
-            source: 'trivy',
-            packageName: pkg.Name,
-            version: pkg.Version || null,
-            type: result.Type || 'unknown',
-            purl: null,
-            license: formatLicense(pkg.License) || null,
-            vendor: null,
-            publisher: null,
-            ecosystem: result.Type || null,
-            language: null,
-            filePath: result.Target || null,
-            layerId: null,
-            metadata: pkg
-          });
-        }
-      }
-    }
-  }
-
-  if (findings.length > 0) {
-    await prisma.scanPackageFinding.createMany({ data: findings });
+  if (allFindings.length > 0) {
+    await prisma.scanPackageFinding.createMany({
+      data: allFindings.map(f => ({ scanId, ...f }))
+    });
   }
 }
 
 async function populateComplianceFindings(scanId: string, reports: ScanReports): Promise<void> {
-  const findings: any[] = [];
+  const allFindings: any[] = [];
 
-  // Process Dockle results
-  if (reports.dockle?.details) {
-    for (const detail of reports.dockle.details) {
-      for (const alert of detail.alerts || []) {
-        findings.push({
-          scanId,
-          source: 'dockle',
-          ruleId: detail.code,
-          ruleName: detail.title,
-          category: mapDockleCategory(detail.level),
-          severity: mapDockleSeverity(detail.level),
-          message: alert,
-          description: detail.details || null,
-          remediation: null,
-          filePath: null,
-          lineNumber: null,
-          code: null,
-          rawFinding: detail
-        });
-      }
+  for (const [name, report] of Object.entries(reports)) {
+    if (!report) continue;
+    const adapter = ScannerAdapterRegistry.get(name);
+    if (adapter) {
+      const findings = adapter.extractCompliance(report);
+      allFindings.push(...findings);
     }
   }
 
-  if (findings.length > 0) {
-    await prisma.scanComplianceFinding.createMany({ data: findings });
+  if (allFindings.length > 0) {
+    await prisma.scanComplianceFinding.createMany({
+      data: allFindings.map(f => ({ scanId, ...f }))
+    });
   }
 }
 
 async function populateEfficiencyFindings(scanId: string, reports: ScanReports): Promise<void> {
-  const findings: any[] = [];
+  const allFindings: any[] = [];
 
-  // Process Dive results
-  if (reports.dive?.layer) {
-    for (const layer of reports.dive.layer) {
-      const layerSizeBytes = Number(layer.sizeBytes || 0);
-      if (layerSizeBytes > 50 * 1024 * 1024) { // > 50MB
-        findings.push({
-          scanId,
-          source: 'dive',
-          findingType: 'large_layer',
-          severity: layerSizeBytes > 100 * 1024 * 1024 ? 'warning' : 'info',
-          layerId: layer.id,
-          layerIndex: layer.index,
-          layerCommand: layer.command || null,
-          sizeBytes: BigInt(layerSizeBytes),
-          wastedBytes: null,
-          efficiencyScore: null,
-          description: `Large layer detected: ${(layerSizeBytes / 1024 / 1024).toFixed(2)}MB`,
-          filePaths: null,
-          rawFinding: layer
-        });
-      }
+  for (const [name, report] of Object.entries(reports)) {
+    if (!report) continue;
+    const adapter = ScannerAdapterRegistry.get(name);
+    if (adapter) {
+      const findings = adapter.extractEfficiency(report);
+      allFindings.push(...findings);
     }
   }
 
-  if (findings.length > 0) {
-    await prisma.scanEfficiencyFinding.createMany({ data: findings });
+  if (allFindings.length > 0) {
+    await prisma.scanEfficiencyFinding.createMany({
+      data: allFindings.map(f => ({ scanId, ...f }))
+    });
   }
 }
 

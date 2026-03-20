@@ -136,24 +136,29 @@ export class TrivyAdapter implements IScannerAdapter {
   }
 
   extractVulnerabilities(report: any): NormalizedVulnerability[] {
-    const findings: NormalizedVulnerability[] = [];
+    const findings: any[] = [];
 
     if (report?.Results) {
       for (const result of report.Results) {
         if (result.Vulnerabilities) {
           for (const vuln of result.Vulnerabilities) {
             findings.push({
-              cveId: vuln.VulnerabilityID || vuln.PkgID,
               source: 'trivy',
+              cveId: vuln.VulnerabilityID || vuln.PkgID,
+              packageName: vuln.PkgName || vuln.PkgID,
+              installedVersion: vuln.InstalledVersion || null,
+              fixedVersion: vuln.FixedVersion || null,
               severity: mapSeverity(vuln.Severity),
-              cvssScore: vuln.CVSS?.nvd?.V3Score || vuln.CVSS?.redhat?.V3Score || undefined,
-              title: vuln.Title || undefined,
-              description: vuln.Description || undefined,
-              packageName: vuln.PkgName || vuln.PkgID || undefined,
-              installedVersion: vuln.InstalledVersion || undefined,
-              fixedVersion: vuln.FixedVersion || undefined,
-              vulnerabilityUrl: vuln.PrimaryURL || undefined,
-              targetName: result.Target || undefined,
+              cvssScore: vuln.CVSS?.nvd?.V3Score || vuln.CVSS?.redhat?.V3Score || null,
+              dataSource: vuln.DataSource?.Name || null,
+              vulnerabilityUrl: vuln.PrimaryURL || null,
+              title: vuln.Title || null,
+              description: vuln.Description || null,
+              publishedDate: vuln.PublishedDate ? new Date(vuln.PublishedDate) : null,
+              lastModified: vuln.LastModifiedDate ? new Date(vuln.LastModifiedDate) : null,
+              filePath: result.Target || null,
+              packageType: result.Type || null,
+              rawFinding: vuln
             });
           }
         }
@@ -164,18 +169,26 @@ export class TrivyAdapter implements IScannerAdapter {
   }
 
   extractPackages(report: any): NormalizedPackage[] {
-    const findings: NormalizedPackage[] = [];
+    const findings: any[] = [];
 
     if (report?.Results) {
       for (const result of report.Results) {
         if (result.Packages) {
           for (const pkg of result.Packages) {
             findings.push({
-              name: pkg.Name,
-              version: pkg.Version || '',
-              type: result.Type || 'unknown',
               source: 'trivy',
-              license: formatLicense(pkg.License) || undefined,
+              packageName: pkg.Name,
+              version: pkg.Version || null,
+              type: result.Type || 'unknown',
+              purl: null,
+              license: formatLicense(pkg.License) || null,
+              vendor: null,
+              publisher: null,
+              ecosystem: result.Type || null,
+              language: null,
+              filePath: result.Target || null,
+              layerId: null,
+              metadata: pkg
             });
           }
         }

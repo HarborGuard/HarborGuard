@@ -70,19 +70,25 @@ export class DiveAdapter implements IScannerAdapter {
   }
 
   extractEfficiency(report: any): NormalizedEfficiency[] {
-    const findings: NormalizedEfficiency[] = [];
+    const findings: any[] = [];
 
     if (report?.layer) {
       for (const layer of report.layer) {
         const layerSizeBytes = Number(layer.sizeBytes || 0);
         if (layerSizeBytes > 50 * 1024 * 1024) { // > 50MB
           findings.push({
-            findingType: 'large_layer',
-            title: `Large layer detected: ${(layerSizeBytes / 1024 / 1024).toFixed(2)}MB`,
-            severity: layerSizeBytes > 100 * 1024 * 1024 ? 'warning' : 'info',
             source: 'dive',
-            sizeBytes: layerSizeBytes,
-            details: layer.command || undefined,
+            findingType: 'large_layer',
+            severity: layerSizeBytes > 100 * 1024 * 1024 ? 'warning' : 'info',
+            layerId: layer.id,
+            layerIndex: layer.index,
+            layerCommand: layer.command || null,
+            sizeBytes: BigInt(layerSizeBytes),
+            wastedBytes: null,
+            efficiencyScore: null,
+            description: `Large layer detected: ${(layerSizeBytes / 1024 / 1024).toFixed(2)}MB`,
+            filePaths: null,
+            rawFinding: layer
           });
         }
       }

@@ -102,17 +102,25 @@ export class SyftAdapter implements IScannerAdapter {
   }
 
   extractPackages(report: any): NormalizedPackage[] {
-    const findings: NormalizedPackage[] = [];
+    const findings: any[] = [];
 
     if (report?.artifacts) {
       for (const artifact of report.artifacts) {
         findings.push({
-          name: artifact.name,
-          version: artifact.version || '',
-          type: artifact.type || 'unknown',
           source: 'syft',
-          license: formatLicense(artifact.licenses) || undefined,
-          purl: artifact.purl || undefined,
+          packageName: artifact.name,
+          version: artifact.version || null,
+          type: artifact.type || 'unknown',
+          purl: artifact.purl || null,
+          license: formatLicense(artifact.licenses) || null,
+          vendor: artifact.vendor || null,
+          publisher: artifact.publisher || null,
+          ecosystem: artifact.language || null,
+          language: artifact.language || null,
+          filePath: artifact.locations?.[0]?.path || null,
+          layerId: artifact.locations?.[0]?.layerID || null,
+          metadata: artifact.metadata || null,
+          dependencies: artifact.upstreams || null
         });
       }
     }

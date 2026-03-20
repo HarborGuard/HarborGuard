@@ -55,21 +55,27 @@ export class GrypeAdapter implements IScannerAdapter {
   }
 
   extractVulnerabilities(report: any): NormalizedVulnerability[] {
-    const findings: NormalizedVulnerability[] = [];
+    const findings: any[] = [];
 
     if (report?.matches) {
       for (const match of report.matches) {
         const vuln = match.vulnerability;
         findings.push({
-          cveId: vuln.id,
           source: 'grype',
-          severity: mapSeverity(vuln.severity),
-          cvssScore: vuln.cvss?.[0]?.metrics?.baseScore || undefined,
-          description: vuln.description || undefined,
+          cveId: vuln.id,
           packageName: match.artifact.name,
-          installedVersion: match.artifact.version || undefined,
-          fixedVersion: vuln.fix?.versions?.[0] || undefined,
-          vulnerabilityUrl: vuln.urls?.[0] || undefined,
+          installedVersion: match.artifact.version || null,
+          fixedVersion: vuln.fix?.versions?.[0] || null,
+          severity: mapSeverity(vuln.severity),
+          cvssScore: vuln.cvss?.[0]?.metrics?.baseScore || null,
+          dataSource: vuln.dataSource || null,
+          vulnerabilityUrl: vuln.urls?.[0] || null,
+          title: null,
+          description: vuln.description || null,
+          filePath: match.artifact.locations?.[0]?.path || null,
+          layerId: match.artifact.locations?.[0]?.layerID || null,
+          packageType: match.artifact.type || null,
+          rawFinding: match
         });
       }
     }

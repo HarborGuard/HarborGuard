@@ -61,22 +61,29 @@ export class OsvAdapter implements IScannerAdapter {
   }
 
   extractVulnerabilities(report: any): NormalizedVulnerability[] {
-    const findings: NormalizedVulnerability[] = [];
+    const findings: any[] = [];
 
     if (report?.results) {
       for (const result of report.results) {
         for (const pkg of result.packages || []) {
           for (const vuln of pkg.vulnerabilities || []) {
             findings.push({
-              cveId: vuln.id,
               source: 'osv',
-              severity: mapOsvSeverity(vuln.severity),
-              cvssScore: extractOsvScore(vuln.severity) || undefined,
-              title: vuln.summary || undefined,
-              description: vuln.details || undefined,
+              cveId: vuln.id,
               packageName: pkg.package.name,
-              installedVersion: pkg.package.version || undefined,
-              vulnerabilityUrl: vuln.references?.[0]?.url || undefined,
+              installedVersion: pkg.package.version || null,
+              fixedVersion: null,
+              severity: mapOsvSeverity(vuln.severity),
+              cvssScore: extractOsvScore(vuln.severity),
+              dataSource: vuln.database_specific?.source || 'osv',
+              vulnerabilityUrl: vuln.references?.[0]?.url || null,
+              title: vuln.summary || null,
+              description: vuln.details || null,
+              publishedDate: vuln.published ? new Date(vuln.published) : null,
+              lastModified: vuln.modified ? new Date(vuln.modified) : null,
+              filePath: result.source?.path || null,
+              packageType: pkg.package.ecosystem || null,
+              rawFinding: vuln
             });
           }
         }

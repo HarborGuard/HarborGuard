@@ -45,18 +45,24 @@ export class DockleAdapter implements IScannerAdapter {
   }
 
   extractCompliance(report: any): NormalizedCompliance[] {
-    const findings: NormalizedCompliance[] = [];
+    const findings: any[] = [];
 
     if (report?.details) {
       for (const detail of report.details) {
         for (const alert of detail.alerts || []) {
           findings.push({
-            checkId: detail.code,
-            title: detail.title,
-            severity: mapDockleSeverity(detail.level),
             source: 'dockle',
+            ruleId: detail.code,
+            ruleName: detail.title,
             category: mapDockleCategory(detail.level),
-            description: typeof alert === 'string' ? alert : (detail.details || undefined),
+            severity: mapDockleSeverity(detail.level),
+            message: alert,
+            description: detail.details || null,
+            remediation: null,
+            filePath: null,
+            lineNumber: null,
+            code: null,
+            rawFinding: detail
           });
         }
       }
