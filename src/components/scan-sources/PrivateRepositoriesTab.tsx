@@ -17,7 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { TabsContent } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import type { Repository, RepositoryImage, RepositoryTag } from "@/hooks/useScanSources"
 import { useScanning } from "@/contexts/ScanningContext"
@@ -274,7 +273,7 @@ export function PrivateRepositoriesTab({
   }
 
   return (
-    <TabsContent value="private" className="space-y-3">
+    <div className="space-y-3">
       {repositories.length === 0 ? (
         <div className="text-center py-8">
           <IconServer className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -433,6 +432,6 @@ export function PrivateRepositoriesTab({
           </p>
         </div>
       )}
-    </TabsContent>
+    </div>
   )
 }
