@@ -2,13 +2,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -17,28 +11,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { IconBrandDocker, IconBrandGithub, IconBrandGitlab, IconServer, IconCheck, IconX, IconLoader, IconPackage } from "@tabler/icons-react"
+import { IconCheck, IconX, IconLoader } from "@tabler/icons-react"
 import { toast } from "sonner"
+import { RegistryTypeSelector, repositoryTypes } from "@/components/repository-config/RegistryTypeSelector"
+import { RegistryConfigForm } from "@/components/repository-config/RegistryConfigForm"
+import type { RepositoryType } from "@/components/repository-config/RegistryTypeSelector"
+import type { RepositoryConfig } from "@/components/repository-config/RegistryConfigForm"
 
 interface AddRepositoryDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onRepositoryAdded: () => void
-}
-
-type RepositoryType = 'dockerhub' | 'ghcr' | 'gitlab' | 'generic' | 'nexus'
-
-interface RepositoryConfig {
-  name: string
-  type: RepositoryType
-  registryUrl: string
-  username: string
-  password: string
-  organization?: string
-  authUrl?: string
-  groupId?: string
-  skipTlsVerify?: boolean
-  registryPort?: number
 }
 
 export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: AddRepositoryDialogProps) {
@@ -56,44 +39,6 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
   })
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
   const [testResult, setTestResult] = useState<{ repositoryCount?: number; error?: string } | null>(null)
-
-  const repositoryTypes = [
-    {
-      type: 'dockerhub' as const,
-      title: 'Docker Hub',
-      description: 'Connect to Docker Hub private repositories',
-      icon: <IconBrandDocker className="h-8 w-8" />,
-      registryUrl: 'docker.io',
-    },
-    {
-      type: 'ghcr' as const,
-      title: 'GitHub Container Registry',
-      description: 'Connect to GitHub Container Registry (ghcr.io)',
-      icon: <IconBrandGithub className="h-8 w-8" />,
-      registryUrl: 'ghcr.io',
-    },
-    {
-      type: 'gitlab' as const,
-      title: 'GitLab Container Registry',
-      description: 'Connect to GitLab Container Registry with JWT authentication',
-      icon: <IconBrandGitlab className="h-8 w-8" />,
-      registryUrl: '',
-    },
-    {
-      type: 'generic' as const,
-      title: 'Generic Registry',
-      description: 'Connect to any OCI-compliant container registry',
-      icon: <IconServer className="h-8 w-8" />,
-      registryUrl: '',
-    },
-    {
-      type: 'nexus' as const,
-      title: 'Sonatype Nexus3',
-      description: 'Connect to Nexus3 Docker repositories',
-      icon: <IconPackage className="h-8 w-8" />,
-      registryUrl: '',
-    },
-  ]
 
   const handleTypeSelect = (type: RepositoryType) => {
     setSelectedType(type)
@@ -203,7 +148,7 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
     onOpenChange(false)
   }
 
-  const canTestConnection = config.name && config.username && config.password && 
+  const canTestConnection = config.name && config.username && config.password &&
     ((config.type !== 'generic' && config.type !== 'gitlab') || config.registryUrl)
 
   const canAddRepository = testStatus === 'success'
@@ -221,231 +166,16 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
         </DialogHeader>
 
         {step === 'select' && (
-          <div className="grid gap-4 py-4">
-            {repositoryTypes.map((type) => (
-              <Card 
-                key={type.type}
-                className="cursor-pointer hover:bg-gray-50 transition-colors"
-                onClick={() => handleTypeSelect(type.type)}
-              >
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    {type.icon}
-                    <div>
-                      <CardTitle className="text-base">{type.title}</CardTitle>
-                      <CardDescription>{type.description}</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-              </Card>
-            ))}
-          </div>
+          <RegistryTypeSelector onTypeSelect={handleTypeSelect} />
         )}
 
         {step === 'configure' && (
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Repository Name</Label>
-              <Input
-                id="name"
-                value={config.name}
-                onChange={(e) => setConfig(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Enter a name for this repository"
-              />
-            </div>
-
-            {(config.type === 'generic' || config.type === 'gitlab' || config.type === 'nexus') && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="registryUrl">Registry URL</Label>
-                  <div className="flex gap-2">
-                    <Select value={protocol} onValueChange={(value: 'https' | 'http') => setProtocol(value)}>
-                      <SelectTrigger className="w-[100px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="https">HTTPS</SelectItem>
-                        <SelectItem value="http">HTTP</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      id="registryUrl"
-                      value={config.registryUrl}
-                      onChange={(e) => {
-                        let value = e.target.value
-                        // If user pastes a URL with protocol, extract it
-                        if (value.startsWith('http://')) {
-                          setProtocol('http')
-                          value = value.substring(7)
-                        } else if (value.startsWith('https://')) {
-                          setProtocol('https')
-                          value = value.substring(8)
-                        }
-                        setConfig(prev => ({ ...prev, registryUrl: value }))
-                      }}
-                      placeholder="registry.company.com:5050"
-                      className="flex-1"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Include port if non-standard (e.g., :5050, :5000). Use HTTP for insecure registries.
-                  </p>
-                </div>
-                
-                {protocol === 'https' && (
-                  <div className="flex items-start space-x-3 py-2">
-                    <Checkbox
-                      id="skipTlsVerify"
-                      checked={config.skipTlsVerify}
-                      onCheckedChange={(checked) => 
-                        setConfig(prev => ({ ...prev, skipTlsVerify: checked === true }))
-                      }
-                    />
-                    <div className="space-y-1">
-                      <Label 
-                        htmlFor="skipTlsVerify" 
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        Skip TLS Verification
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        Enable this for registries with self-signed SSL certificates. 
-                        <span className="text-orange-600">⚠️ Warning: This reduces security.</span>
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="username">
-                {config.type === 'dockerhub' ? 'Docker Hub Username' :
-                 config.type === 'ghcr' ? 'GitHub Username' :
-                 config.type === 'gitlab' ? 'GitLab Username' :
-                 config.type === 'nexus' ? 'Nexus Username' : 'Username'}
-              </Label>
-              <Input
-                id="username"
-                value={config.username}
-                onChange={(e) => setConfig(prev => ({ ...prev, username: e.target.value }))}
-                placeholder="Enter username"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">
-                {config.type === 'dockerhub' ? 'Personal Access Token' :
-                 config.type === 'ghcr' ? 'GitHub Personal Access Token' :
-                 config.type === 'gitlab' ? 'GitLab Password' :
-                 config.type === 'nexus' ? 'Nexus Password' : 'Password/Token'}
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                value={config.password}
-                onChange={(e) => setConfig(prev => ({ ...prev, password: e.target.value }))}
-                placeholder={
-                  config.type === 'dockerhub' ? 'Enter Docker Hub PAT' :
-                  config.type === 'ghcr' ? 'Enter GitHub PAT with packages:read scope' :
-                  config.type === 'gitlab' ? 'Enter GitLab admin password' :
-                  config.type === 'nexus' ? 'Enter Nexus password' :
-                  'Enter password or token'
-                }
-              />
-            </div>
-
-            {config.type === 'ghcr' && (
-              <div className="space-y-2">
-                <Label htmlFor="organization">Organization (optional)</Label>
-                <Input
-                  id="organization"
-                  value={config.organization}
-                  onChange={(e) => setConfig(prev => ({ ...prev, organization: e.target.value }))}
-                  placeholder="Enter organization name for org packages"
-                />
-              </div>
-            )}
-
-            {config.type === 'nexus' && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="organization">Repository Name (optional)</Label>
-                  <Input
-                    id="organization"
-                    value={config.organization}
-                    onChange={(e) => setConfig(prev => ({ ...prev, organization: e.target.value }))}
-                    placeholder="docker-hosted"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Nexus repository name (default: docker-hosted)
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="registryPort">Docker Registry Port (optional)</Label>
-                  <Input
-                    id="registryPort"
-                    type="number"
-                    value={config.registryPort || ''}
-                    onChange={(e) => setConfig(prev => ({ ...prev, registryPort: e.target.value ? parseInt(e.target.value) : undefined }))}
-                    placeholder="5000"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Port for Docker push/pull operations (default: 5000)
-                  </p>
-                </div>
-              </>
-            )}
-
-            {config.type === 'gitlab' && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="registryPort">Registry Port</Label>
-                  <Input
-                    id="registryPort"
-                    type="number"
-                    value={config.registryPort || ''}
-                    onChange={(e) => setConfig(prev => ({ ...prev, registryPort: e.target.value ? parseInt(e.target.value) : undefined }))}
-                    placeholder="5050"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    GitLab registry port (default: 5050). Uses HTTP protocol on this port.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="authUrl">JWT Auth URL (optional)</Label>
-                  <Input
-                    id="authUrl"
-                    value={config.authUrl}
-                    onChange={(e) => setConfig(prev => ({ ...prev, authUrl: e.target.value }))}
-                    placeholder="https://gitlab.example.com/jwt/auth"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Leave blank to auto-detect from registry URL
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="groupId">Group/Project ID (optional)</Label>
-                  <Input
-                    id="groupId"
-                    value={config.groupId}
-                    onChange={(e) => setConfig(prev => ({ ...prev, groupId: e.target.value }))}
-                    placeholder="e.g., mygroup/myproject"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Limit access to specific GitLab group or project
-                  </p>
-                </div>
-              </>
-            )}
-
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <div className="text-sm text-blue-800">
-                <strong>Important:</strong> You must test the connection before adding the repository.
-                This ensures your credentials are valid and we can access your repositories.
-              </div>
-            </div>
-          </div>
+          <RegistryConfigForm
+            config={config}
+            protocol={protocol}
+            onConfigChange={setConfig}
+            onProtocolChange={setProtocol}
+          />
         )}
 
         {step === 'test' && (
@@ -503,7 +233,7 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
           <Button variant="outline" onClick={handleClose}>
             Cancel
           </Button>
-          
+
           {step === 'configure' && (
             <>
               <Button variant="outline" onClick={() => setStep('select')}>

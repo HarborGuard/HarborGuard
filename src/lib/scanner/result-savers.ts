@@ -8,6 +8,73 @@ import { prisma } from '@/lib/prisma';
 import type { ScanReports } from './types';
 
 /**
+ * Create or update ScanMetadata record, storing raw JSONB data for downloads
+ * and Docker image metadata fields.
+ */
+export async function createOrUpdateScanMetadata(scanId: string, reports: ScanReports): Promise<string> {
+  const metadata = reports.metadata || {};
+
+  const scanMetadataData = {
+    dockerId: metadata.Id || null,
+    dockerOs: metadata.Os || metadata.os || null,
+    dockerArchitecture: metadata.Architecture || metadata.architecture || null,
+    dockerSize: metadata.Size ? BigInt(metadata.Size) : null,
+    dockerAuthor: metadata.Author || null,
+    dockerCreated: metadata.Created ? new Date(metadata.Created) : null,
+    dockerVersion: metadata.DockerVersion || null,
+    dockerParent: metadata.Parent || null,
+    dockerComment: metadata.Comment || null,
+    dockerDigest: metadata.Digest || null,
+    dockerConfig: metadata.Config || null,
+    dockerRootFS: metadata.RootFS || null,
+    dockerGraphDriver: metadata.GraphDriver || null,
+    dockerRepoTags: metadata.RepoTags || null,
+    dockerRepoDigests: metadata.RepoDigests || null,
+    dockerMetadata: metadata.Metadata || null,
+    dockerLabels: metadata.Labels || metadata.Config?.Labels || null,
+    dockerEnv: metadata.Env || metadata.Config?.Env || null,
+
+    // Scan Results
+    trivyResults: reports.trivy || null,
+    grypeResults: reports.grype || null,
+    syftResults: reports.syft || null,
+    dockleResults: reports.dockle || null,
+    osvResults: reports.osv || null,
+    diveResults: reports.dive || null,
+
+    // Scanner versions
+    scannerVersions: metadata.scannerVersions || null
+  };
+
+  const scan = await prisma.scan.findUnique({
+    where: { id: scanId },
+    select: { metadataId: true }
+  });
+
+  let metadataId: string;
+
+  if (scan?.metadataId) {
+    await prisma.scanMetadata.update({
+      where: { id: scan.metadataId },
+      data: scanMetadataData
+    });
+    metadataId = scan.metadataId;
+  } else {
+    const newMetadata = await prisma.scanMetadata.create({
+      data: scanMetadataData
+    });
+    metadataId = newMetadata.id;
+
+    await prisma.scan.update({
+      where: { id: scanId },
+      data: { metadataId }
+    });
+  }
+
+  return metadataId;
+}
+
+/**
  * Dispatch scan reports to their individual scanner result tables.
  */
 export async function saveScannerResultTables(metadataId: string, reports: ScanReports): Promise<void> {
