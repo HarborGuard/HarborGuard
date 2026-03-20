@@ -22,15 +22,7 @@ export interface AggregatedData {
   complianceScore?: ComplianceScore;
 }
 
-export interface ScanReports {
-  trivy?: any;
-  grype?: any;
-  syft?: any;
-  dockle?: any;
-  osv?: any;
-  dive?: any;
-  metadata?: any;
-}
+export type ScanReports = Record<string, any>;
 
 export interface ScannerResult {
   success: boolean;

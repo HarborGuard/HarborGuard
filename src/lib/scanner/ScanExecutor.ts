@@ -328,26 +328,29 @@ export class ScanExecutor implements IScanExecutor {
   async loadScanResults(requestId: string): Promise<ScanReports> {
     const reportDir = path.join(this.workDir, 'reports', requestId);
     const reports: ScanReports = {};
-    
-    const reportFiles = ['trivy.json', 'grype.json', 'syft.json', 'dockle.json', 'osv.json', 'dive.json', 'metadata.json'];
-    
-    for (const filename of reportFiles) {
-      const scannerName = filename.replace('.json', '');
 
-      // Check if the scanner is enabled before reading the file
-      if (!config.enabledScanners.includes(scannerName)) {
-          logger.debug(`Scanner ${scannerName} not enabled, skipping file ${filename}`);
-          continue;
-      }      
-      const filePath = path.join(reportDir, filename);
+    // Dynamically load results for all enabled scanners
+    const enabledScanners = AVAILABLE_SCANNERS.filter(scanner =>
+      config.enabledScanners.includes(scanner.name)
+    );
+
+    for (const scanner of enabledScanners) {
+      const reportPath = path.join(reportDir, `${scanner.name}.json`);
       try {
-        const content = await fs.readFile(filePath, 'utf8');
-        const reportName = filename.replace('.json', '') as keyof ScanReports;
-        reports[reportName] = JSON.parse(content);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.warn(`Failed to read ${filename}:`, errorMessage);
+        const content = await fs.readFile(reportPath, 'utf8');
+        reports[scanner.name] = JSON.parse(content);
+      } catch {
+        // Scanner didn't produce output
       }
+    }
+
+    // Also load metadata if present
+    const metadataPath = path.join(reportDir, 'metadata.json');
+    try {
+      const content = await fs.readFile(metadataPath, 'utf8');
+      reports.metadata = JSON.parse(content);
+    } catch {
+      // No metadata file
     }
 
     return reports;
