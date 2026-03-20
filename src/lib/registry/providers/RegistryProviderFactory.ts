@@ -8,6 +8,7 @@ import { GenericOCIProvider } from './generic/GenericOCIProvider';
 import { GitLabRegistryHandler } from './gitlab/GitLabRegistryHandler';
 import { NexusProvider } from './nexus/NexusProvider';
 import { ACRProvider } from './acr/ACRProvider';
+import { GARProvider } from './gar/GARProvider';
 
 export class RegistryProviderFactory {
   private static providers = new Map<RepositoryType, new (repository: Repository) => EnhancedRegistryProvider>();
@@ -20,6 +21,7 @@ export class RegistryProviderFactory {
     this.register('GENERIC', GenericOCIProvider);
     this.register('NEXUS', NexusProvider);
     this.register('ACR', ACRProvider);
+    this.register('GCR', GARProvider);
   }
   
   /**
@@ -65,6 +67,10 @@ export class RegistryProviderFactory {
 
     if (ACRProvider.canHandle(repository)) {
       return new ACRProvider(repository);
+    }
+
+    if (GARProvider.canHandle(repository)) {
+      return new GARProvider(repository);
     }
 
     // GenericOCIProvider is the fallback for any other registry

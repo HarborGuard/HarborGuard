@@ -116,6 +116,13 @@ export interface NexusConfig extends RegistryConfig {
   skipTlsVerify?: boolean;
 }
 
+export interface GARConfig extends RegistryConfig {
+  projectId: string;
+  location: string;
+  repositoryName: string;
+  serviceAccountKey: string;
+}
+
 export interface ACRConfig extends RegistryConfig {
   registryName: string;
   authMethod: 'admin' | 'servicePrincipal';
