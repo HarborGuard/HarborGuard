@@ -12,7 +12,7 @@ import type {
   RegistryCapability,
   RateLimit,
   RegistryConfig,
-  Vulnerability
+  RegistryVulnerability
 } from '../../types';
 
 const execAsync = promisify(exec);
@@ -362,7 +362,7 @@ export abstract class EnhancedRegistryProvider {
   /**
    * Get vulnerability scan results (registry-specific)
    */
-  async getVulnerabilities(image: string, tag: string): Promise<Vulnerability[]> {
+  async getVulnerabilities(image: string, tag: string): Promise<RegistryVulnerability[]> {
     return [];
   }
   

@@ -38,11 +38,7 @@ export async function GET(
 
     return NextResponse.json(tags)
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch image tags'
-    
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: error instanceof Error && error.message.includes('not found') ? 404 : 500 }
-    )
+    const status = error instanceof Error && error.message.includes('not found') ? 404 : 500;
+    return apiError(error, 'Failed to fetch image tags', status);
   }
 }
