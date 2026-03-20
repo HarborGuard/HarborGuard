@@ -876,6 +876,7 @@ enum RepositoryType {
   NEXUS
   ARTIFACTORY
   QUAY
+  GITEA
 }
 
 enum RepositoryStatus {
