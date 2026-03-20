@@ -4,6 +4,7 @@ import { SyftScanner } from './SyftScanner';
 import { OSVScanner } from './OSVScanner';
 import { DockleScanner } from './DockleScanner';
 import { DiveScanner } from './DiveScanner';
+import { ScoutScanner } from './ScoutScanner';
 import { IScannerBase } from '../types';
 
 export const AVAILABLE_SCANNERS: IScannerBase[] = [
@@ -13,6 +14,7 @@ export const AVAILABLE_SCANNERS: IScannerBase[] = [
   new OSVScanner(),
   new DockleScanner(),
   new DiveScanner(),
+  new ScoutScanner(),
 ];
 
 export function getScannerByName(name: string): IScannerBase | undefined {
@@ -36,4 +38,5 @@ export {
   OSVScanner,
   DockleScanner,
   DiveScanner,
+  ScoutScanner,
 };

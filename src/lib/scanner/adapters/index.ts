@@ -5,6 +5,7 @@ import { SyftAdapter } from './SyftAdapter';
 import { DockleAdapter } from './DockleAdapter';
 import { OsvAdapter } from './OsvAdapter';
 import { DiveAdapter } from './DiveAdapter';
+import { ScoutAdapter } from './ScoutAdapter';
 
 class ScannerAdapterRegistry {
   private static adapters = new Map<string, IScannerAdapter>();
@@ -29,6 +30,7 @@ ScannerAdapterRegistry.register(new SyftAdapter());
 ScannerAdapterRegistry.register(new DockleAdapter());
 ScannerAdapterRegistry.register(new OsvAdapter());
 ScannerAdapterRegistry.register(new DiveAdapter());
+ScannerAdapterRegistry.register(new ScoutAdapter());
 
 export { ScannerAdapterRegistry };
 export { TrivyAdapter } from './TrivyAdapter';
@@ -37,3 +39,4 @@ export { SyftAdapter } from './SyftAdapter';
 export { DockleAdapter } from './DockleAdapter';
 export { OsvAdapter } from './OsvAdapter';
 export { DiveAdapter } from './DiveAdapter';
+export { ScoutAdapter } from './ScoutAdapter';
