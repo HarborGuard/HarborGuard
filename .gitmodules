@@ -1,0 +1,3 @@
+[submodule "packages/sensor"]
+	path = packages/sensor
+	url = https://github.com/HarborGuard/harborguard-sensor.git
