@@ -14,20 +14,29 @@ import { logger } from '@/lib/logger';
 
 export class GenericOCIProvider extends EnhancedRegistryProvider {
   protected config: GenericOCIConfig;
-  
+  private _catalogAvailable: boolean = true;
+
   constructor(repository: Repository) {
     super(repository);
     this.config = this.parseConfig(repository) as GenericOCIConfig;
   }
-  
+
+  /**
+   * Check whether the registry catalog endpoint is available.
+   * Returns false when _catalog returned empty or failed.
+   */
+  isCatalogAvailable(): boolean {
+    return this._catalogAvailable;
+  }
+
   getProviderName(): string {
     return 'Generic OCI Registry';
   }
-  
+
   getSupportedCapabilities(): RegistryCapability[] {
     return ['LIST_IMAGES', 'GET_TAGS', 'GET_METADATA'];
   }
-  
+
   getRateLimits(): RateLimit {
     // Generic registries usually have more lenient rate limits
     return {
@@ -36,7 +45,7 @@ export class GenericOCIProvider extends EnhancedRegistryProvider {
       burstLimit: 100
     };
   }
-  
+
   protected parseConfig(repository: Repository): GenericOCIConfig {
     return {
       username: repository.username,
@@ -45,12 +54,12 @@ export class GenericOCIProvider extends EnhancedRegistryProvider {
       protocol: repository.protocol
     };
   }
-  
+
   async getAuthHeaders(): Promise<Record<string, string>> {
     const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
     return { 'Authorization': `Basic ${auth}` };
   }
-  
+
   async getSkopeoAuthArgs(): Promise<string> {
     if (!this.config.username || !this.config.password) {
       return '';
@@ -58,7 +67,7 @@ export class GenericOCIProvider extends EnhancedRegistryProvider {
     // Properly quote credentials to handle special characters
     return `--creds "${this.config.username}:${this.config.password}"`;
   }
-  
+
   private getRegistryUrl(): string {
     let url = `${this.config.protocol}://${this.config.registryUrl}`;
     if (!url.endsWith('/')) {
@@ -66,18 +75,27 @@ export class GenericOCIProvider extends EnhancedRegistryProvider {
     }
     return url;
   }
-  
+
   async listImages(options: ListImagesOptions = {}): Promise<RegistryImage[]> {
     await this.handleRateLimit();
-    
+
     const url = `${this.getRegistryUrl()}v2/_catalog`;
-    
+
     this.logRequest('GET', url);
-    const response = await this.makeAuthenticatedRequest(url);
-    const data = await response.json();
-    
-    let repositories = data.repositories || [];
-    
+
+    let repositories: string[] = [];
+    try {
+      const response = await this.makeAuthenticatedRequest(url);
+      const data = await response.json();
+      repositories = data.repositories || [];
+    } catch (error) {
+      logger.warn(`Catalog endpoint failed for ${this.getProviderName()}: ${error instanceof Error ? error.message : error}`);
+      repositories = [];
+    }
+
+    // Track whether the catalog is actually available
+    this._catalogAvailable = repositories.length > 0;
+
     // Apply pagination if needed
     if (options.offset) {
       repositories = repositories.slice(options.offset);
@@ -85,21 +103,21 @@ export class GenericOCIProvider extends EnhancedRegistryProvider {
     if (options.limit) {
       repositories = repositories.slice(0, options.limit);
     }
-    
+
     // Filter by namespace if provided
     if (options.namespace) {
-      repositories = repositories.filter((name: string) => 
+      repositories = repositories.filter((name: string) =>
         name.startsWith(`${options.namespace}/`)
       );
     }
-    
+
     // Filter by query if provided
     if (options.query) {
-      repositories = repositories.filter((name: string) => 
+      repositories = repositories.filter((name: string) =>
         name.toLowerCase().includes(options.query!.toLowerCase())
       );
     }
-    
+
     return repositories.map((name: string) => {
       const { namespace, imageName } = this.parseImageName(name);
       return {
@@ -114,15 +132,15 @@ export class GenericOCIProvider extends EnhancedRegistryProvider {
       };
     });
   }
-  
+
   async getImageMetadata(namespace: string | null, imageName: string): Promise<ImageMetadata> {
     await this.handleRateLimit();
-    
+
     const fullName = this.buildFullName(namespace, imageName);
-    
+
     // Get tags for this image
     const tags = await this.getTags(namespace, imageName);
-    
+
     // For generic registries, we have limited metadata
     return {
       namespace,
@@ -135,17 +153,17 @@ export class GenericOCIProvider extends EnhancedRegistryProvider {
       availableTags: tags
     };
   }
-  
+
   async getTags(namespace: string | null, imageName: string): Promise<ImageTag[]> {
     await this.handleRateLimit();
-    
+
     const fullName = this.buildFullName(namespace, imageName);
     const url = `${this.getRegistryUrl()}v2/${fullName}/tags/list`;
-    
+
     this.logRequest('GET', url);
     const response = await this.makeAuthenticatedRequest(url);
     const data = await response.json();
-    
+
     return (data.tags || []).map((tag: string) => ({
       name: tag,
       size: null,
@@ -154,15 +172,15 @@ export class GenericOCIProvider extends EnhancedRegistryProvider {
       platform: undefined
     }));
   }
-  
+
   async testConnection(): Promise<ConnectionTestResult> {
     try {
       // Test connection by accessing the API version endpoint
       const versionUrl = `${this.getRegistryUrl()}v2/`;
       this.logRequest('GET', versionUrl);
-      
+
       const response = await this.makeAuthenticatedRequest(versionUrl);
-      
+
       if (response.ok) {
         // Try to get catalog to count repositories
         try {
@@ -193,56 +211,61 @@ export class GenericOCIProvider extends EnhancedRegistryProvider {
       };
     }
   }
-  
-  // Enhanced error handling for OCI registry responses
+
+  /**
+   * Enhanced error handling for OCI registry responses.
+   * Uses Docker v2 token challenge flow: if the registry returns 401
+   * with a Www-Authenticate: Bearer header, exchanges credentials at
+   * the token endpoint and retries with the resulting Bearer token.
+   */
   protected async makeAuthenticatedRequest(url: string, options?: RequestInit): Promise<Response> {
     try {
-      return await super.makeAuthenticatedRequest(url, options);
+      return await super.makeAuthenticatedRequestWithChallenge(url, options);
     } catch (error) {
       if (error instanceof Error) {
         // Handle common OCI registry errors
         if (error.message.includes('401')) {
           throw new Error('Authentication failed. Please check your credentials.');
         }
-        
+
         if (error.message.includes('403')) {
           throw new Error('Access forbidden. You may not have permission to access this registry.');
         }
-        
+
         if (error.message.includes('404')) {
           throw new Error('Registry endpoint not found. Please check the registry URL.');
         }
-        
+
         if (error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED')) {
           throw new Error('Cannot connect to registry. Please check the registry URL and network connectivity.');
         }
-        
+
         if (error.message.includes('certificate')) {
           throw new Error('SSL certificate error. The registry may be using a self-signed certificate.');
         }
       }
-      
+
       throw error;
     }
   }
-  
+
   // Specific method to get manifest information (useful for detailed metadata)
   async getManifest(namespace: string | null, imageName: string, tag: string): Promise<any> {
     await this.handleRateLimit();
-    
+
     const fullName = this.buildFullName(namespace, imageName);
     const url = `${this.getRegistryUrl()}v2/${fullName}/manifests/${tag}`;
-    
+
     this.logRequest('GET', url);
     const response = await this.makeAuthenticatedRequest(url, {
       headers: {
         'Accept': 'application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json'
       }
     });
-    
+
     return await response.json();
   }
-  
+
   // Check if registry supports specific OCI features
   async checkRegistryFeatures(): Promise<{
     supportsDelete: boolean;
@@ -252,7 +275,7 @@ export class GenericOCIProvider extends EnhancedRegistryProvider {
     try {
       // Try DELETE operation on a non-existent manifest to see if it's supported
       const deleteSupported = true; // Most OCI registries support delete
-      
+
       // Try to access search endpoint
       let searchSupported = false;
       try {
@@ -262,7 +285,7 @@ export class GenericOCIProvider extends EnhancedRegistryProvider {
       } catch {
         searchSupported = false;
       }
-      
+
       return {
         supportsDelete: deleteSupported,
         supportsSearch: searchSupported,
@@ -276,7 +299,7 @@ export class GenericOCIProvider extends EnhancedRegistryProvider {
       };
     }
   }
-  
+
   // Override deleteImage to provide basic OCI registry delete support
   async deleteImage(image: string, tag: string): Promise<void> {
     const { namespace, imageName } = this.parseImageName(image);

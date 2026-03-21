@@ -175,6 +175,48 @@ export function parseImageString(imageString: string): {
 }
 
 /**
+ * Single source of truth for registry display name.
+ * Image.source is the primary signal — it reflects how HarborGuard obtained the image.
+ * registry/registryType are only meaningful for REGISTRY/REGISTRY_PRIVATE sources
+ * where an actual repository connection was used.
+ */
+export function resolveRegistryDisplay(
+  source?: string | null,
+  registry?: string | null,
+  registryType?: string | null
+): string {
+  // Local Docker source — scanned from local daemon, no registry connection
+  if (source === 'LOCAL_DOCKER' || source === 'local') {
+    return 'Local Docker';
+  }
+
+  // File upload / tar source
+  if (source === 'FILE_UPLOAD' || source === 'tar') {
+    return 'File Upload';
+  }
+
+  // Registry sources — use actual repository info from the connection
+  if (registry) {
+    return registry;
+  }
+
+  // Fallback to registryType display name if no registry URL
+  if (registryType && registryType !== 'LOCAL' && registryType !== 'TAR') {
+    const config = REGISTRY_CONFIGS[registryType as RegistryType];
+    if (config) {
+      return config.displayName;
+    }
+  }
+
+  // REGISTRY/REGISTRY_PRIVATE without registry info
+  if (source === 'REGISTRY' || source === 'REGISTRY_PRIVATE' || source === 'registry') {
+    return 'Registry';
+  }
+
+  return 'Unknown';
+}
+
+/**
  * Build scan request with proper registry information
  */
 export function buildScanRequest(

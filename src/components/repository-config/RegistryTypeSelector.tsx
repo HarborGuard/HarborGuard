@@ -2,9 +2,9 @@
 
 import React from "react"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { IconBrandDocker, IconBrandGithub, IconBrandGitlab, IconServer, IconPackage } from "@tabler/icons-react"
+import { IconBrandDocker, IconBrandGithub, IconBrandGitlab, IconServer, IconPackage, IconCloud, IconBrandGoogle, IconBrandGit } from "@tabler/icons-react"
 
-type RepositoryType = 'dockerhub' | 'ghcr' | 'gitlab' | 'generic' | 'nexus'
+type RepositoryType = 'dockerhub' | 'ghcr' | 'gitlab' | 'generic' | 'nexus' | 'acr' | 'gcr' | 'gitea'
 
 interface RegistryTypeSelectorProps {
   onTypeSelect: (type: RepositoryType) => void;
@@ -33,6 +33,13 @@ const repositoryTypes = [
     registryUrl: '',
   },
   {
+    type: 'gitea' as const,
+    title: 'Gitea / Forgejo',
+    description: 'Connect to Gitea or Forgejo container registry',
+    icon: <IconBrandGit className="h-8 w-8" />,
+    registryUrl: '',
+  },
+  {
     type: 'generic' as const,
     title: 'Generic Registry',
     description: 'Connect to any OCI-compliant container registry',
@@ -44,6 +51,20 @@ const repositoryTypes = [
     title: 'Sonatype Nexus3',
     description: 'Connect to Nexus3 Docker repositories',
     icon: <IconPackage className="h-8 w-8" />,
+    registryUrl: '',
+  },
+  {
+    type: 'acr' as const,
+    title: 'Azure Container Registry',
+    description: 'Connect to Azure Container Registry (azurecr.io)',
+    icon: <IconCloud className="h-8 w-8" />,
+    registryUrl: '',
+  },
+  {
+    type: 'gcr' as const,
+    title: 'Google Artifact Registry',
+    description: 'Connect to Google Artifact Registry (pkg.dev)',
+    icon: <IconBrandGoogle className="h-8 w-8" />,
     registryUrl: '',
   },
 ]

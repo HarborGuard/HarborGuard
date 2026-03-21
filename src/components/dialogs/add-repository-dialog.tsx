@@ -62,6 +62,12 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
     if ((config.type === 'generic' || config.type === 'gitlab' || config.type === 'nexus') && config.registryUrl) {
       testConfig.registryUrl = `${protocol}://${config.registryUrl.replace(/^https?:\/\//, '')}`
     }
+    if (config.type === 'gcr') {
+      const loc = config.garLocation || 'us'
+      testConfig.registryUrl = `${loc}-docker.pkg.dev`
+      testConfig.username = config.garProjectId || ''
+      testConfig.organization = `${loc}/${config.garRepositoryName || ''}`
+    }
 
     try {
       const response = await fetch('/api/repositories/test', {
@@ -96,6 +102,12 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
     const saveConfig = { ...config }
     if ((config.type === 'generic' || config.type === 'gitlab' || config.type === 'nexus') && config.registryUrl) {
       saveConfig.registryUrl = `${protocol}://${config.registryUrl.replace(/^https?:\/\//, '')}`
+    }
+    if (config.type === 'gcr') {
+      const loc = config.garLocation || 'us'
+      saveConfig.registryUrl = `${loc}-docker.pkg.dev`
+      saveConfig.username = config.garProjectId || ''
+      saveConfig.organization = `${loc}/${config.garRepositoryName || ''}`
     }
 
     // Include test results if the test was successful
@@ -148,8 +160,10 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
     onOpenChange(false)
   }
 
-  const canTestConnection = config.name && config.username && config.password &&
-    ((config.type !== 'generic' && config.type !== 'gitlab') || config.registryUrl)
+  const canTestConnection = config.type === 'gcr'
+    ? !!(config.name && config.garProjectId && config.garRepositoryName && config.password)
+    : !!(config.name && config.username && config.password &&
+        ((config.type !== 'generic' && config.type !== 'gitlab') || config.registryUrl))
 
   const canAddRepository = testStatus === 'success'
 
@@ -185,8 +199,19 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
               <div className="space-y-2 text-sm">
                 <div><strong>Name:</strong> {config.name}</div>
                 <div><strong>Type:</strong> {repositoryTypes.find(t => t.type === config.type)?.title}</div>
-                <div><strong>Registry:</strong> {(config.type === 'generic' || config.type === 'gitlab' || config.type === 'nexus') && config.registryUrl ? `${protocol}://${config.registryUrl}` : config.registryUrl}</div>
-                <div><strong>Username:</strong> {config.username}</div>
+                {config.type === 'gcr' ? (
+                  <>
+                    <div><strong>Project:</strong> {config.garProjectId}</div>
+                    <div><strong>Location:</strong> {config.garLocation || 'us'}</div>
+                    <div><strong>Repository:</strong> {config.garRepositoryName}</div>
+                    <div><strong>Registry:</strong> {(config.garLocation || 'us')}-docker.pkg.dev</div>
+                  </>
+                ) : (
+                  <>
+                    <div><strong>Registry:</strong> {(config.type === 'generic' || config.type === 'gitlab' || config.type === 'nexus') && config.registryUrl ? `${protocol}://${config.registryUrl}` : config.registryUrl}</div>
+                    <div><strong>Username:</strong> {config.username}</div>
+                  </>
+                )}
               </div>
             </div>
 

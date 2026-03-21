@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import type { LegacyScan } from '@/types'
 import { getImageName } from '@/lib/utils/image-utils'
+import { resolveRegistryDisplay } from '@/lib/registry/registry-utils'
 
 // Use LegacyScan for backward compatibility with existing UI components
 type Scan = LegacyScan
@@ -192,7 +193,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           baseImage: getImageName(scan.image?.name || '') || 'unknown', // Simplified extraction
           osInfo: undefined,
           lastScan: scan.finishedAt || scan.startedAt,
-          registry: scan.image.registry
+          registry: resolveRegistryDisplay(scan.image.source || scan.source, scan.image.registry, scan.image.registryType)
         }
       }) || []
 

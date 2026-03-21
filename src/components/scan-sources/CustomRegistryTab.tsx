@@ -2,7 +2,7 @@
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { TabsContent } from "@/components/ui/tabs"
+
 
 interface CustomRegistryTabProps {
   customRegistry: string
@@ -11,7 +11,7 @@ interface CustomRegistryTabProps {
 
 export function CustomRegistryTab({ customRegistry, setCustomRegistry }: CustomRegistryTabProps) {
   return (
-    <TabsContent value="custom" className="space-y-3">
+    <div className="space-y-3">
       <Label htmlFor="custom-registry">Custom Registry URL</Label>
       <Input
         id="custom-registry"
@@ -22,6 +22,6 @@ export function CustomRegistryTab({ customRegistry, setCustomRegistry }: CustomR
       <p className="text-xs text-muted-foreground">
         Enter the full URL to your custom registry image.
       </p>
-    </TabsContent>
+    </div>
   )
 }

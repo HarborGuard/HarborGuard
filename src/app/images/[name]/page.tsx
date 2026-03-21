@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { IconDownload, IconUpload, IconTrash } from "@tabler/icons-react";
 import { ExportImageDialogEnhanced } from "@/components/dialogs/export-image-dialog-enhanced";
 import { getImageName } from "@/lib/utils/image-utils";
+import { resolveRegistryDisplay } from "@/lib/registry/registry-utils";
 
 export default function ImageDetailsPage() {
   const params = useParams();
@@ -107,7 +108,7 @@ export default function ImageDetailsPage() {
 
     // Get unique registries from all images
     const registries = [...new Set(imagesByName
-      .map((img) => img.registry || img.registryType)
+      .map((img) => resolveRegistryDisplay(img.source, img.registry, img.registryType))
       .filter(Boolean)
     )];
 
@@ -260,8 +261,11 @@ export default function ImageDetailsPage() {
 
         // Find the corresponding image to get registry info
         const matchingImage = imageData.images.find(img => img.id === scan.imageId);
-        const registryInfo = matchingImage?.registry || matchingImage?.registryType ||
-                            scan.image?.registry || scan.image?.registryType || 'Unknown';
+        const registryInfo = resolveRegistryDisplay(
+          matchingImage?.source || scan.image?.source,
+          matchingImage?.registry || scan.image?.registry,
+          matchingImage?.registryType || scan.image?.registryType
+        );
 
         return {
           id: Math.abs(
@@ -387,7 +391,7 @@ export default function ImageDetailsPage() {
                   <p className="text-sm">
                     {imageData.registries?.length > 0
                       ? imageData.registries.join(", ")
-                      : "Docker Hub"}
+                      : resolveRegistryDisplay(imageData.latestImage?.source)}
                   </p>
                 </div>
                 <div>

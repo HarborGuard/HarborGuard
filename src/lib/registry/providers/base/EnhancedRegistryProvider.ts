@@ -599,7 +599,95 @@ export abstract class EnhancedRegistryProvider {
     const message = error.message || error.toString();
     return /unauthorized|401|403|forbidden|authentication|credential/i.test(message);
   }
-  
+
+  /**
+   * Handle Docker v2 token authentication challenge.
+   * When a registry returns 401 with a Www-Authenticate: Bearer header,
+   * this method parses the challenge, exchanges credentials at the token
+   * endpoint, and returns the bearer token.
+   */
+  protected async handleTokenChallenge(response: Response): Promise<string | null> {
+    const wwwAuth = response.headers.get('www-authenticate');
+    if (!wwwAuth || !wwwAuth.toLowerCase().startsWith('bearer ')) return null;
+
+    // Parse realm="...",service="...",scope="..." from the challenge header
+    const params: Record<string, string> = {};
+    const matches = wwwAuth.matchAll(/(\w+)="([^"]+)"/g);
+    for (const match of matches) {
+      params[match[1]] = match[2];
+    }
+
+    if (!params.realm) return null;
+
+    const url = new URL(params.realm);
+    if (params.service) url.searchParams.set('service', params.service);
+    if (params.scope) url.searchParams.set('scope', params.scope);
+
+    // Exchange credentials for a bearer token
+    const credentials = Buffer.from(
+      `${this.repository.username}:${this.repository.encryptedPassword}`
+    ).toString('base64');
+
+    try {
+      const tokenResponse = await fetch(url.toString(), {
+        headers: { 'Authorization': `Basic ${credentials}` }
+      });
+
+      if (!tokenResponse.ok) return null;
+
+      const data = await tokenResponse.json();
+      return data.token || data.access_token || null;
+    } catch (error) {
+      logger.warn('Token challenge exchange failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Make an authenticated HTTP request with Docker v2 token challenge support.
+   * First tries with current auth headers. If the registry responds with
+   * 401 + Www-Authenticate: Bearer, performs the token exchange and retries
+   * with the bearer token.
+   */
+  protected async makeAuthenticatedRequestWithChallenge(
+    url: string,
+    options?: RequestInit
+  ): Promise<Response> {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch(url, {
+      ...options,
+      headers: { ...headers, ...options?.headers }
+    });
+
+    // If 401 with Bearer challenge, attempt token exchange and retry
+    if (response.status === 401) {
+      const token = await this.handleTokenChallenge(response);
+      if (token) {
+        const retryResponse = await fetch(url, {
+          ...options,
+          headers: {
+            ...options?.headers,
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (!retryResponse.ok) {
+          const errorText = await retryResponse.text().catch(() => 'Unknown error');
+          throw new Error(`HTTP ${retryResponse.status}: ${errorText}`);
+        }
+
+        return retryResponse;
+      }
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+
+    return response;
+  }
+
   /**
    * Make an authenticated HTTP request to the registry API
    */
@@ -612,12 +700,12 @@ export abstract class EnhancedRegistryProvider {
       ...options,
       headers: { ...headers, ...options?.headers }
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
       throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
-    
+
     return response;
   }
   

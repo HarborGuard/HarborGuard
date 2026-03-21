@@ -116,6 +116,26 @@ export interface NexusConfig extends RegistryConfig {
   skipTlsVerify?: boolean;
 }
 
+export interface GARConfig extends RegistryConfig {
+  projectId: string;
+  location: string;
+  repositoryName: string;
+  serviceAccountKey: string;
+}
+
+export interface ACRConfig extends RegistryConfig {
+  registryName: string;
+  authMethod: 'admin' | 'servicePrincipal';
+  tenantId?: string;
+}
+
+export interface GiteaConfig extends RegistryConfig {
+  username: string;
+  pat: string;         // Personal Access Token
+  registryUrl: string; // Gitea/Forgejo instance URL
+  organization: string; // Package owner (user or org)
+}
+
 export interface CacheEntry<T = any> {
   data: T;
   cachedAt: Date;

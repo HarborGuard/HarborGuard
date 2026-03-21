@@ -2,7 +2,7 @@
 
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { TabsContent } from "@/components/ui/tabs"
+
 import { DockerImageSelector } from "@/components/images/docker-image-selector"
 import type { DockerImage } from "@/types"
 
@@ -26,7 +26,7 @@ export function LocalImagesTab({
   isLoading,
 }: LocalImagesTabProps) {
   return (
-    <TabsContent value="local" className="space-y-3">
+    <div className="space-y-3">
       <div className="flex items-center space-x-2">
         <Checkbox
           id="scan-all-local"
@@ -68,6 +68,6 @@ export function LocalImagesTab({
           ? `All ${localImageCount || 0} local Docker images will be scanned.`
           : "Select a Docker image from your local Docker daemon."}
       </p>
-    </TabsContent>
+    </div>
   )
 }

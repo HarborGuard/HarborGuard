@@ -6,6 +6,7 @@
 
 import { prisma } from '@/lib/prisma';
 import type { ScanReports } from './types';
+import { ScannerAdapterRegistry } from './adapters';
 
 /**
  * Create or update ScanMetadata record, storing raw JSONB data for downloads
@@ -77,31 +78,16 @@ export async function createOrUpdateScanMetadata(scanId: string, reports: ScanRe
 
 /**
  * Dispatch scan reports to their individual scanner result tables.
+ * Uses the adapter registry to dynamically delegate to the correct adapter.
  */
 export async function saveScannerResultTables(metadataId: string, reports: ScanReports): Promise<void> {
   try {
-    if (reports.grype) {
-      await saveGrypeResults(metadataId, reports.grype);
-    }
-
-    if (reports.trivy) {
-      await saveTrivyResults(metadataId, reports.trivy);
-    }
-
-    if (reports.dive) {
-      await saveDiveResults(metadataId, reports.dive);
-    }
-
-    if (reports.syft) {
-      await saveSyftResults(metadataId, reports.syft);
-    }
-
-    if (reports.dockle) {
-      await saveDockleResults(metadataId, reports.dockle);
-    }
-
-    if (reports.osv) {
-      await saveOsvResults(metadataId, reports.osv);
+    for (const [name, report] of Object.entries(reports)) {
+      if (!report) continue;
+      const adapter = ScannerAdapterRegistry.get(name);
+      if (adapter) {
+        await adapter.saveResults(metadataId, report);
+      }
     }
   } catch (error) {
     console.error('Error saving to scanner result tables:', error);

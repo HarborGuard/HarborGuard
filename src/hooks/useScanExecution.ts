@@ -6,6 +6,7 @@ import { buildScanRequest, parseImageString as parseImage } from "@/lib/registry
 import { useApp } from "@/contexts/AppContext"
 import { useScanning } from "@/contexts/ScanningContext"
 import type { DockerImage, SwarmService } from "@/types"
+import type { KubeImage } from "@/lib/kubernetes/types"
 import type { Repository, RepositoryImage } from "@/hooks/useScanSources"
 
 export interface ScanFormState {
@@ -17,6 +18,7 @@ export interface ScanFormState {
   selectedDockerImage: DockerImage | null
   selectedExistingImage: { source: string; name: string } | null
   selectedSwarmService: SwarmService | null
+  selectedKubeImage: KubeImage | null
   scanAllLocalImages: boolean
   selectedRepository: Repository | null
   selectedImages: Record<string, RepositoryImage>
@@ -32,6 +34,7 @@ export interface ScanFormResetters {
   setCustomRegistry: (value: string) => void
   setSelectedDockerImage: (value: DockerImage | null) => void
   setSelectedSwarmService: (value: SwarmService | null) => void
+  setSelectedKubeImage: (value: KubeImage | null) => void
   setSearchQuery: (value: string) => void
   setScanAllLocalImages: (value: boolean) => void
   setLocalImageCount: (value: number) => void
@@ -101,7 +104,7 @@ export function useScanExecution(
     const {
       selectedSource, imageUrl, githubRepo, selectedDockerImage,
       localImageName, customRegistry, selectedSwarmService,
-      selectedRepository, selectedImages, selectedTags
+      selectedKubeImage, selectedRepository, selectedImages, selectedTags
     } = formState
 
     switch (selectedSource) {
@@ -117,6 +120,8 @@ export function useScanExecution(
         return imageUrl
       case 'swarm':
         return selectedSwarmService ? `${selectedSwarmService.image}:${selectedSwarmService.imageTag}` : ''
+      case 'kubernetes':
+        return selectedKubeImage ? selectedKubeImage.image : ''
       case 'private':
         if (selectedRepository) {
           const image = selectedImages[selectedRepository.id]
@@ -132,8 +137,8 @@ export function useScanExecution(
   const handleStartScan = async () => {
     const {
       selectedSource, selectedDockerImage, selectedSwarmService,
-      scanAllLocalImages, selectedRepository, selectedImages,
-      selectedTags, selectedExistingImage, dockerImages
+      selectedKubeImage, scanAllLocalImages, selectedRepository,
+      selectedImages, selectedTags, selectedExistingImage, dockerImages
     } = formState
 
     // Handle scan all local images
@@ -207,6 +212,10 @@ export function useScanExecution(
         imageName = selectedSwarmService.image
         imageTag = selectedSwarmService.imageTag
         registry = undefined
+      } else if (selectedSource === 'kubernetes' && selectedKubeImage) {
+        imageName = selectedKubeImage.name
+        imageTag = selectedKubeImage.tag
+        registry = undefined
       } else if (selectedSource === 'private' && selectedRepository) {
         const selectedImage = selectedImages[selectedRepository.id]
         const selectedTag = selectedTags[selectedRepository.id]
@@ -256,6 +265,10 @@ export function useScanExecution(
         scanRequest.source = 'registry'
       }
 
+      if (selectedSource === 'kubernetes' && selectedKubeImage) {
+        scanRequest.source = 'registry'
+      }
+
       const response = await fetch('/api/scans/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -292,6 +305,7 @@ export function useScanExecution(
       resetters.setCustomRegistry('')
       resetters.setSelectedDockerImage(null)
       resetters.setSelectedSwarmService(null)
+      resetters.setSelectedKubeImage(null)
       resetters.setSearchQuery('')
       resetters.setIsOpen(false)
 
