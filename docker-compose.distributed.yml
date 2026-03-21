@@ -1,0 +1,72 @@
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    ports:
+      - "3456:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - DATABASE_URL=postgresql://postgres:harborguard@db:5432/harborguard
+      - S3_ENDPOINT=http://minio:9000
+      - S3_BUCKET=harborguard
+      - S3_ACCESS_KEY=minioadmin
+      - S3_SECRET_KEY=minioadmin
+      - LOG_LEVEL=info
+      - HEALTH_CHECK_ENABLED=true
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+  sensor:
+    build:
+      context: ./packages/sensor
+      dockerfile: Dockerfile
+    image: harborguard-sensor
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - sensor-cache:/workspace/cache
+    environment:
+      - HG_DASHBOARD_URL=http://dashboard:3000
+      - HG_API_KEY=${HG_API_KEY:-}
+      - HG_AGENT_NAME=local-sensor
+      - HG_S3_ENDPOINT=http://minio:9000
+      - HG_S3_BUCKET=harborguard
+      - HG_S3_ACCESS_KEY=minioadmin
+      - HG_S3_SECRET_KEY=minioadmin
+      - HG_LOG_LEVEL=info
+    depends_on:
+      - dashboard
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=harborguard
+      - POSTGRES_PASSWORD=harborguard
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - s3data:/data
+
+volumes:
+  pgdata:
+  s3data:
+  sensor-cache:
