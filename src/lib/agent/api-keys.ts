@@ -15,7 +15,7 @@ export async function validateApiKey(key: string): Promise<{ id: string; name: s
   const hash = crypto.createHash('sha256').update(key).digest('hex');
 
   const agent = await prisma.agent.findFirst({
-    where: { apiKeyHash: hash, status: 'ACTIVE' },
+    where: { apiKeyHash: hash, status: { in: ['ACTIVE', 'DISCONNECTED'] } },
     select: { id: true, name: true, capabilities: true },
   });
 
