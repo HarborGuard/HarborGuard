@@ -103,19 +103,23 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    const scanMetadata = await prisma.scanMetadata.create({
+      data: {
+        ...(validatedData.scan.scannerVersions && { scannerVersions: validatedData.scan.scannerVersions }),
+      },
+    })
+
     const scan = await prisma.scan.create({
       data: {
         requestId: validatedData.requestId,
         imageId: image.id,
+        tag: validatedData.image.tag,
         startedAt: new Date(validatedData.scan.startedAt),
         finishedAt: validatedData.scan.finishedAt ? new Date(validatedData.scan.finishedAt) : null,
         status: validatedData.scan.status,
         reportsDir: validatedData.scan.reportsDir,
         errorMessage: validatedData.scan.errorMessage,
-        metadata: {
-          ...(validatedData.reports?.metadata || {}),
-          scannerVersions: validatedData.scan.scannerVersions
-        } as any,
+        metadataId: scanMetadata.id,
       },
     })
 
