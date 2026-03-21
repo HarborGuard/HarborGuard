@@ -580,7 +580,7 @@ export class PatchExecutorTar {
         sizeBytes: originalImage.sizeBytes
       }
     });
-    
+
     await prisma.patchedImage.create({
       data: {
         originalImageId: originalImage.id,

@@ -53,7 +53,8 @@ export async function GET(request: NextRequest) {
               tag: true,
               source: true,
               digest: true,
-              registry: true
+              registry: true,
+              registryType: true
             }
           },
           // Include vulnerability findings for accurate counting

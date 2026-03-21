@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
         try {
           // Upsert the image - create if doesn't exist, or update if it does
           const imageDigest = image.digest || image.id;
-          
+
           dbImage = await prisma.image.upsert({
             where: {
               digest: imageDigest

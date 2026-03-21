@@ -122,6 +122,8 @@ export async function GET(request: NextRequest) {
             digest: true,
             sizeBytes: true,
             platform: true,
+            registry: true,
+            registryType: true,
             primaryRepositoryId: true,
             createdAt: true,
             updatedAt: true
