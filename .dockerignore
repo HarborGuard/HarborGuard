@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.claude
+CLAUDE.md
+docs
+.specify
+specs
+coverage
+packages/sensor/node_modules
+packages/sensor/dist
+packages/sensor/.git
