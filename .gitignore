@@ -45,6 +45,7 @@ next-env.d.ts
 
 /src/generated/prisma
 /.claude
+CLAUDE.md
 /docs/*
 !/docs/ADDING-A-REGISTRY.md
 !/docs/ADDING-A-SCANNER.md
