@@ -1,3 +1,11 @@
+# ---- 0) Build sensor module ----
+FROM node:20-alpine AS sensor-builder
+WORKDIR /sensor
+COPY packages/sensor/package.json packages/sensor/package-lock.json* ./
+RUN npm ci
+COPY packages/sensor/ .
+RUN npm run build
+
 # ---- 1) Build Next.js ----
 FROM node:20-alpine AS builder
 WORKDIR /app
@@ -132,6 +140,11 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/src/generated ./src/generated
 COPY --from=builder /app/scripts ./scripts
+
+# Sensor module (CLI: node /app/sensor/dist/index.js)
+COPY --from=sensor-builder /sensor/dist ./sensor/dist
+COPY --from=sensor-builder /sensor/node_modules ./sensor/node_modules
+COPY --from=sensor-builder /sensor/package.json ./sensor/package.json
 
 ENV PORT=3000
 
