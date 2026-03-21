@@ -1022,6 +1022,58 @@ enum PatchStrategy {
   MULTI
 }
 
+// ---------------------------------------------------------------------------
+// Agent management (sensor <-> dashboard protocol)
+// ---------------------------------------------------------------------------
+
+model Agent {
+  id              String      @id @default(cuid())
+  name            String
+  apiKey          String      @unique
+  apiKeyHash      String
+  status          AgentStatus @default(ACTIVE)
+  lastSeenAt      DateTime?
+  registeredAt    DateTime    @default(now())
+  hostname        String?
+  os              String?
+  arch            String?
+  sensorVersion   String?
+  scannerVersions Json?
+  capabilities    String[]
+  s3Configured    Boolean     @default(false)
+  metadata        Json?
+  scanJobs        AgentJob[]
+
+  @@index([apiKey])
+  @@index([status])
+  @@map("agents")
+}
+
+model AgentJob {
+  id           String    @id @default(cuid())
+  agentId      String?
+  type         String
+  status       String    @default("PENDING")
+  payload      Json
+  result       Json?
+  createdAt    DateTime  @default(now())
+  assignedAt   DateTime?
+  completedAt  DateTime?
+  errorMessage String?
+  agent        Agent?    @relation(fields: [agentId], references: [id])
+
+  @@index([agentId])
+  @@index([status])
+  @@index([agentId, status])
+  @@map("agent_jobs")
+}
+
+enum AgentStatus {
+  ACTIVE
+  INACTIVE
+  DISCONNECTED
+}
+
 model ScheduledScan {
   id                  String                @id @default(cuid())
   name                String
