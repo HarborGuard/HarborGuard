@@ -158,19 +158,31 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         repository = this.buildTemporaryRepository(registryUrl, request);
       }
 
-      console.log('[DatabaseAdapter] Creating provider for repository type:', repository.type);
-      const provider = RegistryProviderFactory.createFromRepository(repository);
-      console.log('[DatabaseAdapter] Provider created:', provider.getProviderName());
-      const inspection = await provider.inspectImage(cleanImageName, request.tag);
-      const digest = inspection.digest;
-      const metadata = inspection.config || {};
-
       // Determine registry type
       const registryTypeValue = request.registryType
         || (repository ? repository.type as string : null)
         || this.detectRegistryType(registryUrl);
 
-      const imageSize = this.resolveImageSize(inspection, metadata);
+      // Try to inspect the image for digest/metadata — falls back to placeholder
+      // when skopeo/registry tools aren't available (dashboard-only image)
+      let digest: string;
+      let metadata: any = {};
+      let imageSize = 0;
+
+      try {
+        console.log('[DatabaseAdapter] Creating provider for repository type:', repository.type);
+        const provider = RegistryProviderFactory.createFromRepository(repository);
+        console.log('[DatabaseAdapter] Provider created:', provider.getProviderName());
+        const inspection = await provider.inspectImage(cleanImageName, request.tag);
+        digest = inspection.digest;
+        metadata = inspection.config || {};
+        imageSize = this.resolveImageSize(inspection, metadata);
+      } catch (inspectError) {
+        // Dashboard-only image may not have skopeo — create a placeholder digest
+        console.warn('[DatabaseAdapter] Image inspection failed, using placeholder:', inspectError instanceof Error ? inspectError.message : inspectError);
+        digest = `pending:${cleanImageName}:${request.tag}:${Date.now()}`;
+      }
+
       const imageData: any = {
         name: cleanImageName, tag: request.tag, digest,
         source: registryUrl && registryUrl !== 'docker.io' ? 'REGISTRY_PRIVATE' : 'REGISTRY',
