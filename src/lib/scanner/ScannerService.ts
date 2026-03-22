@@ -6,6 +6,7 @@ import { detectScanMode, executeScanViaSensor, dispatchScanToAgent, ingestEnvelo
 import type { ScanRequest, ScanJob, ScanStatus } from '@/types';
 import { logger } from '@/lib/logger';
 import { notificationService } from '@/lib/notifications';
+import { auditLogger } from '@/lib/audit-logger';
 // Template types removed - using basic ScanRequest
 
 // Global shared state to work around Next.js development mode module reloading
@@ -170,6 +171,7 @@ export class ScannerService {
 
         this.updateJobStatus(requestId, 'SUCCESS', 100, undefined, 'Scan completed successfully');
         await scanQueue.completeScan(requestId);
+        auditLogger.scanComplete('system', `${request.image}:${request.tag}`, scanId).catch(() => {});
         return;
       }
 
@@ -183,6 +185,7 @@ export class ScannerService {
       });
       this.updateJobStatus(requestId, 'FAILED', undefined, errorMessage);
       await scanQueue.completeScan(requestId, errorMessage);
+      auditLogger.scanFailed('system', `${request.image}:${request.tag}`, scanId, errorMessage).catch(() => {});
       return;
     } catch (error) {
       console.error(`Scan execution failed for ${requestId}:`, error);
@@ -197,6 +200,7 @@ export class ScannerService {
       });
       this.updateJobStatus(requestId, 'FAILED', undefined, errorMessage);
       await scanQueue.completeScan(requestId, errorMessage);
+      auditLogger.scanFailed('system', `${request.image}:${request.tag}`, scanId, errorMessage).catch(() => {});
       throw error;
     }
   }

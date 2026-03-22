@@ -222,6 +222,22 @@ export const auditLogger = {
   },
 
   /**
+   * Log scan failure
+   */
+  scanFailed: async (userIp: string, imageName: string, scanId: string, errorMessage?: string) => {
+    const protectedIp = process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ? 'DEMO_PROTECT' : userIp;
+
+    await logAuditEvent({
+      eventType: 'scan_failed',
+      category: 'error',
+      userIp: protectedIp,
+      action: `Scan failed for ${imageName}`,
+      resource: imageName,
+      details: { scanId, imageName, errorMessage }
+    });
+  },
+
+  /**
    * Log CVE classification
    */
   cveClassification: async (
