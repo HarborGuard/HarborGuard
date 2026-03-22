@@ -196,6 +196,7 @@ export class ScannerService {
         finishedAt: new Date()
       });
       this.updateJobStatus(requestId, 'FAILED', undefined, errorMessage);
+      await scanQueue.completeScan(requestId, errorMessage);
       throw error;
     }
   }
