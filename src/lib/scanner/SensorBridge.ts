@@ -6,13 +6,14 @@
  *  - Agent dispatch: creates an AgentJob for a remote sensor container to pick up
  */
 import { promisify } from 'util';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import fs from 'fs/promises';
 import { prisma } from '@/lib/prisma';
 import type { ScanRequest } from '@/types';
 import { logger } from '@/lib/logger';
+import { mapSeverityToEnum } from '@/lib/utils/severity-utils';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 const SENSOR_CLI = process.env.SENSOR_CLI_PATH || '/app/sensor/dist/index.js';
 
@@ -37,12 +38,6 @@ interface ScanEnvelope {
   artifacts?: { s3Prefix?: string; rawResults?: Record<string, string>; sbom?: string };
 }
 
-function mapSeverityToEnum(severity: string): 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO' {
-  const upper = severity?.toUpperCase();
-  if (['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'].includes(upper)) return upper as any;
-  return 'INFO';
-}
-
 // -------------------------------------------------------------------------
 // Detection
 // -------------------------------------------------------------------------
@@ -58,17 +53,17 @@ export async function isSensorAvailableLocally(): Promise<boolean> {
 
 export async function hasRegisteredAgents(): Promise<boolean> {
   const count = await prisma.agent.count({
-    where: { status: { in: ['ACTIVE', 'DISCONNECTED'] } },
+    where: { status: 'ACTIVE' },
   });
   return count > 0;
 }
 
-export type ScanMode = 'local-sensor' | 'agent-dispatch' | 'legacy';
+export type ScanMode = 'local-sensor' | 'agent-dispatch' | 'unavailable';
 
 export async function detectScanMode(): Promise<ScanMode> {
   if (await hasRegisteredAgents()) return 'agent-dispatch';
   if (await isSensorAvailableLocally()) return 'local-sensor';
-  return 'legacy';
+  return 'unavailable';
 }
 
 // -------------------------------------------------------------------------
@@ -106,13 +101,11 @@ export async function executeScanViaSensor(
     args.push('--scanners', scannersList);
   }
 
-  const cmd = `node "${SENSOR_CLI}" ${args.map(a => `"${a}"`).join(' ')}`;
-
   onProgress?.(30, 'Running sensor scan');
-  logger.info(`[SensorBridge] Executing: ${cmd}`);
+  logger.info(`[SensorBridge] Executing: node ${SENSOR_CLI} ${args.join(' ')}`);
 
   try {
-    const { stdout, stderr } = await execAsync(cmd, {
+    const { stdout, stderr } = await execFileAsync('node', [SENSOR_CLI, ...args], {
       timeout: 30 * 60 * 1000,
       maxBuffer: 100 * 1024 * 1024,
       env: { ...process.env },
@@ -145,9 +138,13 @@ export async function dispatchScanToAgent(
     : request.source === 'local' ? 'docker'
     : 'registry';
 
+  const imageRef = request.source === 'tar' && request.tarPath
+    ? request.tarPath
+    : `${request.image}:${request.tag}`;
+
   const payload: any = {
     scan: {
-      imageRef: `${request.image}:${request.tag}`,
+      imageRef,
       source: sourceType,
       ...(request.tarPath && { tarPath: request.tarPath }),
       ...(request.scanners && {
@@ -160,8 +157,9 @@ export async function dispatchScanToAgent(
 
   const job = await prisma.agentJob.create({
     data: {
-      type: 'scan',
+      type: 'SCAN',
       status: 'PENDING',
+      scanId,
       payload,
     },
   });
