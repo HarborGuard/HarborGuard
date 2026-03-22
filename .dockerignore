@@ -7,6 +7,5 @@ docs
 .specify
 specs
 coverage
-harborguard-sensor/node_modules
-harborguard-sensor/dist
 harborguard-sensor/.git
+harborguard-sensor/harborguard-sensor

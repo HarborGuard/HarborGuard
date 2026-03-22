@@ -1,10 +1,10 @@
-# ---- 0) Build sensor module ----
-FROM node:20-alpine AS sensor-builder
+# ---- 0) Build sensor module (Go) ----
+FROM golang:1.24-alpine AS sensor-builder
 WORKDIR /sensor
-COPY harborguard-sensor/package.json harborguard-sensor/package-lock.json* ./
-RUN npm ci
+COPY harborguard-sensor/go.mod harborguard-sensor/go.sum ./
+RUN go mod download
 COPY harborguard-sensor/ .
-RUN npm run build
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /harborguard-sensor .
 
 # ---- 1) Build Next.js ----
 FROM node:20-alpine AS builder
@@ -141,10 +141,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/src/generated ./src/generated
 COPY --from=builder /app/scripts ./scripts
 
-# Sensor module (CLI: node /app/sensor/dist/index.js)
-COPY --from=sensor-builder /sensor/dist ./sensor/dist
-COPY --from=sensor-builder /sensor/node_modules ./sensor/node_modules
-COPY --from=sensor-builder /sensor/package.json ./sensor/package.json
+# Sensor binary (Go)
+COPY --from=sensor-builder /harborguard-sensor ./sensor/harborguard-sensor
 
 ENV PORT=3000
 
