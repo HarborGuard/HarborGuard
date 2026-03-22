@@ -147,9 +147,9 @@ export class ScannerService {
         this.updateJobStatus(requestId, 'RUNNING', 10, undefined, 'Dispatching to sensor agent');
         const { jobId } = await dispatchScanToAgent(scanId, request);
         logger.info(`[ScannerService] Scan ${requestId} dispatched as agent job ${jobId}`);
-        // The scan stays RUNNING until the sensor uploads results via /api/scans/upload
-        // and calls /api/agent/jobs/{jobId}/status
         this.updateJobStatus(requestId, 'RUNNING', 20, undefined, 'Waiting for sensor agent');
+        // Release the queue slot — the scan will be completed when the sensor uploads results
+        await scanQueue.completeScan(requestId);
         return;
       }
 
