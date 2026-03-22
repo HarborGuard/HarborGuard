@@ -156,19 +156,21 @@ async function handleEnvelopeUpload(envelope: any, agentId: string | null) {
   const digest = envelope.image?.digest || `sensor:${requestId}`
 
   // 1. Upsert image
-  let image = await prisma.image.findUnique({ where: { digest } })
-  if (!image) {
-    image = await prisma.image.create({
-      data: {
-        name: envelope.image?.name || 'unknown',
-        tag: envelope.image?.tag || 'latest',
-        source: 'REGISTRY',
-        digest,
-        platform: envelope.image?.platform ?? null,
-        sizeBytes: envelope.image?.sizeBytes ? BigInt(envelope.image.sizeBytes) : null,
-      },
-    })
-  }
+  const image = await prisma.image.upsert({
+    where: { digest },
+    update: {
+      name: envelope.image?.name || 'unknown',
+      tag: envelope.image?.tag || 'latest',
+    },
+    create: {
+      name: envelope.image?.name || 'unknown',
+      tag: envelope.image?.tag || 'latest',
+      source: 'REGISTRY',
+      digest,
+      platform: envelope.image?.platform ?? null,
+      sizeBytes: envelope.image?.sizeBytes ? BigInt(envelope.image.sizeBytes) : null,
+    },
+  })
 
   // 2. Create scan
   const scan = await prisma.scan.create({
@@ -197,6 +199,7 @@ async function handleEnvelopeUpload(envelope: any, agentId: string | null) {
       complianceScore: envelope.aggregates?.complianceScore ?? null,
       complianceGrade: envelope.aggregates?.complianceGrade ?? null,
       scannerVersions: envelope.sensor?.scannerVersions ?? null,
+      s3Prefix: envelope.artifacts?.s3Prefix ?? null,
     },
   })
 
