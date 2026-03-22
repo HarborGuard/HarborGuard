@@ -226,6 +226,14 @@ export class ScannerService {
     }
   }
 
+  /**
+   * Called when an agent uploads results for a dispatched scan.
+   * Updates the in-memory job tracker so SSE/status endpoints reflect completion.
+   */
+  markScanComplete(requestId: string, status: 'SUCCESS' | 'PARTIAL' | 'FAILED'): void {
+    this.updateJobStatus(requestId, status, 100, undefined, 'Scan completed by sensor');
+  }
+
   getScanJob(requestId: string): ScanJob | undefined {
     return globalJobs.get(requestId);
   }

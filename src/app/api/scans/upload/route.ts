@@ -5,6 +5,7 @@ import type { ScanUploadRequest } from '@/types'
 import { apiError } from '@/lib/api/api-utils'
 import { extractBearerToken, validateApiKey } from '@/lib/agent/api-keys'
 import { ingestEnvelope } from '@/lib/scanner/SensorBridge'
+import { scannerService } from '@/lib/scanner'
 
 // Validation schema for legacy scan upload
 const ScanUploadSchema = z.object({
@@ -187,6 +188,11 @@ async function handleEnvelopeUpload(envelope: any, agentId: string | null) {
       }
 
       await ingestEnvelope(existingScan.id, envelope)
+
+      // Update in-memory job tracker so SSE/status endpoints reflect completion
+      const scanStatus = envelope.scan.status === 'FAILED' ? 'FAILED' as const : envelope.scan.status === 'PARTIAL' ? 'PARTIAL' as const : 'SUCCESS' as const
+      scannerService.markScanComplete(existingScan.requestId, scanStatus)
+
       return NextResponse.json({ success: true, scanId: existingScan.id, imageId: existingScan.imageId }, { status: 200 })
     }
   }
