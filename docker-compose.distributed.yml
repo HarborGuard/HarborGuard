@@ -23,10 +23,7 @@ services:
         condition: service_started
 
   sensor:
-    build:
-      context: ./harborguard-sensor
-      dockerfile: Dockerfile
-    image: harborguard-sensor
+    image: ghcr.io/harborguard/harborguard-sensor:latest
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - sensor-cache:/workspace/cache
