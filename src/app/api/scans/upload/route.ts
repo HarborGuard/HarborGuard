@@ -145,12 +145,54 @@ export async function POST(request: NextRequest) {
 // ---------------------------------------------------------------------------
 
 async function handleEnvelopeUpload(envelope: any, agentId: string | null) {
-  const requestId = envelope.scan?.id
-  if (!requestId) {
+  const envelopeScanId = envelope.scan?.id
+  if (!envelopeScanId) {
     return NextResponse.json({ error: 'Missing scan.id in envelope' }, { status: 400 })
   }
 
-  const existingScan = await prisma.scan.findUnique({ where: { requestId } })
+  // Check if this envelope is from an agent-dispatched job.
+  // The sensor uses the AgentJob ID as envelope.scan.id, so look up the linked scan.
+  const agentJob = await prisma.agentJob.findUnique({
+    where: { id: envelopeScanId },
+    select: { scanId: true },
+  })
+
+  if (agentJob?.scanId) {
+    // Update the existing scan that the dashboard created when it dispatched the job
+    const existingScan = await prisma.scan.findUnique({ where: { id: agentJob.scanId } })
+    if (existingScan) {
+      await prisma.scan.update({
+        where: { id: existingScan.id },
+        data: {
+          status: envelope.scan.status === 'FAILED' ? 'FAILED' : envelope.scan.status === 'PARTIAL' ? 'PARTIAL' : 'SUCCESS',
+          riskScore: envelope.aggregates?.riskScore ?? null,
+          finishedAt: envelope.scan.finishedAt ? new Date(envelope.scan.finishedAt) : new Date(),
+          source: 'sensor',
+        },
+      })
+
+      // Update image with digest if we have one now
+      const digest = envelope.image?.digest
+      if (digest) {
+        await prisma.image.update({
+          where: { id: existingScan.imageId },
+          data: {
+            digest,
+            platform: envelope.image?.platform ?? undefined,
+            sizeBytes: envelope.image?.sizeBytes ? BigInt(envelope.image.sizeBytes) : undefined,
+          },
+        }).catch(() => {
+          // digest uniqueness conflict — image already exists with this digest, that's fine
+        })
+      }
+
+      await ingestEnvelope(existingScan.id, envelope)
+      return NextResponse.json({ success: true, scanId: existingScan.id, imageId: existingScan.imageId }, { status: 200 })
+    }
+  }
+
+  // No linked agent job — standalone upload (CLI one-shot or direct upload)
+  const existingScan = await prisma.scan.findUnique({ where: { requestId: envelopeScanId } })
   if (existingScan) {
     return NextResponse.json(
       { error: 'Scan with this requestId already exists', scanId: existingScan.id },
@@ -158,10 +200,8 @@ async function handleEnvelopeUpload(envelope: any, agentId: string | null) {
     )
   }
 
-  // Generate a stable digest if not provided
-  const digest = envelope.image?.digest || `sensor:${requestId}`
+  const digest = envelope.image?.digest || `sensor:${envelopeScanId}`
 
-  // 1. Upsert image
   const image = await prisma.image.upsert({
     where: { digest },
     update: {
@@ -178,10 +218,9 @@ async function handleEnvelopeUpload(envelope: any, agentId: string | null) {
     },
   })
 
-  // 2. Create scan
   const scan = await prisma.scan.create({
     data: {
-      requestId,
+      requestId: envelopeScanId,
       imageId: image.id,
       tag: envelope.image?.tag || 'latest',
       startedAt: new Date(envelope.scan.startedAt),
@@ -192,9 +231,7 @@ async function handleEnvelopeUpload(envelope: any, agentId: string | null) {
     },
   })
 
-  // 3. Delegate metadata creation and findings insertion to shared function
   await ingestEnvelope(scan.id, envelope)
-
   return NextResponse.json({ success: true, scanId: scan.id, imageId: image.id }, { status: 201 })
 }
 
