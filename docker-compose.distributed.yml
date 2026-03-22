@@ -24,7 +24,7 @@ services:
 
   sensor:
     build:
-      context: ./packages/sensor
+      context: ./harborguard-sensor
       dockerfile: Dockerfile
     image: harborguard-sensor
     volumes:

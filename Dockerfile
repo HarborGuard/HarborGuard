@@ -1,9 +1,9 @@
 # ---- 0) Build sensor module ----
 FROM node:20-alpine AS sensor-builder
 WORKDIR /sensor
-COPY packages/sensor/package.json packages/sensor/package-lock.json* ./
+COPY harborguard-sensor/package.json harborguard-sensor/package-lock.json* ./
 RUN npm ci
-COPY packages/sensor/ .
+COPY harborguard-sensor/ .
 RUN npm run build
 
 # ---- 1) Build Next.js ----
