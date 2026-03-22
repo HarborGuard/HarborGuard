@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { prismaToScanWithImage, serializeForJson } from '@/lib/utils/type-utils'
 import { apiError } from '@/lib/api/api-utils'
+import { DashboardS3Client } from '@/lib/storage/s3'
 
 const UpdateScanSchema = z.object({
   status: z.enum(['PENDING', 'RUNNING', 'SUCCESS', 'PARTIAL', 'FAILED', 'CANCELLED']).optional(),
@@ -10,6 +11,32 @@ const UpdateScanSchema = z.object({
   riskScore: z.number().min(0).max(100).optional().nullable(),
   finishedAt: z.string().datetime().optional().nullable(),
 })
+
+/**
+ * Load scanner data from S3 if available.
+ * Priority: S3 raw JSON > relational tables > JSONB fields.
+ */
+async function loadFromS3(metadata: any): Promise<Record<string, any> | null> {
+  if (!metadata?.s3Prefix || !DashboardS3Client.isConfigured()) return null;
+
+  try {
+    const s3 = DashboardS3Client.getInstance();
+    const scanId = metadata.s3Prefix.replace('scans/', '').replace(/\/$/, '');
+    const scannerNames = ['trivy', 'grype', 'syft', 'dockle', 'osv', 'dive'];
+    const results: Record<string, any> = {};
+
+    await Promise.all(
+      scannerNames.map(async (name) => {
+        const data = await s3.getRawResult(scanId, name);
+        if (data) results[name] = data;
+      }),
+    );
+
+    return Object.keys(results).length > 0 ? results : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Normalize scanner data from relational tables into a consistent shape.
@@ -308,6 +335,7 @@ export async function GET(
         complianceInfo: true,
         compliancePass: true,
         scannerVersions: true,
+        s3Prefix: true,
         dockerId: true,
         dockerCreated: true,
         dockerSize: true,
@@ -411,8 +439,9 @@ export async function GET(
     // Convert Prisma data to properly typed scan
     const scanData = prismaToScanWithImage(scan);
 
-    // Normalize scanner results on the server side so clients don't need fallback chains
-    const scannerData = normalizeScannerData(scan.metadata);
+    // Priority: S3 raw JSON > relational tables > JSONB fields
+    const s3Data = await loadFromS3(scan.metadata);
+    const scannerData = s3Data ?? normalizeScannerData(scan.metadata);
 
     return NextResponse.json(serializeForJson({ ...scanData, scannerData }))
   } catch (error) {
