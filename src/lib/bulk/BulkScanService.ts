@@ -384,6 +384,10 @@ export class BulkScanService {
    * When no DB images match the pattern, create image records so bulk scan can proceed.
    * Handles specific image names (e.g. "alpine") and tag patterns (e.g. "3.1*").
    */
+  private isPatternLiteral(s: string): boolean {
+    return !/[*?\\[\](){}^$+|]/.test(s);
+  }
+
   private async createImagesFromPattern(
     imagePattern?: string,
     tagPattern?: string,
@@ -391,12 +395,12 @@ export class BulkScanService {
     if (!imagePattern) return [];
 
     const results: any[] = [];
-    const isSpecificImage = !imagePattern.includes('*') && !imagePattern.includes('?');
+    const isSpecificImage = this.isPatternLiteral(imagePattern);
 
     if (isSpecificImage) {
-      // Determine tags to create
+      // Determine tags to create — only use tagPattern if it's a literal value
       const tags: string[] = [];
-      if (tagPattern && !tagPattern.includes('*') && !tagPattern.includes('?')) {
+      if (tagPattern && this.isPatternLiteral(tagPattern)) {
         tags.push(tagPattern);
       } else {
         tags.push('latest');
