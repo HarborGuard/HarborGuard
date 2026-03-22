@@ -48,6 +48,18 @@ export class BulkScanService {
 
     console.log(`Found ${matchingImages.length} images matching bulk scan criteria`);
 
+    // If no DB images match, try to create image records from the pattern directly
+    if (matchingImages.length === 0) {
+      const created = await this.createImagesFromPattern(
+        request.patterns.imagePattern,
+        request.patterns.tagPattern,
+      );
+      if (created.length > 0) {
+        matchingImages.push(...created);
+        console.log(`Created ${created.length} image record(s) from pattern for bulk scan`);
+      }
+    }
+
     if (matchingImages.length === 0) {
       throw new Error('No images found matching the specified patterns');
     }
@@ -366,6 +378,52 @@ export class BulkScanService {
     }
 
     return { scanIds: results, successful, failed };
+  }
+
+  /**
+   * When no DB images match the pattern, create image records so bulk scan can proceed.
+   * Handles specific image names (e.g. "alpine") and tag patterns (e.g. "3.1*").
+   */
+  private async createImagesFromPattern(
+    imagePattern?: string,
+    tagPattern?: string,
+  ): Promise<any[]> {
+    if (!imagePattern) return [];
+
+    const results: any[] = [];
+    const isSpecificImage = !imagePattern.includes('*') && !imagePattern.includes('?');
+
+    if (isSpecificImage) {
+      // Determine tags to create
+      const tags: string[] = [];
+      if (tagPattern && !tagPattern.includes('*') && !tagPattern.includes('?')) {
+        tags.push(tagPattern);
+      } else {
+        tags.push('latest');
+      }
+
+      for (const tag of tags) {
+        let image = await prisma.image.findFirst({
+          where: { name: imagePattern, tag },
+          select: { id: true, name: true, tag: true, source: true, digest: true },
+        });
+
+        if (!image) {
+          image = await prisma.image.create({
+            data: {
+              name: imagePattern,
+              tag,
+              source: 'REGISTRY',
+              digest: `pending:${imagePattern}:${tag}:${Date.now()}`,
+            },
+            select: { id: true, name: true, tag: true, source: true, digest: true },
+          });
+        }
+        results.push(image);
+      }
+    }
+
+    return results;
   }
 
   private generateBatchId(): string {
