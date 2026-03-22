@@ -4,6 +4,7 @@ import { DatabaseAdapter } from './DatabaseAdapter';
 import { ScanExecutor } from './ScanExecutor';
 import { getScannerVersions } from './scanners';
 import { scanQueue } from './ScanQueue';
+import { detectScanMode, executeScanViaSensor, dispatchScanToAgent, ingestEnvelope } from './SensorBridge';
 import type { ScanRequest, ScanJob, ScanStatus } from '@/types';
 import { logger } from '@/lib/logger';
 import { notificationService } from '@/lib/notifications';
@@ -138,8 +139,48 @@ export class ScannerService {
 
   private async executeScan(requestId: string, request: ScanRequest, scanId: string, imageId: string) {
     try {
+      const mode = await detectScanMode();
+      logger.info(`[ScannerService] Scan mode: ${mode} for ${requestId}`);
+
+      if (mode === 'agent-dispatch') {
+        // Distributed mode: create an AgentJob and return — the sensor will upload results
+        this.updateJobStatus(requestId, 'RUNNING', 10, undefined, 'Dispatching to sensor agent');
+        const { jobId } = await dispatchScanToAgent(scanId, request);
+        logger.info(`[ScannerService] Scan ${requestId} dispatched as agent job ${jobId}`);
+        // The scan stays RUNNING until the sensor uploads results via /api/scans/upload
+        // and calls /api/agent/jobs/{jobId}/status
+        this.updateJobStatus(requestId, 'RUNNING', 20, undefined, 'Waiting for sensor agent');
+        return;
+      }
+
+      if (mode === 'local-sensor') {
+        // Monolith mode: run sensor CLI locally
+        const envelope = await executeScanViaSensor(
+          scanId,
+          request,
+          (pct, step) => this.updateJobStatus(requestId, 'RUNNING', pct, undefined, step),
+        );
+
+        this.updateJobStatus(requestId, 'RUNNING', 90, undefined, 'Storing results');
+        await ingestEnvelope(scanId, envelope);
+
+        // Send notifications
+        const { critical, high } = envelope.aggregates.vulnerabilityCounts;
+        if (critical > 0 || high > 0) {
+          await notificationService.notifyScanComplete(
+            `${request.image}:${request.tag}`,
+            scanId,
+            envelope.aggregates.vulnerabilityCounts,
+          );
+        }
+
+        this.updateJobStatus(requestId, 'SUCCESS', 100, undefined, 'Scan completed successfully');
+        await scanQueue.completeScan(requestId);
+        return;
+      }
+
+      // Legacy fallback: direct scanner execution (old code path)
       if (request.source === 'tar' && request.tarPath) {
-        // Direct tar file scanning
         await this.scanExecutor.executeTarScan(requestId, request, scanId, imageId);
         await this.finalizeScan(requestId, scanId, request);
       } else if (this.isLocalDockerScan(request)) {
@@ -149,15 +190,13 @@ export class ScannerService {
         if (this.shouldSimulateDownload(request)) {
           this.progressTracker.simulateDownloadProgress(requestId);
         }
-        
         this.progressTracker.simulateScanningProgress(requestId);
-        
         await this.scanExecutor.executeRegistryScan(requestId, request, scanId, imageId);
         await this.finalizeScan(requestId, scanId, request);
       }
     } catch (error) {
       console.error(`Scan execution failed for ${requestId}:`, error);
-      
+
       this.progressTracker.cleanup(requestId);
 
       const errorMessage = error instanceof Error ? error.message : String(error);
