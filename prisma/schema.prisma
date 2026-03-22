@@ -123,6 +123,7 @@ model ScanMetadata {
   compliancePass        Int?
   aggregatedRiskScore   Int?
   scannerVersions       Json?
+  s3Prefix              String?
   createdAt             DateTime       @default(now())
   updatedAt             DateTime       @updatedAt
   diveResult            DiveResults?
