@@ -5,8 +5,6 @@ import type { ScanRequest } from '@/types';
 import { RepositoryService } from '@/lib/registry/RepositoryService';
 import { RegistryProviderFactory } from '@/lib/registry/providers/RegistryProviderFactory';
 import type { Repository } from '@/generated/prisma';
-import { createOrUpdateScanMetadata, saveScannerResultTables } from './result-savers';
-import { populateNormalizedFindings, calculateAggregatedData } from './finding-normalizer';
 
 export class DatabaseAdapter implements IDatabaseAdapter {
   private repositoryService: RepositoryService;
@@ -46,18 +44,6 @@ export class DatabaseAdapter implements IDatabaseAdapter {
         console.debug('Bulk scan item update skipped:', error);
       }
     }
-  }
-
-  async uploadScanResults(scanId: string, reports: ScanReports): Promise<void> {
-    await this.updateScanRecord(scanId, { status: 'SUCCESS', finishedAt: new Date() });
-    const metadataId = await createOrUpdateScanMetadata(scanId, reports);
-    await saveScannerResultTables(metadataId, reports);
-    await populateNormalizedFindings(scanId, reports);
-    await calculateAggregatedData(scanId, reports, metadataId, this.updateScanRecord.bind(this));
-  }
-
-  async calculateAggregatedData(scanId: string, reports: ScanReports, metadataId?: string): Promise<void> {
-    await calculateAggregatedData(scanId, reports, metadataId, this.updateScanRecord.bind(this));
   }
 
   // ---------------------------------------------------------------------------

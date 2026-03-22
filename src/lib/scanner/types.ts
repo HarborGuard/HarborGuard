@@ -46,19 +46,6 @@ export interface IProgressTracker {
 export interface IDatabaseAdapter {
   initializeScanRecord(requestId: string, request: any): Promise<{ scanId: string; imageId: string }>;
   updateScanRecord(scanId: string, updates: any): Promise<void>;
-  uploadScanResults(scanId: string, reports: ScanReports): Promise<void>;
-  calculateAggregatedData(scanId: string, reports: ScanReports): Promise<void>;
-}
-
-export interface IMockDataGenerator {
-  generateMockScanData(request: any): Promise<ScanReports>;
-  uploadMockScanResults(requestId: string, scanId: string, reports: ScanReports): Promise<void>;
-}
-
-export interface IScanExecutor {
-  executeLocalDockerScan(requestId: string, request: any, scanId: string, imageId: string): Promise<void>;
-  executeRegistryScan(requestId: string, request: any, scanId: string, imageId: string): Promise<void>;
-  loadScanResults(requestId: string): Promise<ScanReports>;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,8 +1,6 @@
 import { ScanProgressEvent } from './types';
 import { ProgressTracker } from './ProgressTracker';
 import { DatabaseAdapter } from './DatabaseAdapter';
-import { ScanExecutor } from './ScanExecutor';
-import { getScannerVersions } from './scanners';
 import { scanQueue } from './ScanQueue';
 import { detectScanMode, executeScanViaSensor, dispatchScanToAgent, ingestEnvelope } from './SensorBridge';
 import type { ScanRequest, ScanJob, ScanStatus } from '@/types';
@@ -26,7 +24,6 @@ declare global {
 export class ScannerService {
   private progressTracker: ProgressTracker;
   private databaseAdapter: DatabaseAdapter;
-  private scanExecutor: ScanExecutor;
   private instanceId: string;
   private scanStartedListener?: (queuedScan: any) => void;
 
@@ -34,9 +31,6 @@ export class ScannerService {
     this.instanceId = Math.random().toString(36).substring(2, 8);
     this.progressTracker = new ProgressTracker(globalJobs, this.updateJobStatus.bind(this));
     this.databaseAdapter = new DatabaseAdapter();
-    this.scanExecutor = new ScanExecutor({
-      updateProgress: this.progressTracker.updateProgress.bind(this.progressTracker)
-    });
 
     // Set up queue event listeners
     this.setupQueueListeners();
@@ -179,21 +173,17 @@ export class ScannerService {
         return;
       }
 
-      // Legacy fallback: direct scanner execution (old code path)
-      if (request.source === 'tar' && request.tarPath) {
-        await this.scanExecutor.executeTarScan(requestId, request, scanId, imageId);
-        await this.finalizeScan(requestId, scanId, request);
-      } else if (this.isLocalDockerScan(request)) {
-        await this.scanExecutor.executeLocalDockerScan(requestId, request, scanId, imageId);
-        await this.finalizeScan(requestId, scanId, request);
-      } else {
-        if (this.shouldSimulateDownload(request)) {
-          this.progressTracker.simulateDownloadProgress(requestId);
-        }
-        this.progressTracker.simulateScanningProgress(requestId);
-        await this.scanExecutor.executeRegistryScan(requestId, request, scanId, imageId);
-        await this.finalizeScan(requestId, scanId, request);
-      }
+      // No scanner available — fail with a clear message
+      const errorMessage = 'No scan execution path available. Register a sensor agent or deploy the monolith image with the sensor module.';
+      logger.error(`[ScannerService] ${errorMessage}`);
+      await this.databaseAdapter.updateScanRecord(scanId, {
+        status: 'FAILED',
+        errorMessage,
+        finishedAt: new Date(),
+      });
+      this.updateJobStatus(requestId, 'FAILED', undefined, errorMessage);
+      await scanQueue.completeScan(requestId, errorMessage);
+      return;
     } catch (error) {
       console.error(`Scan execution failed for ${requestId}:`, error);
 
@@ -210,46 +200,6 @@ export class ScannerService {
     }
   }
 
-
-  private async finalizeScan(requestId: string, scanId: string, _request: ScanRequest) {
-    this.updateJobStatus(requestId, 'RUNNING', 90, undefined, 'Processing scan results');
-
-    const reports = await this.scanExecutor.loadScanResults(requestId);
-    
-    const scannerVersions = await getScannerVersions();
-    // Add scanner versions to reports metadata
-    if (!reports.metadata) {
-      reports.metadata = {};
-    }
-    reports.metadata.scannerVersions = scannerVersions;
-
-    await this.databaseAdapter.uploadScanResults(scanId, reports);
-
-    // Calculate vulnerability counts for notifications
-    const vulnerabilityCounts = this.calculateVulnerabilityCounts(reports);
-    
-    // Send notifications if high/critical vulnerabilities found
-    if (vulnerabilityCounts.critical > 0 || vulnerabilityCounts.high > 0) {
-      await notificationService.notifyScanComplete(
-        `${_request.image}:${_request.tag}`,
-        scanId,
-        vulnerabilityCounts
-      );
-    }
-
-    this.updateJobStatus(requestId, 'SUCCESS', 100, undefined, 'Scan completed successfully');
-    
-    // Notify queue that scan is complete
-    await scanQueue.completeScan(requestId);
-  }
-
-  private isLocalDockerScan(request: ScanRequest): boolean {
-    return request.source === 'local';
-  }
-
-  private shouldSimulateDownload(request: ScanRequest): boolean {
-    return request.source !== 'local' && request.source !== 'tar';
-  }
 
   private updateJobStatus(requestId: string, status: ScanJob['status'], progress?: number, error?: string, step?: string) {
     const job = globalJobs.get(requestId);
@@ -344,67 +294,6 @@ export class ScannerService {
     return scanQueue.getEstimatedWaitTime(requestId);
   }
 
-  private calculateVulnerabilityCounts(reports: any): { critical: number; high: number; medium: number; low: number } {
-    const counts = {
-      critical: 0,
-      high: 0,
-      medium: 0,
-      low: 0
-    };
-
-    // Count vulnerabilities from all scanner reports
-    for (const [scanner, report] of Object.entries(reports)) {
-      if (scanner === 'trivy' && report) {
-        const trivyReport = report as any;
-        if (trivyReport.Results) {
-          for (const result of trivyReport.Results) {
-            if (result.Vulnerabilities) {
-              for (const vuln of result.Vulnerabilities) {
-                const severity = (vuln.Severity || 'UNKNOWN').toUpperCase();
-                switch (severity) {
-                  case 'CRITICAL':
-                    counts.critical++;
-                    break;
-                  case 'HIGH':
-                    counts.high++;
-                    break;
-                  case 'MEDIUM':
-                    counts.medium++;
-                    break;
-                  case 'LOW':
-                    counts.low++;
-                    break;
-                }
-              }
-            }
-          }
-        }
-      } else if (scanner === 'grype' && report) {
-        const grypeReport = report as any;
-        if (grypeReport.matches) {
-          for (const match of grypeReport.matches) {
-            const severity = (match.vulnerability?.severity || 'Unknown').toUpperCase();
-            switch (severity) {
-              case 'CRITICAL':
-                counts.critical++;
-                break;
-              case 'HIGH':
-                counts.high++;
-                break;
-              case 'MEDIUM':
-                counts.medium++;
-                break;
-              case 'LOW':
-                counts.low++;
-                break;
-            }
-          }
-        }
-      }
-    }
-
-    return counts;
-  }
 }
 
 // Create singleton scanner service

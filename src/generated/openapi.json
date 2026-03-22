@@ -21,6 +21,18 @@
   ],
   "tags": [
     {
+      "name": "Admin",
+      "description": "Admin operations"
+    },
+    {
+      "name": "Agent",
+      "description": "Agent operations"
+    },
+    {
+      "name": "Agents",
+      "description": "Agents operations"
+    },
+    {
       "name": "Audit Logs",
       "description": "Audit logging and history"
     },
@@ -39,6 +51,10 @@
     {
       "name": "Images",
       "description": "Container image management"
+    },
+    {
+      "name": "Kubernetes",
+      "description": "Kubernetes operations"
     },
     {
       "name": "Openapi.json",
@@ -78,6 +94,204 @@
     }
   ],
   "paths": {
+    "/api/admin/backfill-registry": {
+      "post": {
+        "summary": "POST /api/admin/backfill-registry",
+        "tags": [
+          "Admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/agent/heartbeat": {
+      "post": {
+        "summary": "POST /api/agent/heartbeat",
+        "tags": [
+          "Agent"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "activeScans": {
+                    "type": "string",
+                    "description": "activeScans parameter (optional)"
+                  },
+                  "uptimeSeconds": {
+                    "type": "string",
+                    "description": "uptimeSeconds parameter (optional)"
+                  },
+                  "status": {
+                    "type": "string",
+                    "description": "status parameter (optional)"
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agent/jobs/{jobId}/status": {
+      "post": {
+        "summary": "POST /api/agent/jobs/{jobId}/status",
+        "tags": [
+          "Agent"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "jobId parameter"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "description": "status parameter"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agent/jobs": {
+      "get": {
+        "summary": "GET /api/agent/jobs",
+        "tags": [
+          "Agent"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/agent/register": {
+      "post": {
+        "summary": "POST /api/agent/register",
+        "tags": [
+          "Agent"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hostname": {
+                    "type": "string",
+                    "description": "hostname parameter (optional)"
+                  },
+                  "os": {
+                    "type": "string",
+                    "description": "os parameter (optional)"
+                  },
+                  "arch": {
+                    "type": "string",
+                    "description": "arch parameter (optional)"
+                  },
+                  "version": {
+                    "type": "string",
+                    "description": "version parameter (optional)"
+                  },
+                  "scannerVersions": {
+                    "type": "string",
+                    "description": "scannerVersions parameter (optional)"
+                  },
+                  "capabilities": {
+                    "type": "string",
+                    "description": "capabilities parameter (optional)"
+                  },
+                  "s3Configured": {
+                    "type": "string",
+                    "description": "s3Configured parameter (optional)"
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agents": {
+      "get": {
+        "summary": "GET /api/agents",
+        "tags": [
+          "Agents"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/agents",
+        "tags": [
+          "Agents"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "name parameter"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audit-logs": {
       "get": {
         "summary": "GET /api/audit-logs",
@@ -891,6 +1105,45 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/kubernetes/images": {
+      "get": {
+        "summary": "GET /api/kubernetes/images",
+        "tags": [
+          "Kubernetes"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/kubernetes/namespaces": {
+      "get": {
+        "summary": "GET /api/kubernetes/namespaces",
+        "tags": [
+          "Kubernetes"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/kubernetes/status": {
+      "get": {
+        "summary": "GET /api/kubernetes/status",
+        "tags": [
+          "Kubernetes"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
           }
         }
       }
@@ -1903,93 +2156,16 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "requestId": {
+                  "version": {
                     "type": "string",
-                    "description": "requestId parameter"
+                    "description": "version parameter (optional)"
                   },
-                  "image": {
-                    "type": "object",
-                    "description": "image parameter"
-                  },
-                  "tag": {
+                  "findings": {
                     "type": "string",
-                    "description": "tag parameter"
-                  },
-                  "registry": {
-                    "type": "string",
-                    "description": "registry parameter (optional)"
-                  },
-                  "digest": {
-                    "type": "string",
-                    "description": "digest parameter"
-                  },
-                  "platform": {
-                    "type": "string",
-                    "description": "platform parameter (optional)"
-                  },
-                  "sizeBytes": {
-                    "type": "number",
-                    "description": "sizeBytes parameter (optional)"
-                  },
-                  "scan": {
-                    "type": "object",
-                    "description": "scan parameter"
-                  },
-                  "finishedAt": {
-                    "type": "string",
-                    "description": "finishedAt parameter (optional)"
-                  },
-                  "status": {
-                    "type": "string",
-                    "description": "status parameter"
-                  },
-                  "reportsDir": {
-                    "type": "string",
-                    "description": "reportsDir parameter (optional)"
-                  },
-                  "errorMessage": {
-                    "type": "string",
-                    "description": "errorMessage parameter (optional)"
-                  },
-                  "scannerVersions": {
-                    "type": "string",
-                    "description": "scannerVersions parameter"
-                  },
-                  "scanConfig": {
-                    "type": "string",
-                    "description": "scanConfig parameter"
-                  },
-                  "reports": {
-                    "type": "object",
-                    "description": "reports parameter (optional)"
-                  },
-                  "grype": {
-                    "type": "string",
-                    "description": "grype parameter (optional)"
-                  },
-                  "syft": {
-                    "type": "string",
-                    "description": "syft parameter (optional)"
-                  },
-                  "dockle": {
-                    "type": "string",
-                    "description": "dockle parameter (optional)"
-                  },
-                  "metadata": {
-                    "type": "string",
-                    "description": "metadata parameter (optional)"
+                    "description": "findings parameter (optional)"
                   }
                 },
-                "required": [
-                  "requestId",
-                  "image",
-                  "tag",
-                  "digest",
-                  "scan",
-                  "status",
-                  "scannerVersions",
-                  "scanConfig"
-                ]
+                "required": []
               }
             }
           }
