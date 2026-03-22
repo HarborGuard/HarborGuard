@@ -32,6 +32,9 @@ export async function POST(
     if (job.agentId !== agent.id) {
       return NextResponse.json({ error: 'Job not assigned to this agent' }, { status: 403 });
     }
+    if (job.status === 'COMPLETED' || job.status === 'FAILED') {
+      return NextResponse.json({ error: 'Job already finalized' }, { status: 409 });
+    }
 
     await prisma.agentJob.update({
       where: { id: jobId },

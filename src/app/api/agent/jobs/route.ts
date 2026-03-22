@@ -28,19 +28,23 @@ export async function GET(request: NextRequest) {
 
     // Filter by agent capabilities (patch jobs require 'patch' capability)
     const filteredJobs = jobs.filter(
-      (j) => j.type === 'scan' || (j.type === 'patch' && agent.capabilities.includes('patch')),
+      (j) => j.type === 'SCAN' || (j.type === 'PATCH' && agent.capabilities.includes('patch')),
     );
 
-    // Mark as assigned
+    // Atomically claim jobs — only succeed if still PENDING
+    const claimedJobs = [];
     for (const job of filteredJobs) {
-      await prisma.agentJob.update({
-        where: { id: job.id },
+      const result = await prisma.agentJob.updateMany({
+        where: { id: job.id, status: 'PENDING' },
         data: { agentId: agent.id, status: 'ASSIGNED', assignedAt: new Date() },
       });
+      if (result.count > 0) {
+        claimedJobs.push(job);
+      }
     }
 
     return NextResponse.json(
-      filteredJobs.map((j) => ({
+      claimedJobs.map((j) => ({
         id: j.id,
         type: j.type,
         createdAt: j.createdAt.toISOString(),
