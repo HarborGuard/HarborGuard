@@ -6,6 +6,7 @@ import { apiError } from '@/lib/api/api-utils'
 import { extractBearerToken, validateApiKey } from '@/lib/agent/api-keys'
 import { ingestEnvelope } from '@/lib/scanner/SensorBridge'
 import { scannerService } from '@/lib/scanner'
+import { auditLogger } from '@/lib/audit-logger'
 
 // Validation schema for legacy scan upload
 const ScanUploadSchema = z.object({
@@ -193,6 +194,16 @@ async function handleEnvelopeUpload(envelope: any, agentId: string | null) {
       const scanStatus = envelope.scan.status === 'FAILED' ? 'FAILED' as const : envelope.scan.status === 'PARTIAL' ? 'PARTIAL' as const : 'SUCCESS' as const
       scannerService.markScanComplete(existingScan.requestId, scanStatus)
 
+      // Audit log the agent-dispatched scan completion
+      const imageName = envelope.image?.name
+        ? `${envelope.image.name}:${envelope.image?.tag || 'latest'}`
+        : 'unknown';
+      if (scanStatus === 'FAILED') {
+        auditLogger.scanFailed('agent', imageName, existingScan.id).catch(() => {});
+      } else {
+        auditLogger.scanComplete('agent', imageName, existingScan.id).catch(() => {});
+      }
+
       return NextResponse.json({ success: true, scanId: existingScan.id, imageId: existingScan.imageId }, { status: 200 })
     }
   }
@@ -238,6 +249,15 @@ async function handleEnvelopeUpload(envelope: any, agentId: string | null) {
   })
 
   await ingestEnvelope(scan.id, envelope)
+
+  // Audit log standalone upload
+  const uploadImageName = `${envelope.image?.name || 'unknown'}:${envelope.image?.tag || 'latest'}`;
+  if (envelope.scan.status === 'FAILED') {
+    auditLogger.scanFailed('upload', uploadImageName, scan.id).catch(() => {});
+  } else {
+    auditLogger.scanComplete('upload', uploadImageName, scan.id).catch(() => {});
+  }
+
   return NextResponse.json({ success: true, scanId: scan.id, imageId: image.id }, { status: 201 })
 }
 

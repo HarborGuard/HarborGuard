@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { apiError } from '@/lib/api/api-utils'
+import { loadScannerDataFromS3 } from '@/lib/storage/s3'
 
 export async function GET(
   request: NextRequest,
@@ -62,6 +63,11 @@ export async function GET(
         break
       default:
         return NextResponse.json({ error: 'Invalid report type' }, { status: 400 })
+    }
+
+    // If not in DB, try S3 fallback
+    if (!reportData) {
+      reportData = await loadScannerDataFromS3(metadata, reportType.toLowerCase())
     }
 
     if (!reportData) {
