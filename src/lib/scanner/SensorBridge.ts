@@ -15,7 +15,7 @@ import { mapSeverityToEnum } from '@/lib/utils/severity-utils';
 
 const execFileAsync = promisify(execFile);
 
-const SENSOR_CLI = process.env.SENSOR_CLI_PATH || '/app/sensor/dist/index.js';
+const SENSOR_CLI = process.env.SENSOR_CLI_PATH || '/app/sensor/harborguard-sensor';
 
 interface ScanEnvelope {
   version: string;
@@ -102,10 +102,10 @@ export async function executeScanViaSensor(
   }
 
   onProgress?.(30, 'Running sensor scan');
-  logger.info(`[SensorBridge] Executing: node ${SENSOR_CLI} ${args.join(' ')}`);
+  logger.info(`[SensorBridge] Executing: ${SENSOR_CLI} ${args.join(' ')}`);
 
   try {
-    const { stdout, stderr } = await execFileAsync('node', [SENSOR_CLI, ...args], {
+    const { stdout, stderr } = await execFileAsync(SENSOR_CLI, args, {
       timeout: 30 * 60 * 1000,
       maxBuffer: 100 * 1024 * 1024,
       env: { ...process.env },
