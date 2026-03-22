@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { inspectDockerImage } from '@/lib/docker';
-import { IDatabaseAdapter, ScanReports } from './types';
+import { IDatabaseAdapter } from './types';
 import type { ScanRequest } from '@/types';
 import { RepositoryService } from '@/lib/registry/RepositoryService';
 import { RegistryProviderFactory } from '@/lib/registry/providers/RegistryProviderFactory';

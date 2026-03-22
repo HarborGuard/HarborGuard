@@ -78,21 +78,6 @@ export async function listDockerImages(): Promise<DockerImage[]> {
 }
 
 /**
- * Export a Docker image to a tar file
- */
-export async function exportDockerImage(imageName: string, outputPath: string): Promise<void> {
-  try {
-    await execAsync(
-      `docker save "${imageName}" -o "${outputPath}"`,
-      { timeout: 300000 } // 5 minute timeout for large images
-    );
-  } catch (error) {
-    console.error(`Failed to export Docker image ${imageName}:`, error);
-    throw new Error(`Failed to export Docker image: ${error instanceof Error ? error.message : String(error)}`);
-  }
-}
-
-/**
  * Get detailed information about a specific Docker image
  */
 export async function inspectDockerImage(imageName: string): Promise<any> {
