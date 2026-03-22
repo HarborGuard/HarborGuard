@@ -35,15 +35,16 @@ function addCellStyle(worksheet: any, cell: string, style: any) {
   worksheet[cell].s = style
 }
 
-export function generateXlsxReport(scan: any, decodedImageName: string): Buffer {
+export function generateXlsxReport(scan: any, decodedImageName: string, scannerDataOverride?: Record<string, any>): Buffer {
   const workbook = XLSX.utils.book_new()
 
   const metadata = scan.metadata
-  const trivyVulns = metadata?.trivyResults?.Results?.[0]?.Vulnerabilities || []
-  const grypeVulns = metadata?.grypeResults?.matches || []
-  const dockleIssues = metadata?.dockleResults?.details || []
-  const syftPackages = metadata?.syftResults?.artifacts || []
-  const osvVulns = metadata?.osvResults?.results || []
+  const sd = scannerDataOverride ?? {}
+  const trivyVulns = (sd.trivy ?? metadata?.trivyResults)?.Results?.[0]?.Vulnerabilities || []
+  const grypeVulns = (sd.grype ?? metadata?.grypeResults)?.matches || []
+  const dockleIssues = (sd.dockle ?? metadata?.dockleResults)?.details || []
+  const syftPackages = (sd.syft ?? metadata?.syftResults)?.artifacts || []
+  const osvVulns = (sd.osv ?? metadata?.osvResults)?.results || []
 
   // Calculate summary statistics
   const vulnSummary = {

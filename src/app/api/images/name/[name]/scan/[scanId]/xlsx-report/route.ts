@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { generateXlsxReport } from '@/lib/reporting/xlsx-report'
 import { apiError } from '@/lib/api/api-utils'
+import { DashboardS3Client } from '@/lib/storage/s3'
+
+async function loadScannerData(metadata: any, scanner: string): Promise<any> {
+  if (metadata?.s3Prefix && DashboardS3Client.isConfigured()) {
+    try {
+      const s3 = DashboardS3Client.getInstance();
+      const scanId = metadata.s3Prefix.replace('scans/', '').replace(/\/$/, '');
+      const data = await s3.getRawResult(scanId, scanner);
+      if (data) return data;
+    } catch { /* fall through to JSONB */ }
+  }
+  return null;
+}
 
 export async function GET(
   _request: NextRequest,
@@ -27,7 +40,14 @@ export async function GET(
       return NextResponse.json({ error: 'Scan does not belong to this image' }, { status: 404 })
     }
 
-    const xlsxBuffer = generateXlsxReport(scan, decodedImageName)
+    // Load scanner data with S3 fallback
+    const scannerNames = ['trivy', 'grype', 'syft', 'dockle', 'osv'];
+    const scannerEntries = await Promise.all(
+      scannerNames.map(async (s) => [s, await loadScannerData(scan.metadata, s)] as const)
+    );
+    const scannerData = Object.fromEntries(scannerEntries.filter(([, v]) => v != null));
+
+    const xlsxBuffer = generateXlsxReport(scan, decodedImageName, Object.keys(scannerData).length > 0 ? scannerData : undefined)
 
     const filename = `${decodedImageName.replace('/', '_')}_${scanId}_report.xlsx`
     const headers = new Headers()
