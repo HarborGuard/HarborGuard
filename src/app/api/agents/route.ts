@@ -6,7 +6,7 @@ function isLocalRequest(request: NextRequest): boolean {
   const forwarded = request.headers.get('x-forwarded-for');
   const realIP = request.headers.get('x-real-ip');
   const ip = forwarded?.split(',')[0] || realIP || 'localhost';
-  const allowedIPs = ['127.0.0.1', '::1', 'localhost'];
+  const allowedIPs = ['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1'];
   if (allowedIPs.some((a) => ip === a)) return true;
   if (ip.startsWith('10.')) return true;
   if (ip.startsWith('172.')) {

@@ -42,7 +42,7 @@ function isLocalRequest(request: NextRequest): boolean {
   const forwarded = request.headers.get('x-forwarded-for')
   const realIP = request.headers.get('x-real-ip')
   const ip = forwarded?.split(',')[0] || realIP || 'localhost'
-  const allowedIPs = ['127.0.0.1', '::1', 'localhost']
+  const allowedIPs = ['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1']
   return allowedIPs.some(a => ip === a) ||
     isRfc1918_172(ip) ||
     ip.startsWith('10.')
