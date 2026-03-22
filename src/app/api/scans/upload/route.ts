@@ -4,6 +4,7 @@ import { z } from 'zod'
 import type { ScanUploadRequest } from '@/types'
 import { apiError } from '@/lib/api/api-utils'
 import { extractBearerToken, validateApiKey } from '@/lib/agent/api-keys'
+import { ingestEnvelope } from '@/lib/scanner/SensorBridge'
 
 // Validation schema for legacy scan upload
 const ScanUploadSchema = z.object({
@@ -42,10 +43,15 @@ function isLocalRequest(request: NextRequest): boolean {
   const realIP = request.headers.get('x-real-ip')
   const ip = forwarded?.split(',')[0] || realIP || 'localhost'
   const allowedIPs = ['127.0.0.1', '::1', 'localhost']
-  return allowedIPs.some(a => ip.includes(a)) ||
-    ip.startsWith('172.') ||
-    ip.startsWith('10.') ||
-    ip === 'unknown'
+  return allowedIPs.some(a => ip === a) ||
+    isRfc1918_172(ip) ||
+    ip.startsWith('10.')
+}
+
+function isRfc1918_172(ip: string): boolean {
+  if (!ip.startsWith('172.')) return false
+  const secondOctet = parseInt(ip.split('.')[1], 10)
+  return secondOctet >= 16 && secondOctet <= 31
 }
 
 export async function POST(request: NextRequest) {
@@ -186,94 +192,10 @@ async function handleEnvelopeUpload(envelope: any, agentId: string | null) {
     },
   })
 
-  // 3. Create metadata
-  await prisma.scanMetadata.create({
-    data: {
-      scan: { connect: { id: scan.id } },
-      vulnerabilityCritical: envelope.aggregates?.vulnerabilityCounts?.critical ?? 0,
-      vulnerabilityHigh: envelope.aggregates?.vulnerabilityCounts?.high ?? 0,
-      vulnerabilityMedium: envelope.aggregates?.vulnerabilityCounts?.medium ?? 0,
-      vulnerabilityLow: envelope.aggregates?.vulnerabilityCounts?.low ?? 0,
-      vulnerabilityInfo: envelope.aggregates?.vulnerabilityCounts?.info ?? 0,
-      aggregatedRiskScore: envelope.aggregates?.riskScore ?? null,
-      complianceScore: envelope.aggregates?.complianceScore ?? null,
-      complianceGrade: envelope.aggregates?.complianceGrade ?? null,
-      scannerVersions: envelope.sensor?.scannerVersions ?? null,
-      s3Prefix: envelope.artifacts?.s3Prefix ?? null,
-    },
-  })
-
-  // 4. Bulk insert normalized findings
-  const findings = envelope.findings || {}
-
-  if (findings.vulnerabilities?.length > 0) {
-    await prisma.scanVulnerabilityFinding.createMany({
-      data: findings.vulnerabilities.map((v: any) => ({
-        scanId: scan.id,
-        source: v.source,
-        cveId: v.cveId,
-        packageName: v.packageName,
-        installedVersion: v.installedVersion ?? null,
-        fixedVersion: v.fixedVersion ?? null,
-        severity: mapSeverityToEnum(v.severity),
-        cvssScore: v.cvssScore ?? null,
-        title: v.title ?? null,
-        description: v.description ?? null,
-        vulnerabilityUrl: v.vulnerabilityUrl ?? null,
-      })),
-    })
-  }
-
-  if (findings.packages?.length > 0) {
-    await prisma.scanPackageFinding.createMany({
-      data: findings.packages.map((p: any) => ({
-        scanId: scan.id,
-        source: p.source,
-        packageName: p.name,
-        version: p.version ?? null,
-        type: p.type || 'unknown',
-        purl: p.purl ?? null,
-        license: p.license ?? null,
-      })),
-    })
-  }
-
-  if (findings.compliance?.length > 0) {
-    await prisma.scanComplianceFinding.createMany({
-      data: findings.compliance.map((c: any) => ({
-        scanId: scan.id,
-        source: c.source,
-        ruleId: c.ruleId,
-        ruleName: c.ruleName,
-        category: c.category || 'General',
-        severity: mapSeverityToEnum(c.severity),
-        message: c.message || '',
-      })),
-    })
-  }
-
-  if (findings.efficiency?.length > 0) {
-    await prisma.scanEfficiencyFinding.createMany({
-      data: findings.efficiency.map((e: any) => ({
-        scanId: scan.id,
-        source: e.source,
-        findingType: e.findingType,
-        severity: e.severity || 'INFO',
-        sizeBytes: e.sizeBytes ? BigInt(e.sizeBytes) : null,
-        description: e.details || e.title || '',
-      })),
-    })
-  }
+  // 3. Delegate metadata creation and findings insertion to shared function
+  await ingestEnvelope(scan.id, envelope)
 
   return NextResponse.json({ success: true, scanId: scan.id, imageId: image.id }, { status: 201 })
-}
-
-function mapSeverityToEnum(severity: string): 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO' {
-  const upper = severity?.toUpperCase()
-  if (['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'].includes(upper)) {
-    return upper as any
-  }
-  return 'INFO'
 }
 
 // ---------------------------------------------------------------------------
