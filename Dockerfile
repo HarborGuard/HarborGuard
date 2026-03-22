@@ -1,5 +1,5 @@
 # ---- 0) Build sensor module (Go) ----
-FROM golang:1.23-alpine AS sensor-builder
+FROM golang:1.24-alpine AS sensor-builder
 WORKDIR /sensor
 COPY harborguard-sensor/go.mod harborguard-sensor/go.sum ./
 RUN go mod download
