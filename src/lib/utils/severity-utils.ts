@@ -149,3 +149,13 @@ export function getSeverityWeight(severity: string): number {
       return 0;
   }
 }
+
+/**
+ * Maps a raw severity string to a Prisma-compatible enum value.
+ * Returns one of 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'.
+ */
+export function mapSeverityToEnum(severity: string): 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO' {
+  const upper = severity?.toUpperCase();
+  if (['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'].includes(upper)) return upper as any;
+  return 'INFO';
+}

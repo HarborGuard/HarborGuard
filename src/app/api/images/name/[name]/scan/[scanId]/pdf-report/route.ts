@@ -2,22 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import puppeteer from 'puppeteer'
 import { apiError } from '@/lib/api/api-utils'
-import { DashboardS3Client } from '@/lib/storage/s3'
-
-async function loadScannerData(metadata: any, scanner: string): Promise<any> {
-  // Try S3 first if configured
-  if (metadata?.s3Prefix && DashboardS3Client.isConfigured()) {
-    try {
-      const s3 = DashboardS3Client.getInstance();
-      const scanId = metadata.s3Prefix.replace('scans/', '').replace(/\/$/, '');
-      const data = await s3.getRawResult(scanId, scanner);
-      if (data) return data;
-    } catch { /* fall through to JSONB */ }
-  }
-  // Fall back to JSONB
-  const key = `${scanner}Results`;
-  return metadata?.[key] ?? null;
-}
+import { loadScannerDataFromS3 } from '@/lib/storage/s3'
 
 function generateHtmlReport(scan: any, decodedImageName: string, scannerData: Record<string, any>): string {
   const metadata = scan.metadata
@@ -633,9 +618,9 @@ export async function GET(
 
     // Load scanner data with S3 fallback
     const [trivyData, grypeData, dockleData] = await Promise.all([
-      loadScannerData(scan.metadata, 'trivy'),
-      loadScannerData(scan.metadata, 'grype'),
-      loadScannerData(scan.metadata, 'dockle'),
+      loadScannerDataFromS3(scan.metadata, 'trivy'),
+      loadScannerDataFromS3(scan.metadata, 'grype'),
+      loadScannerDataFromS3(scan.metadata, 'dockle'),
     ]);
     const scannerData = { trivy: trivyData, grype: grypeData, dockle: dockleData };
 

@@ -10,8 +10,8 @@ export class DashboardS3Client {
 
   constructor() {
     const endpoint = process.env.S3_ENDPOINT ?? process.env.HG_S3_ENDPOINT;
-    const accessKey = process.env.S3_ACCESS_KEY ?? process.env.AWS_ACCESS_KEY_ID;
-    const secretKey = process.env.S3_SECRET_KEY ?? process.env.AWS_SECRET_ACCESS_KEY;
+    const accessKey = process.env.S3_ACCESS_KEY ?? process.env.AWS_ACCESS_KEY_ID ?? process.env.HG_S3_ACCESS_KEY;
+    const secretKey = process.env.S3_SECRET_KEY ?? process.env.AWS_SECRET_ACCESS_KEY ?? process.env.HG_S3_SECRET_KEY;
     const region = process.env.S3_REGION ?? process.env.AWS_REGION ?? 'us-east-1';
     this.bucket = process.env.S3_BUCKET ?? process.env.HG_S3_BUCKET ?? '';
 
@@ -68,8 +68,8 @@ export class DashboardS3Client {
 
   static isConfigured(): boolean {
     const bucket = process.env.S3_BUCKET ?? process.env.HG_S3_BUCKET;
-    const accessKey = process.env.S3_ACCESS_KEY ?? process.env.AWS_ACCESS_KEY_ID;
-    const secretKey = process.env.S3_SECRET_KEY ?? process.env.AWS_SECRET_ACCESS_KEY;
+    const accessKey = process.env.S3_ACCESS_KEY ?? process.env.AWS_ACCESS_KEY_ID ?? process.env.HG_S3_ACCESS_KEY;
+    const secretKey = process.env.S3_SECRET_KEY ?? process.env.AWS_SECRET_ACCESS_KEY ?? process.env.HG_S3_SECRET_KEY;
     return !!(bucket && accessKey && secretKey);
   }
 
@@ -87,4 +87,22 @@ async function streamToString(stream: Readable): Promise<string> {
     chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
   }
   return Buffer.concat(chunks).toString('utf-8');
+}
+
+/**
+ * Load scanner result data, trying S3 first (if configured and metadata has
+ * an s3Prefix), then falling back to the JSONB column on the metadata record.
+ */
+export async function loadScannerDataFromS3(metadata: any, scanner: string): Promise<any> {
+  if (metadata?.s3Prefix && DashboardS3Client.isConfigured()) {
+    try {
+      const s3 = DashboardS3Client.getInstance();
+      const scanId = metadata.s3Prefix.replace('scans/', '').replace(/\/$/, '');
+      const data = await s3.getRawResult(scanId, scanner);
+      if (data) return data;
+    } catch { /* fall through to JSONB */ }
+  }
+  // Fall back to JSONB
+  const key = `${scanner}Results`;
+  return metadata?.[key] ?? null;
 }
