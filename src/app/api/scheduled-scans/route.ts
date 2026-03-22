@@ -86,8 +86,12 @@ export async function POST(request: NextRequest) {
       imageSelectionMode,
       imagePattern,
       selectedImageIds = [],
-      source = 'MANUAL'
+      source: rawSource = 'MANUAL'
     } = body
+
+    // Normalize source to valid enum value
+    const validSources = ['MANUAL', 'AUTOMATED']
+    const source = validSources.includes(rawSource?.toUpperCase?.() ?? '') ? rawSource.toUpperCase() : 'MANUAL'
 
     // Validate required fields
     if (!name) {
