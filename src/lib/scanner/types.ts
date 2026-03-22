@@ -5,7 +5,7 @@ export type { VulnerabilityCount, ComplianceScore };
 export interface ScanProgressEvent {
   requestId: string;
   scanId: string;
-  status: 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
+  status: 'RUNNING' | 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
   progress: number;
   step?: string;
   error?: string;

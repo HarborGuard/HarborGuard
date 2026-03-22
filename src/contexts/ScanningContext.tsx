@@ -8,7 +8,7 @@ export interface ScanJob {
   scanId: string;
   imageId: string;
   imageName?: string;
-  status: 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
+  status: 'RUNNING' | 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
   progress: number;
   step?: string;
   error?: string;
@@ -68,8 +68,8 @@ function scanningReducer(state: ScanningState, action: ScanningAction): Scanning
 
       const newJobs = new Map(state.jobs);
       
-      // For successful scans, remove them after a brief delay to allow UI to update
-      if (event.status === 'SUCCESS') {
+      // For completed scans, remove them after a brief delay to allow UI to update
+      if (event.status === 'SUCCESS' || event.status === 'PARTIAL') {
         newJobs.set(event.requestId, updatedJob);
         // Set timeout to remove successful scan after 3 seconds
         setTimeout(() => {
@@ -125,8 +125,8 @@ function scanningReducer(state: ScanningState, action: ScanningAction): Scanning
         // Keep running jobs
         if (job.status === 'RUNNING') {
           cleanedJobs.set(requestId, job);
-        } else if (job.status === 'SUCCESS') {
-          // Remove successful jobs immediately
+        } else if (job.status === 'SUCCESS' || job.status === 'PARTIAL') {
+          // Remove completed jobs immediately
           return;
         } else if (job.status === 'FAILED' || job.status === 'CANCELLED') {
           // Keep failed/cancelled jobs for 30 seconds
@@ -178,11 +178,12 @@ export function ScanningProvider({ children }: { children: React.ReactNode }) {
     const currentJobs = state.jobs;
     const previousJobs = previousJobsRef.current;
 
-    // Check for jobs that just became SUCCESS
+    // Check for jobs that just completed (SUCCESS or PARTIAL)
     currentJobs.forEach((job, requestId) => {
       const previousJob = previousJobs.get(requestId);
-      if (job.status === 'SUCCESS' && previousJob && previousJob.status !== 'SUCCESS') {
-        // This job just completed successfully
+      const isCompleted = job.status === 'SUCCESS' || job.status === 'PARTIAL';
+      const wasNotCompleted = previousJob && previousJob.status !== 'SUCCESS' && previousJob.status !== 'PARTIAL';
+      if (isCompleted && wasNotCompleted) {
         if (onScanCompleteRef.current) {
           onScanCompleteRef.current(job);
         }
