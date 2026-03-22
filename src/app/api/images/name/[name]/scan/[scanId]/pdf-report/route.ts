@@ -2,13 +2,29 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import puppeteer from 'puppeteer'
 import { apiError } from '@/lib/api/api-utils'
+import { DashboardS3Client } from '@/lib/storage/s3'
 
-function generateHtmlReport(scan: any, decodedImageName: string): string {
+async function loadScannerData(metadata: any, scanner: string): Promise<any> {
+  // Try S3 first if configured
+  if (metadata?.s3Prefix && DashboardS3Client.isConfigured()) {
+    try {
+      const s3 = DashboardS3Client.getInstance();
+      const scanId = metadata.s3Prefix.replace('scans/', '').replace(/\/$/, '');
+      const data = await s3.getRawResult(scanId, scanner);
+      if (data) return data;
+    } catch { /* fall through to JSONB */ }
+  }
+  // Fall back to JSONB
+  const key = `${scanner}Results`;
+  return metadata?.[key] ?? null;
+}
+
+function generateHtmlReport(scan: any, decodedImageName: string, scannerData: Record<string, any>): string {
   const metadata = scan.metadata
 
-  const trivyVulns = metadata?.trivyResults?.Results?.[0]?.Vulnerabilities || []
-  const grypeVulns = metadata?.grypeResults?.matches || []
-  const dockleIssues = metadata?.dockleResults?.details || []
+  const trivyVulns = scannerData.trivy?.Results?.[0]?.Vulnerabilities || []
+  const grypeVulns = scannerData.grype?.matches || []
+  const dockleIssues = scannerData.dockle?.details || []
 
   // Merge and normalize all vulnerabilities
   const allVulns = [
@@ -615,7 +631,15 @@ export async function GET(
       return NextResponse.json({ error: 'Scan does not belong to this image' }, { status: 404 })
     }
 
-    const htmlContent = generateHtmlReport(scan, decodedImageName)
+    // Load scanner data with S3 fallback
+    const [trivyData, grypeData, dockleData] = await Promise.all([
+      loadScannerData(scan.metadata, 'trivy'),
+      loadScannerData(scan.metadata, 'grype'),
+      loadScannerData(scan.metadata, 'dockle'),
+    ]);
+    const scannerData = { trivy: trivyData, grype: grypeData, dockle: dockleData };
+
+    const htmlContent = generateHtmlReport(scan, decodedImageName, scannerData)
 
     browser = await puppeteer.launch({
       headless: true,
