@@ -67,6 +67,7 @@ model Scan {
   scanResults           ScanResult[]
   vulnerabilityFindings ScanVulnerabilityFinding[]
   scheduledScanResults  ScheduledScanResult[]
+  agentJobs             AgentJob[]
   image                 Image                      @relation(fields: [imageId], references: [id], onDelete: Cascade)
   metadata              ScanMetadata?              @relation(fields: [metadataId], references: [id])
 
@@ -1030,7 +1031,6 @@ enum PatchStrategy {
 model Agent {
   id              String      @id @default(cuid())
   name            String
-  apiKey          String      @unique
   apiKeyHash      String
   status          AgentStatus @default(ACTIVE)
   lastSeenAt      DateTime?
@@ -1045,28 +1045,44 @@ model Agent {
   metadata        Json?
   scanJobs        AgentJob[]
 
-  @@index([apiKey])
+  @@index([apiKeyHash])
   @@index([status])
   @@map("agents")
 }
 
 model AgentJob {
-  id           String    @id @default(cuid())
+  id           String         @id @default(cuid())
   agentId      String?
-  type         String
-  status       String    @default("PENDING")
+  scanId       String?
+  type         AgentJobType
+  status       AgentJobStatus @default(PENDING)
   payload      Json
   result       Json?
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime       @default(now())
   assignedAt   DateTime?
   completedAt  DateTime?
   errorMessage String?
-  agent        Agent?    @relation(fields: [agentId], references: [id])
+  agent        Agent?         @relation(fields: [agentId], references: [id])
+  scan         Scan?          @relation(fields: [scanId], references: [id])
 
   @@index([agentId])
   @@index([status])
   @@index([agentId, status])
+  @@index([scanId])
   @@map("agent_jobs")
+}
+
+enum AgentJobType {
+  SCAN
+  PATCH
+}
+
+enum AgentJobStatus {
+  PENDING
+  ASSIGNED
+  RUNNING
+  COMPLETED
+  FAILED
 }
 
 enum AgentStatus {
