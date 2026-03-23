@@ -2,7 +2,36 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { scheduleAutoCleanup } = await import('./lib/cleanup');
     scheduleAutoCleanup();
+    await bootstrapAgentKey();
     await initializeDemoMode();
+  }
+}
+
+async function bootstrapAgentKey() {
+  const bootstrapKey = process.env.HG_API_KEY;
+  if (!bootstrapKey || !bootstrapKey.startsWith('hg_ak_')) return;
+
+  try {
+    const crypto = await import('crypto');
+    const { prisma } = await import('./lib/prisma');
+
+    const hash = crypto.createHash('sha256').update(bootstrapKey).digest('hex');
+
+    // Skip if an agent with this key already exists
+    const existing = await prisma.agent.findFirst({ where: { apiKeyHash: hash } });
+    if (existing) return;
+
+    await prisma.agent.create({
+      data: {
+        name: 'bootstrap-sensor',
+        apiKeyHash: hash,
+        status: 'DISCONNECTED',
+        capabilities: ['scan'],
+      },
+    });
+    console.log('[bootstrap] Auto-registered agent from HG_API_KEY');
+  } catch (error) {
+    console.warn('[bootstrap] Failed to seed agent key:', error);
   }
 }
 

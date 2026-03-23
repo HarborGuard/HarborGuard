@@ -16,6 +16,7 @@ services:
       - S3_SECRET_KEY=minioadmin
       - LOG_LEVEL=info
       - HEALTH_CHECK_ENABLED=true
+      - HG_API_KEY=${HG_API_KEY:-hg_ak_default_distributed_key_change_me}
     depends_on:
       db:
         condition: service_healthy
@@ -32,7 +33,7 @@ services:
       - sensor-cache:/workspace/cache
     environment:
       - HG_DASHBOARD_URL=http://dashboard:3000
-      - HG_API_KEY=${HG_API_KEY:-}
+      - HG_API_KEY=${HG_API_KEY:-hg_ak_default_distributed_key_change_me}
       - HG_AGENT_NAME=local-sensor
       - HG_S3_ENDPOINT=http://minio:9000
       - HG_S3_BUCKET=harborguard
