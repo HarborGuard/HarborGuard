@@ -86,9 +86,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Reconstruct the full image ref for registry scans.
+    // The DB stores the short name (e.g. "docker/library/alpine") but
+    // the sensor needs the full ref (e.g. "public.ecr.aws/docker/library/alpine").
+    let fullImageName = imageData.name;
+    if (imageData.primaryRepositoryId && (imageData.source === 'REGISTRY' || imageData.source === 'REGISTRY_PRIVATE')) {
+      const repo = await prisma.repository.findUnique({
+        where: { id: imageData.primaryRepositoryId },
+        select: { registryUrl: true },
+      });
+      if (repo?.registryUrl) {
+        const registryHost = repo.registryUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        // Only prepend if the image name doesn't already start with the registry host
+        if (!fullImageName.startsWith(registryHost)) {
+          fullImageName = `${registryHost}/${fullImageName}`;
+        }
+      }
+    }
+
     // Build the scan request from the database data
     const scanRequest: ScanRequest = {
-      image: imageData.name,
+      image: fullImageName,
       tag: actualTag,
       registry: undefined,
       registryType: undefined,
