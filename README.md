@@ -78,6 +78,18 @@ Harbor Guard supports comprehensive configuration through environment variables.
 | `HEALTH_CHECK_ENABLED` | Enable `/api/health` and `/api/ready` endpoints | `true` | `true`, `false` | `HEALTH_CHECK_ENABLED=false` |
 | `VERSION_CHECK_ENABLED` | Enable automatic version checking for updates | `true` | `true`, `false` | `VERSION_CHECK_ENABLED=false` |
 
+### S3/Object Storage (Distributed Deployments)
+
+These variables configure S3-compatible storage for distributed sensor deployments. Each variable also accepts alternative names for AWS or HarborGuard sensor compatibility.
+
+| Variable | Description | Default | Alternatives |
+|----------|-------------|---------|-------------|
+| `S3_ENDPOINT` | S3-compatible endpoint URL (e.g. MinIO) | *none* | `HG_S3_ENDPOINT` |
+| `S3_BUCKET` | S3 bucket name | *none* | `HG_S3_BUCKET` |
+| `S3_ACCESS_KEY` | S3 access key | *none* | `AWS_ACCESS_KEY_ID`, `HG_S3_ACCESS_KEY` |
+| `S3_SECRET_KEY` | S3 secret key | *none* | `AWS_SECRET_ACCESS_KEY`, `HG_S3_SECRET_KEY` |
+| `S3_REGION` | S3 region | `us-east-1` | `AWS_REGION` |
+
 ### Advanced Environment Variables
 
 These variables are typically used for internal configuration or advanced deployments:
@@ -87,8 +99,10 @@ These variables are typically used for internal configuration or advanced deploy
 | `SCANNER_WORKDIR` | Working directory for scanner operations | `/workspace` | `SCANNER_WORKDIR=/tmp/scanners` |
 | `PATCH_WORKDIR` | Working directory for patch operations | `/workspace/patches` | `PATCH_WORKDIR=/tmp/patches` |
 | `ENABLE_RAW_OUTPUT` | Enable raw scanner output in API responses | `false` | `ENABLE_RAW_OUTPUT=true` |
+| `SENSOR_CLI_PATH` | Path to sensor CLI binary | `/app/sensor/harborguard-sensor` | `SENSOR_CLI_PATH=/usr/local/bin/sensor` |
+| `PUPPETEER_EXECUTABLE_PATH` | Chromium binary path for PDF report generation | *auto-detected* | `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser` |
 | `NEXT_PUBLIC_DEMO_MODE` | Enable demo mode with limited functionality | `false` | `NEXT_PUBLIC_DEMO_MODE=true` |
-| `NEXT_PUBLIC_APP_URL` | Public application URL (for OpenAPI spec) | `http://localhost:3000` | `NEXT_PUBLIC_APP_URL=https://harborguard.example.com` |
+| `NEXT_PUBLIC_APP_URL` | Public application URL (for demo mode and OpenAPI spec) | `http://localhost:3000` | `NEXT_PUBLIC_APP_URL=https://harborguard.example.com` |
 | `NEXT_PUBLIC_API_URL` | Public API URL (for OpenAPI spec) | *auto-detected* | `NEXT_PUBLIC_API_URL=https://api.harborguard.example.com` |
 | `NEXT_PUBLIC_APP_VERSION` | Override application version display | *auto-detected* | `NEXT_PUBLIC_APP_VERSION=1.0.0` |
 | `NODE_ENV` | Node.js environment mode | `production` | `NODE_ENV=development` |
