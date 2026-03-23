@@ -119,7 +119,23 @@ export async function executeScanViaSensor(
 
     const envelope: ScanEnvelope = JSON.parse(stdout);
     return envelope;
-  } catch (error) {
+  } catch (error: any) {
+    // The sensor CLI may exit non-zero but still produce valid JSON on stdout
+    // (e.g. status logs written to stderr cause a non-zero exit code).
+    if (error?.stdout) {
+      try {
+        const envelope: ScanEnvelope = JSON.parse(error.stdout);
+        if (envelope?.scan && envelope?.findings) {
+          if (error.stderr) {
+            logger.debug(`[SensorBridge] stderr (non-fatal): ${String(error.stderr).slice(0, 500)}`);
+          }
+          onProgress?.(85, 'Processing scan results');
+          return envelope;
+        }
+      } catch {
+        // stdout wasn't valid JSON — fall through to the original error
+      }
+    }
     const msg = error instanceof Error ? error.message : String(error);
     logger.error(`[SensorBridge] Sensor scan failed: ${msg}`);
     throw new Error(`Sensor scan failed: ${msg}`);
