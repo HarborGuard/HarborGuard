@@ -14,11 +14,13 @@ A comprehensive container security scanning platform that provides an intuitive 
 
 ## Screenshots
 
-<p align="center">
-  <img src="assets/home.png" alt="Harbor Guard Dashboard" height="400" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); display: inline-block;">
-  <img src="assets/scan.png" alt="Harbor Guard Scans" height="400" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); display: inline-block;">
-  <img src="assets/libraries.png" alt="Harbor Guard Library" height="400" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); display: inline-block;">
-</p>
+<table>
+  <tr>
+    <td><img src="assets/home.png" alt="Harbor Guard Dashboard" height="400"></td>
+    <td><img src="assets/scan.png" alt="Harbor Guard Scans" height="400"></td>
+    <td><img src="assets/libraries.png" alt="Harbor Guard Library" height="400"></td>
+  </tr>
+</table>
 
 ## Installation
 
