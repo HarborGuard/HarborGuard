@@ -90,17 +90,42 @@ export async function POST(request: NextRequest) {
     // The DB stores the short name (e.g. "docker/library/alpine") but
     // the sensor needs the full ref (e.g. "public.ecr.aws/docker/library/alpine").
     let fullImageName = imageData.name;
-    if (imageData.primaryRepositoryId && (imageData.source === 'REGISTRY' || imageData.source === 'REGISTRY_PRIVATE')) {
-      const repo = await prisma.repository.findUnique({
-        where: { id: imageData.primaryRepositoryId },
-        select: { registryUrl: true },
-      });
-      if (repo?.registryUrl) {
-        const registryHost = repo.registryUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
-        // Only prepend if the image name doesn't already start with the registry host
-        if (!fullImageName.startsWith(registryHost)) {
-          fullImageName = `${registryHost}/${fullImageName}`;
+    if (imageData.source === 'REGISTRY' || imageData.source === 'REGISTRY_PRIVATE') {
+      let registryHost = '';
+
+      // Try the linked repository first
+      if (imageData.primaryRepositoryId) {
+        const repo = await prisma.repository.findUnique({
+          where: { id: imageData.primaryRepositoryId },
+          select: { registryUrl: true },
+        });
+        if (repo?.registryUrl) {
+          registryHost = repo.registryUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
         }
+      }
+
+      // Fallback: try to find a repository by registry name or type
+      if (!registryHost && imageData.registry) {
+        const matchingRepo = await prisma.repository.findFirst({
+          where: { OR: [{ name: imageData.registry }, { registryUrl: { contains: imageData.registry } }] },
+          select: { registryUrl: true },
+        });
+        if (matchingRepo?.registryUrl) {
+          registryHost = matchingRepo.registryUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        }
+      }
+
+      // Last resort: derive from registryType
+      if (!registryHost && imageData.registryType) {
+        const hostMap: Record<string, string> = {
+          GHCR: 'ghcr.io', ECR: 'public.ecr.aws', GCR: 'gcr.io',
+          DOCKERHUB: 'docker.io', QUAY: 'quay.io',
+        };
+        registryHost = hostMap[imageData.registryType] || '';
+      }
+
+      if (registryHost && !fullImageName.startsWith(registryHost)) {
+        fullImageName = `${registryHost}/${fullImageName}`;
       }
     }
 
