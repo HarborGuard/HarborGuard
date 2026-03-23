@@ -1205,3 +1205,11 @@ enum ScheduledScanTrigger {
   SCHEDULED
   API
 }
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
+}
