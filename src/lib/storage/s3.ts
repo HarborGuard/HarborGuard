@@ -1,4 +1,4 @@
-import { S3Client, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Readable } from 'stream';
 
@@ -51,6 +51,32 @@ export class DashboardS3Client {
     } catch {
       return false;
     }
+  }
+
+  async deletePrefix(prefix: string): Promise<number> {
+    let deleted = 0;
+    let continuationToken: string | undefined;
+    do {
+      const list = await this.client.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucket,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+        }),
+      );
+      const objects = list.Contents;
+      if (!objects || objects.length === 0) break;
+
+      await this.client.send(
+        new DeleteObjectsCommand({
+          Bucket: this.bucket,
+          Delete: { Objects: objects.map((o) => ({ Key: o.Key! })) },
+        }),
+      );
+      deleted += objects.length;
+      continuationToken = list.IsTruncated ? list.NextContinuationToken : undefined;
+    } while (continuationToken);
+    return deleted;
   }
 
   private async getJson(key: string): Promise<any | null> {

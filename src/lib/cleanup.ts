@@ -6,6 +6,7 @@
 import { config } from './config';
 import { logger } from './logger';
 import { prisma } from './prisma';
+import { DashboardS3Client } from './storage/s3';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -42,6 +43,8 @@ export class DatabaseCleanup {
             id: true,
             requestId: true,
             reportsDir: true,
+            metadata: { select: { s3Prefix: true } },
+            agentJobs: { select: { id: true }, take: 1 },
           }
         });
 
@@ -59,6 +62,27 @@ export class DatabaseCleanup {
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             logger.error(`Failed to cleanup report files for scan ${scan.id}:`, errorMessage);
+          }
+        }
+
+        // Clean up S3 artifacts before deleting DB records
+        if (DashboardS3Client.isConfigured()) {
+          try {
+            const s3 = DashboardS3Client.getInstance();
+            for (const scan of batch) {
+              try {
+                const prefix = scan.metadata?.s3Prefix
+                  || (scan.agentJobs?.[0]?.id ? `scans/${scan.agentJobs[0].id}/` : null);
+                if (prefix) {
+                  await s3.deletePrefix(prefix);
+                }
+              } catch (s3Err) {
+                // Non-fatal: S3 failures should not block DB cleanup
+                logger.warn(`Failed to delete S3 artifacts for scan ${scan.id}:`, s3Err);
+              }
+            }
+          } catch (s3InitErr) {
+            logger.warn('Failed to initialize S3 client for cleanup:', s3InitErr);
           }
         }
 
@@ -208,3 +232,11 @@ export class DatabaseCleanup {
 
 // Create singleton instance
 export const databaseCleanup = new DatabaseCleanup();
+
+let cleanupScheduled = false;
+export function scheduleAutoCleanup() {
+  if (cleanupScheduled) return;
+  cleanupScheduled = true;
+  setTimeout(() => databaseCleanup.cleanupOldScans().catch(console.error), 30_000);
+  setInterval(() => databaseCleanup.cleanupOldScans().catch(console.error), 24 * 60 * 60 * 1000);
+}

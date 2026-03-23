@@ -1,6 +1,7 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    // Only run on the server
+    const { scheduleAutoCleanup } = await import('./lib/cleanup');
+    scheduleAutoCleanup();
     await initializeDemoMode();
   }
 }
