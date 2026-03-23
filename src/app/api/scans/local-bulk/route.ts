@@ -3,12 +3,20 @@ import { listDockerImages } from '@/lib/docker';
 import { BulkScanService } from '@/lib/bulk/BulkScanService';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
-import { scannerService } from '@/lib/scanner';
+import { scannerService, detectScanMode } from '@/lib/scanner';
 import type { ScanRequest } from '@/types';
 import { apiError } from '@/lib/api/api-utils';
 
 export async function POST(request: NextRequest) {
   try {
+    const scanMode = await detectScanMode();
+    if (scanMode === 'unavailable') {
+      return NextResponse.json(
+        { error: 'No scanner available. Register a sensor agent or deploy the monolith image with the sensor module.' },
+        { status: 503 }
+      );
+    }
+
     logger.info('Starting bulk scan of all local Docker images');
     
     // Get all local Docker images

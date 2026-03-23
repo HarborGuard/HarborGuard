@@ -156,6 +156,14 @@ export function useScanExecution(
         const data = await response.json()
 
         if (!response.ok) {
+          if (response.status === 503) {
+            toast.error("No Sensor Detected", {
+              description: "Register a sensor agent to enable scanning.",
+            })
+            resetProgress()
+            setIsLoading(false)
+            return
+          }
           throw new Error(data.error || 'Failed to start bulk scan')
         }
 
@@ -276,8 +284,17 @@ export function useScanExecution(
       })
 
       if (!response.ok) {
-        const error = await response.text()
-        throw new Error(error || 'Failed to start scan')
+        const errorData = await response.json().catch(() => null)
+        const errorMsg = errorData?.error || 'Failed to start scan'
+        if (response.status === 503) {
+          toast.error("No Sensor Detected", {
+            description: "Register a sensor agent to enable scanning.",
+          })
+          resetProgress()
+          setIsLoading(false)
+          return
+        }
+        throw new Error(errorMsg)
       }
 
       const result = await response.json()

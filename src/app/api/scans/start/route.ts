@@ -67,7 +67,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { scannerService } from '@/lib/scanner'
+import { scannerService, detectScanMode } from '@/lib/scanner'
 import { z } from 'zod'
 import type { ScanRequest } from '@/types'
 import { auditLogger } from '@/lib/audit-logger'
@@ -246,10 +246,19 @@ async function processBatchScans(scans: any[], priority: number, request: NextRe
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    
+
     // Validate request data
     const validatedData = ScanStartSchema.parse(body)
-    
+
+    // Pre-flight check: ensure a scan execution path exists
+    const scanMode = await detectScanMode();
+    if (scanMode === 'unavailable') {
+      return NextResponse.json(
+        { error: 'No scanner available. Register a sensor agent or deploy the monolith image with the sensor module.' },
+        { status: 503 }
+      );
+    }
+
     // Check if this is a batch request
     if ('scans' in validatedData) {
       // Handle batch scan request
