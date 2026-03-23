@@ -4,6 +4,9 @@ import puppeteer from 'puppeteer'
 import { apiError } from '@/lib/api/api-utils'
 import { loadScannerDataFromS3 } from '@/lib/storage/s3'
 
+let activePdfRenders = 0;
+const MAX_CONCURRENT_PDFS = 2;
+
 function generateHtmlReport(scan: any, decodedImageName: string, scannerData: Record<string, any>): string {
   const metadata = scan.metadata
 
@@ -595,6 +598,14 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ name: string; scanId: string }> }
 ) {
+  if (activePdfRenders >= MAX_CONCURRENT_PDFS) {
+    return NextResponse.json(
+      { error: 'PDF generation is busy, please try again shortly' },
+      { status: 429, headers: { 'Retry-After': '5' } }
+    );
+  }
+  activePdfRenders++;
+
   let browser
   try {
     const { name, scanId } = await params
@@ -667,5 +678,7 @@ export async function GET(
       await browser.close()
     }
     return apiError(error, 'Failed to generate PDF report');
+  } finally {
+    activePdfRenders--;
   }
 }
