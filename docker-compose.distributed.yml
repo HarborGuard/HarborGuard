@@ -2,7 +2,7 @@ services:
   dashboard:
     build:
       context: .
-      dockerfile: Dockerfile.dashboard
+      dockerfile: Dockerfile.distributed
     ports:
       - "3456:3000"
     environment:
