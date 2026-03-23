@@ -14,6 +14,8 @@ export async function GET(
     const search = searchParams.get('search') || '';
     const severity = searchParams.get('severity') || '';
     const source = searchParams.get('source') || '';
+    const limit = Math.max(1, Math.min(parseInt(searchParams.get('limit') || '500') || 500, 2000));
+    const offset = Math.max(0, parseInt(searchParams.get('offset') || '0') || 0);
 
     // Verify scan exists
     const scan = await prisma.scan.findUnique({
@@ -78,14 +80,19 @@ export async function GET(
 
     // Fetch vulnerabilities
     if (type === 'vulnerabilities' || type === 'all') {
-      const vulnerabilities = await prisma.scanVulnerabilityFinding.findMany({
-        where: buildWhereClause('vulnerabilities'),
-        orderBy: [
-          { severity: 'desc' },
-          { cvssScore: 'desc' },
-          { cveId: 'asc' }
-        ]
-      });
+      const [vulnerabilities, vulnTotal] = await Promise.all([
+        prisma.scanVulnerabilityFinding.findMany({
+          where: buildWhereClause('vulnerabilities'),
+          orderBy: [
+            { severity: 'desc' },
+            { cvssScore: 'desc' },
+            { cveId: 'asc' }
+          ],
+          take: limit,
+          skip: offset
+        }),
+        prisma.scanVulnerabilityFinding.count({ where: buildWhereClause('vulnerabilities') })
+      ]);
 
       // Group vulnerabilities by source for summary
       const vulnBySource: Record<string, any> = {};
@@ -111,22 +118,28 @@ export async function GET(
       });
 
       result.vulnerabilities = {
-        total: vulnerabilities.length,
+        total: vulnTotal,
         bySeverity: vulnBySeverity,
         bySource: Object.values(vulnBySource),
-        findings: vulnerabilities
+        findings: vulnerabilities,
+        pagination: { total: vulnTotal, limit, offset, hasMore: offset + limit < vulnTotal }
       };
     }
 
     // Fetch packages
     if (type === 'packages' || type === 'all') {
-      const packages = await prisma.scanPackageFinding.findMany({
-        where: buildWhereClause('packages'),
-        orderBy: [
-          { packageName: 'asc' },
-          { version: 'asc' }
-        ]
-      });
+      const [packages, pkgTotal] = await Promise.all([
+        prisma.scanPackageFinding.findMany({
+          where: buildWhereClause('packages'),
+          orderBy: [
+            { packageName: 'asc' },
+            { version: 'asc' }
+          ],
+          take: limit,
+          skip: offset
+        }),
+        prisma.scanPackageFinding.count({ where: buildWhereClause('packages') })
+      ]);
 
       // Group packages by type and source
       const pkgByType: Record<string, number> = {};
@@ -142,24 +155,30 @@ export async function GET(
       });
 
       result.packages = {
-        total: packages.length,
+        total: pkgTotal,
         byType: pkgByType,
         bySource: pkgBySource,
         byEcosystem: pkgByEcosystem,
-        findings: packages
+        findings: packages,
+        pagination: { total: pkgTotal, limit, offset, hasMore: offset + limit < pkgTotal }
       };
     }
 
     // Fetch compliance findings
     if (type === 'compliance' || type === 'all') {
-      const compliance = await prisma.scanComplianceFinding.findMany({
-        where: buildWhereClause('compliance'),
-        orderBy: [
-          { severity: 'desc' },
-          { category: 'asc' },
-          { ruleName: 'asc' }
-        ]
-      });
+      const [compliance, compTotal] = await Promise.all([
+        prisma.scanComplianceFinding.findMany({
+          where: buildWhereClause('compliance'),
+          orderBy: [
+            { severity: 'desc' },
+            { category: 'asc' },
+            { ruleName: 'asc' }
+          ],
+          take: limit,
+          skip: offset
+        }),
+        prisma.scanComplianceFinding.count({ where: buildWhereClause('compliance') })
+      ]);
 
       // Group compliance by category and severity
       const compByCategory: Record<string, number> = {};
@@ -177,22 +196,28 @@ export async function GET(
       });
 
       result.compliance = {
-        total: compliance.length,
+        total: compTotal,
         bySeverity: compBySeverity,
         byCategory: compByCategory,
-        findings: compliance
+        findings: compliance,
+        pagination: { total: compTotal, limit, offset, hasMore: offset + limit < compTotal }
       };
     }
 
     // Fetch efficiency findings
     if (type === 'efficiency' || type === 'all') {
-      const efficiency = await prisma.scanEfficiencyFinding.findMany({
-        where: { scanId },
-        orderBy: [
-          { wastedBytes: 'desc' },
-          { sizeBytes: 'desc' }
-        ]
-      });
+      const [efficiency, effTotal] = await Promise.all([
+        prisma.scanEfficiencyFinding.findMany({
+          where: { scanId },
+          orderBy: [
+            { wastedBytes: 'desc' },
+            { sizeBytes: 'desc' }
+          ],
+          take: limit,
+          skip: offset
+        }),
+        prisma.scanEfficiencyFinding.count({ where: { scanId } })
+      ]);
 
       // Group efficiency by type
       const effByType: Record<string, number> = {};
@@ -206,7 +231,7 @@ export async function GET(
       });
 
       result.efficiency = {
-        total: efficiency.length,
+        total: effTotal,
         byType: effByType,
         totalWastedBytes: totalWastedBytes.toString(),
         totalSizeBytes: totalSizeBytes.toString(),
@@ -214,7 +239,8 @@ export async function GET(
           ...eff,
           wastedBytes: eff.wastedBytes?.toString(),
           sizeBytes: eff.sizeBytes?.toString()
-        }))
+        })),
+        pagination: { total: effTotal, limit, offset, hasMore: offset + limit < effTotal }
       };
     }
 

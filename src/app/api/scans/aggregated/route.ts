@@ -57,13 +57,14 @@ export async function GET(request: NextRequest) {
               registryType: true
             }
           },
-          // Include vulnerability findings for accurate counting
+          // Include vulnerability findings only as fallback for scans without metadata
           vulnerabilityFindings: {
             select: {
               cveId: true,
               severity: true,
               source: true
-            }
+            },
+            take: 2000
           }
         },
         orderBy: { startedAt: 'desc' },
