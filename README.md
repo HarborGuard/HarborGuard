@@ -1,11 +1,14 @@
-# <img src="public/icon.svg" alt="Harbor Guard Logo" width="44" height="44" style="vertical-align: middle; filter: brightness(0) invert(1);"> Harbor Guard
+<p align="center">
+  <img src="assets/harborguard-dark.png" alt="HarborGuard Logo" width="56" height="56" style="vertical-align: middle;">
+  <img src="assets/harborguard-text.png" alt="HarborGuard" height="40" style="vertical-align: middle; margin-left: 12px;">
+</p>
 
+[![Stars](https://img.shields.io/github/stars/HarborGuard/HarborGuard?color=5B5BD6&style=flat-square)](https://github.com/HarborGuard/HarborGuard)
+[![Downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fipitio.github.io%2Fbackage%2FHarborGuard%2FHarborGuard%2Fharborguard.json&query=%24.downloads&label=pulls&color=2496ED&style=flat-square&logo=docker)](https://github.com/HarborGuard/HarborGuard/pkgs/container/harborguard)
 [![Next.js](https://img.shields.io/badge/Next.js-15.4.6-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.1.0-blue?style=flat-square&logo=react)](https://reactjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
-[![Prisma](https://img.shields.io/badge/Prisma-6.14.0-2D3748?style=flat-square&logo=prisma)](https://www.prisma.io/)
 [![Docker](https://img.shields.io/badge/Docker-enabled-2496ED?style=flat-square&logo=docker)](https://www.docker.com/)
-[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/License-AGPL--3.0-green?style=flat-square)](LICENSE)
 
 A comprehensive container security scanning platform that provides an intuitive web interface for managing and visualizing security assessments of Docker images.
 
