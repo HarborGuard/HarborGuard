@@ -266,8 +266,8 @@ export async function GET(
     const { id } = await params
     const { searchParams } = new URL(request.url)
     const includeJsonb = searchParams.get('includeJsonb') === 'true'
-    const packageLimit = parseInt(searchParams.get('packageLimit') || '100')
-    const packagePage = parseInt(searchParams.get('packagePage') || '0')
+    const packageLimit = Math.max(1, Math.min(parseInt(searchParams.get('packageLimit') || '100') || 100, 500))
+    const packagePage = Math.max(0, parseInt(searchParams.get('packagePage') || '0') || 0)
 
     // Build metadata select/include based on query params
     const metadataQuery = includeJsonb ? {

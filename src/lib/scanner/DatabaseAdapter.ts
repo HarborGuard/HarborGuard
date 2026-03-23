@@ -68,7 +68,7 @@ export class DatabaseAdapter implements IDatabaseAdapter {
             name: request.image, tag: request.tag, source: 'LOCAL_DOCKER', digest,
             platform: `${imageData.Os}/${imageData.Architecture}`,
             sizeBytes: imageData.Size ? BigInt(imageData.Size) : null,
-            dockerImageId: request.dockerImageId,
+            registryType: 'LOCAL', dockerImageId: request.dockerImageId,
           }
         });
 
