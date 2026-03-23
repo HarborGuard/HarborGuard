@@ -24,6 +24,11 @@ export class RegistryProviderFactory {
     this.register('ACR', ACRProvider);
     this.register('GCR', GARProvider);
     this.register('GITEA', GiteaProvider);
+    // ECR, QUAY, HARBOR, ARTIFACTORY use GenericOCI as fallback
+    this.register('ECR', GenericOCIProvider);
+    this.register('QUAY', GenericOCIProvider);
+    this.register('HARBOR', GenericOCIProvider);
+    this.register('ARTIFACTORY', GenericOCIProvider);
   }
   
   /**
