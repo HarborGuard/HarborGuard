@@ -1,6 +1,8 @@
 /**
  * Database cleanup utilities for Harbor Guard
- * Handles automatic cleanup of old scans based on CLEANUP_OLD_SCANS_DAYS configuration
+ * Handles automatic cleanup of old scans based on configuration.
+ * Settings are read from the app_settings table (UI-configurable),
+ * falling back to CLEANUP_OLD_SCANS_DAYS env var, then default of 30.
  */
 
 import { config } from './config';
@@ -10,6 +12,25 @@ import { DashboardS3Client } from './storage/s3';
 import fs from 'fs/promises';
 import path from 'path';
 
+async function getRetentionSettings() {
+  const defaults = {
+    cleanupOldScansDays: config.cleanupOldScansDays,
+    cleanupAuditLogsDays: config.cleanupOldScansDays,
+    cleanupBulkScansDays: config.cleanupOldScansDays,
+    cleanupS3Artifacts: true,
+  };
+  try {
+    const rows = await prisma.appSetting.findMany();
+    for (const row of rows) {
+      if (row.key === 'cleanupOldScansDays') defaults.cleanupOldScansDays = parseInt(row.value) || defaults.cleanupOldScansDays;
+      if (row.key === 'cleanupAuditLogsDays') defaults.cleanupAuditLogsDays = parseInt(row.value) || defaults.cleanupAuditLogsDays;
+      if (row.key === 'cleanupBulkScansDays') defaults.cleanupBulkScansDays = parseInt(row.value) || defaults.cleanupBulkScansDays;
+      if (row.key === 'cleanupS3Artifacts') defaults.cleanupS3Artifacts = row.value !== 'false';
+    }
+  } catch { /* use defaults if table doesn't exist yet */ }
+  return defaults;
+}
+
 export class DatabaseCleanup {
   private workDir = process.env.SCANNER_WORKDIR || '/workspace';
 
@@ -18,10 +39,12 @@ export class DatabaseCleanup {
    */
   async cleanupOldScans(): Promise<void> {
     try {
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - config.cleanupOldScansDays);
+      const retention = await getRetentionSettings();
 
-      logger.info(`Starting cleanup of scans older than ${config.cleanupOldScansDays} days (before ${cutoffDate.toISOString()})`);
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - retention.cleanupOldScansDays);
+
+      logger.info(`Starting cleanup of scans older than ${retention.cleanupOldScansDays} days (before ${cutoffDate.toISOString()})`);
 
       let cleanupCount = 0;
       let errorCount = 0;
@@ -66,7 +89,7 @@ export class DatabaseCleanup {
         }
 
         // Clean up S3 artifacts before deleting DB records
-        if (DashboardS3Client.isConfigured()) {
+        if (retention.cleanupS3Artifacts && DashboardS3Client.isConfigured()) {
           try {
             const s3 = DashboardS3Client.getInstance();
             for (const scan of batch) {
@@ -107,11 +130,15 @@ export class DatabaseCleanup {
         logger.warn(`Cleanup reached max iteration limit (${MAX_ITERATIONS}); some old scans may remain`);
       }
 
-      // Clean up orphaned bulk scan items
-      await this.cleanupOrphanedBulkScanItems(cutoffDate);
+      // Clean up orphaned bulk scan items (may have independent retention)
+      const bulkCutoff = new Date();
+      bulkCutoff.setDate(bulkCutoff.getDate() - retention.cleanupBulkScansDays);
+      await this.cleanupOrphanedBulkScanItems(bulkCutoff);
 
-      // Clean up orphaned audit logs
-      await this.cleanupOldAuditLogs(cutoffDate);
+      // Clean up orphaned audit logs (may have independent retention)
+      const auditCutoff = new Date();
+      auditCutoff.setDate(auditCutoff.getDate() - retention.cleanupAuditLogsDays);
+      await this.cleanupOldAuditLogs(auditCutoff);
 
       logger.info(`Cleanup completed: ${cleanupCount} scans cleaned, ${errorCount} errors`);
 
