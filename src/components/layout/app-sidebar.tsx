@@ -51,6 +51,11 @@ const data = {
       url: "/scheduled-scans",
       icon: IconCalendarEvent,
     },
+    {
+      title: "Settings",
+      url: "/settings",
+      icon: IconSettings,
+    },
   ],
 };
 
