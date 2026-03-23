@@ -12,6 +12,14 @@
 
 A comprehensive container security scanning platform that provides an intuitive web interface for managing and visualizing security assessments of Docker images.
 
+## Screenshots
+
+<p align="center">
+  <img src="assets/home.png" alt="Harbor Guard Dashboard" height="400" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); display: inline-block;">
+  <img src="assets/scan.png" alt="Harbor Guard Scans" height="400" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); display: inline-block;">
+  <img src="assets/libraries.png" alt="Harbor Guard Library" height="400" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); display: inline-block;">
+</p>
+
 ## Installation
 
 ### Docker (Recommended)
@@ -50,7 +58,8 @@ docker run -p 3000:3000 \
 
 Access the application at `http://localhost:3000`
 
-## Environment Variables
+<details>
+<summary><h2>Environment Variables</h2></summary>
 
 Harbor Guard supports comprehensive configuration through environment variables. All variables have sensible defaults and proper validation.
 
@@ -177,12 +186,7 @@ docker run -p 8080:8080 \
   ghcr.io/harborguard/harborguard:latest
 ```
 
-## Screenshots
-
-<div align="center">
-  <img src="assets/home.png" alt="Harbor Guard Dashboard" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);" width="800">
-  <p><em>Harbor Guard Dashboard - Container security scanning made simple</em></p>
-</div>
+</details>
 
 ### Development Setup
 
@@ -215,11 +219,6 @@ Harbor Guard is a modern web application designed to streamline container securi
 
 ### Multi-Tool Security Scanning
 
-<div align="center">
-  <img src="assets/scan.png" alt="Harbor Guard Scans" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);" width="800">
-  <p><em>Harbor Guard Dashboard - Container security scanning made simple</em></p>
-</div>
-
 Harbor Guard integrates and orchestrates multiple industry-standard security scanning tools:
 
 - **[Trivy](https://github.com/aquasecurity/trivy)** - Comprehensive vulnerability scanner for containers
@@ -230,11 +229,6 @@ Harbor Guard integrates and orchestrates multiple industry-standard security sca
 - **[Dive](https://github.com/wagoodman/dive)** - Docker image layer analysis and optimization tool
 
 ### Optimized Visualization Strategy
-
-<div align="center">
-  <img src="assets/libraries.png" alt="Harbor Guard Library" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);" width="800">
-  <p><em>Harbor Guard Dashboard - Container security scanning made simple</em></p>
-</div>
 
 The platform employs several innovative approaches to vulnerability data visualization:
 
