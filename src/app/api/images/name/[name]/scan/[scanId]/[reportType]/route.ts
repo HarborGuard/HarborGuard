@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { apiError } from '@/lib/api/api-utils'
-import { loadScannerDataFromS3 } from '@/lib/storage/s3'
+import { loadScannerDataFromS3, DashboardS3Client } from '@/lib/storage/s3'
 
 export async function GET(
   request: NextRequest,
@@ -65,9 +65,23 @@ export async function GET(
         return NextResponse.json({ error: 'Invalid report type' }, { status: 400 })
     }
 
-    // If not in DB, try S3 fallback
+    // If not in DB metadata, try S3 fallback via s3Prefix
     if (!reportData) {
       reportData = await loadScannerDataFromS3(metadata, reportType.toLowerCase())
+    }
+
+    // If still not found, try looking up via AgentJob (sensor uses job ID as S3 key)
+    if (!reportData && DashboardS3Client.isConfigured()) {
+      try {
+        const agentJob = await prisma.agentJob.findFirst({
+          where: { scanId },
+          select: { id: true },
+        })
+        if (agentJob) {
+          const s3 = DashboardS3Client.getInstance()
+          reportData = await s3.getRawResult(agentJob.id, reportType.toLowerCase())
+        }
+      } catch { /* S3 not available */ }
     }
 
     if (!reportData) {
