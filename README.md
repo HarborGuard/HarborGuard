@@ -4,7 +4,7 @@
 </p>
 
 [![Stars](https://img.shields.io/github/stars/HarborGuard/HarborGuard?color=5B5BD6&style=flat-square)](https://github.com/HarborGuard/HarborGuard)
-[![Downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fipitio.github.io%2Fbackage%2FHarborGuard%2FHarborGuard%2Fharborguard.json&query=%24.downloads&label=pulls&color=2496ED&style=flat-square&logo=docker)](https://github.com/HarborGuard/HarborGuard/pkgs/container/harborguard)
+[![Downloads](https://img.shields.io/github/downloads/HarborGuard/HarborGuard/total?style=flat-square&label=downloads&color=2496ED&logo=github)](https://github.com/HarborGuard/HarborGuard/releases)
 [![Next.js](https://img.shields.io/badge/Next.js-15.4.6-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.1.0-blue?style=flat-square&logo=react)](https://reactjs.org/)
 [![Docker](https://img.shields.io/badge/Docker-enabled-2496ED?style=flat-square&logo=docker)](https://www.docker.com/)
