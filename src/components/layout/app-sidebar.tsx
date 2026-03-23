@@ -22,7 +22,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { AnchorIcon } from "lucide-react";
+
 
 const data = {
   navMain: [
@@ -71,7 +71,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 className="data-[slot=sidebar-menu-button]:!p-1.5 flex-1"
               >
                 <a href="/">
-                  <AnchorIcon className="!size-5.5 border-2 border-[#000] rounded-xl p-[1px]" />
+                  <img src="/harborguard-light.png" alt="HarborGuard" className="size-6" />
                   <span className="text-base font-semibold">Harbor Guard</span>
                 </a>
               </SidebarMenuButton>
