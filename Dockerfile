@@ -1,13 +1,14 @@
 # ---- 0) Build sensor module (Go) ----
-FROM golang:1.24-alpine AS sensor-builder
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS sensor-builder
+ARG TARGETOS TARGETARCH
 WORKDIR /sensor
 COPY harborguard-sensor/go.mod harborguard-sensor/go.sum ./
 RUN go mod download
 COPY harborguard-sensor/ .
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /harborguard-sensor .
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o /harborguard-sensor .
 
 # ---- 1) Build Next.js ----
-FROM node:20-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
 WORKDIR /app
 
 RUN apk add --no-cache python3 make g++
