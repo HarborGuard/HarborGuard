@@ -140,7 +140,7 @@ jobs:
       - name: Sign the published Docker image
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
-          DIGEST: ${{ steps.meta.outputs.tags && '' }}
         run: |
-          MANIFEST_DIGEST=$(docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LC }}:${{ steps.meta.outputs.version }} --format '{{.Manifest.Digest}}')
-          echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${MANIFEST_DIGEST}
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LC }}:${{ steps.meta.outputs.version }}"
+          DIGEST=$(docker buildx imagetools inspect "$IMAGE" | grep -m1 'Digest:' | awk '{print $2}')
+          echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
