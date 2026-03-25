@@ -1,0 +1,41 @@
+name: Update Sensor Submodule
+
+on:
+  repository_dispatch:
+    types: [sensor-updated]
+
+jobs:
+  update-submodule:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update sensor submodule to latest main
+        run: |
+          git submodule update --remote harborguard-sensor
+          echo "SENSOR_SHA=$(git -C harborguard-sensor rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add harborguard-sensor
+          git commit -m "chore: update harborguard-sensor submodule to ${{ env.SENSOR_SHA }}"
+          git push

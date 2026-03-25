@@ -1,3 +1,4 @@
 [submodule "harborguard-sensor"]
 	path = harborguard-sensor
 	url = https://github.com/HarborGuard/harborguard-sensor.git
+	branch = main
