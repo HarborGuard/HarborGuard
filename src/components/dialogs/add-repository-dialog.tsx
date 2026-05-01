@@ -53,30 +53,30 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
     setStep('configure')
   }
 
-  const handleTestConnection = async () => {
-    setTestStatus('testing')
-    setTestResult(null)
+    const handleTestConnection = async () => {
+        setTestStatus('testing')
+        setTestResult(null)
 
-    // Prepare the config with protocol for generic, gitlab, and nexus registries
-    const testConfig = { ...config }
-    if ((config.type === 'generic' || config.type === 'gitlab' || config.type === 'nexus') && config.registryUrl) {
-      testConfig.registryUrl = `${protocol}://${config.registryUrl.replace(/^https?:\/\//, '')}`
-    }
-    if (config.type === 'gcr') {
-      const loc = config.garLocation || 'us'
-      testConfig.registryUrl = `${loc}-docker.pkg.dev`
-      testConfig.username = config.garProjectId || ''
-      testConfig.organization = `${loc}/${config.garRepositoryName || ''}`
-    }
+        // Prepare the config with protocol for generic, gitlab, and nexus registries
+        const testConfig = { ...config, type: config.type.toUpperCase() }
+        if ((config.type === 'generic' || config.type === 'gitlab' || config.type === 'nexus') && config.registryUrl) {
+            testConfig.registryUrl = `${protocol}://${config.registryUrl.replace(/^https?:\/\//, '')}`
+        }
+        if (config.type === 'gcr') {
+            const loc = config.garLocation || 'us'
+            testConfig.registryUrl = `${loc}-docker.pkg.dev`
+            testConfig.username = config.garProjectId || ''
+            testConfig.organization = `${loc}/${config.garRepositoryName || ''}`
+        }
 
-    try {
-      const response = await fetch('/api/repositories/test', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(testConfig),
-      })
+        try {
+            const response = await fetch('/api/repositories/test', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(testConfig),
+            })
 
       const result = await response.json()
 
@@ -97,36 +97,36 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
     }
   }
 
-  const handleAddRepository = async () => {
-    // Prepare the config with protocol for generic, gitlab, and nexus registries
-    const saveConfig = { ...config }
-    if ((config.type === 'generic' || config.type === 'gitlab' || config.type === 'nexus') && config.registryUrl) {
-      saveConfig.registryUrl = `${protocol}://${config.registryUrl.replace(/^https?:\/\//, '')}`
-    }
-    if (config.type === 'gcr') {
-      const loc = config.garLocation || 'us'
-      saveConfig.registryUrl = `${loc}-docker.pkg.dev`
-      saveConfig.username = config.garProjectId || ''
-      saveConfig.organization = `${loc}/${config.garRepositoryName || ''}`
-    }
+    const handleAddRepository = async () => {
+        // Prepare the config with protocol for generic, gitlab, and nexus registries
+        const saveConfig = { ...config, type: config.type.toUpperCase() }
+        if ((config.type === 'generic' || config.type === 'gitlab' || config.type === 'nexus') && config.registryUrl) {
+            saveConfig.registryUrl = `${protocol}://${config.registryUrl.replace(/^https?:\/\//, '')}`
+        }
+        if (config.type === 'gcr') {
+            const loc = config.garLocation || 'us'
+            saveConfig.registryUrl = `${loc}-docker.pkg.dev`
+            saveConfig.username = config.garProjectId || ''
+            saveConfig.organization = `${loc}/${config.garRepositoryName || ''}`
+        }
 
-    // Include test results if the test was successful
-    const requestBody = {
-      ...saveConfig,
-      testResult: testStatus === 'success' ? {
-        success: true,
-        repositoryCount: testResult?.repositoryCount
-      } : undefined
-    }
+        // Include test results if the test was successful
+        const requestBody = {
+            ...saveConfig,
+            testResult: testStatus === 'success' ? {
+                success: true,
+                repositoryCount: testResult?.repositoryCount
+            } : undefined
+        }
 
-    try {
-      const response = await fetch('/api/repositories', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      })
+        try {
+            const response = await fetch('/api/repositories', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody),
+            })
 
       if (response.ok) {
         toast.success('Repository added successfully')
