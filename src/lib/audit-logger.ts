@@ -239,26 +239,40 @@ export const auditLogger = {
 
   /**
    * Log CVE classification
+   *
+   * `extra.isIgnored` distinguishes "user accepts this risk and wants it
+   * out of default lists" from "scanner is wrong" (`isFalsePositive`).
+   * See issue #154.
    */
   cveClassification: async (
-    request: NextRequest, 
-    cveId: string, 
-    imageName: string, 
+    request: NextRequest,
+    cveId: string,
+    imageName: string,
     isFalsePositive: boolean,
-    comment?: string
+    comment?: string,
+    extra?: { isIgnored?: boolean; ignoreReason?: string }
   ) => {
-    const action = isFalsePositive 
-      ? `Marked ${cveId} as false positive for ${imageName}${comment ? ` with comment "${comment}"` : ''}`
-      : `Updated classification for ${cveId} on ${imageName}`;
-      
+    const isIgnored = extra?.isIgnored === true;
+    const ignoreReason = extra?.ignoreReason;
+
+    let action: string;
+    if (isIgnored) {
+      const reasonSuffix = ignoreReason ? ` (reason: "${ignoreReason}")` : '';
+      action = `Ignored ${cveId} on ${imageName}${reasonSuffix}`;
+    } else if (isFalsePositive) {
+      action = `Marked ${cveId} as false positive for ${imageName}${comment ? ` with comment "${comment}"` : ''}`;
+    } else {
+      action = `Updated classification for ${cveId} on ${imageName}`;
+    }
+
     await logAuditEventFromRequest(
       request,
       'cve_classification',
       'action',
       action,
-      { 
+      {
         resource: `${imageName}:${cveId}`,
-        details: { cveId, imageName, isFalsePositive, comment }
+        details: { cveId, imageName, isFalsePositive, isIgnored, ignoreReason, comment }
       }
     );
   },

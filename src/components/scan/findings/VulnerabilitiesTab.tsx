@@ -38,6 +38,9 @@ interface VulnerabilitiesTabProps {
   onSortFieldChange: (field: string) => void;
   onSortOrderToggle: () => void;
   isFalsePositive: (cveId: string) => boolean;
+  // Returns true if the vuln has been marked as accepted-risk / ignored.
+  // Optional so older callers that haven't been migrated still compile.
+  isIgnored?: (cveId: string) => boolean;
   getComment: (cveId: string) => string | undefined;
   getSourceBadge: (source: string) => React.ReactNode;
   onVulnerabilityClick: (vuln: any) => void;
@@ -103,11 +106,13 @@ export function VulnerabilitiesTab({
   onSortFieldChange,
   onSortOrderToggle,
   isFalsePositive,
+  isIgnored,
   getComment,
   getSourceBadge,
   onVulnerabilityClick,
   onClassifyClick,
 }: VulnerabilitiesTabProps) {
+  const isIgnoredFn = isIgnored ?? (() => false);
   const handleSort = (field: string) => {
     if (sortField === field) {
       onSortOrderToggle();
@@ -177,18 +182,23 @@ export function VulnerabilitiesTab({
           <TableBody>
             {sortFindings(filterVulnerabilities(vulnerabilities, vulnerabilitySearch), sortField, sortOrder).map((vuln: any) => {
               const comment = getComment(vuln.cveId);
+              const ignored = isIgnoredFn(vuln.cveId);
+              const fp = isFalsePositive(vuln.cveId);
               return (
                 <TableRow
                   key={`${vuln.id}-${vuln.source}`}
-                  className={`${isFalsePositive(vuln.cveId) ? 'opacity-50' : ''} cursor-pointer hover:bg-muted/50`}
+                  className={`${(fp || ignored) ? 'opacity-50' : ''} cursor-pointer hover:bg-muted/50`}
                   onClick={() => onVulnerabilityClick(vuln)}
                 >
                   <TableCell>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-sm">{vuln.cveId}</span>
-                        {isFalsePositive(vuln.cveId) && (
+                        {fp && (
                           <Badge variant="outline" className="text-xs">FP</Badge>
+                        )}
+                        {ignored && (
+                          <Badge variant="outline" className="text-xs">Ignored</Badge>
                         )}
                       </div>
                       {comment && (

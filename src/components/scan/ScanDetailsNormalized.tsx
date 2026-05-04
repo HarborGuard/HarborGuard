@@ -34,6 +34,10 @@ interface ScanDetailsNormalizedProps {
   scanId: string;
   scanData: any;
   showFalsePositives: boolean;
+  // Defaults to false (i.e. ignored vulns are hidden from the default
+  // vulnerability list) per #154. The parent page controls the toggle so the
+  // setting can persist across tabs.
+  showIgnored?: boolean;
   consolidatedClassifications: any[];
   onClassificationChange: () => void;
 }
@@ -42,6 +46,7 @@ export function ScanDetailsNormalized({
   scanId,
   scanData,
   showFalsePositives,
+  showIgnored = false,
   consolidatedClassifications,
   onClassificationChange
 }: ScanDetailsNormalizedProps) {
@@ -102,6 +107,11 @@ export function ScanDetailsNormalized({
     return classification?.isFalsePositive ?? false;
   };
 
+  const isIgnored = (cveId: string) => {
+    const classification = getClassification(cveId);
+    return classification?.isIgnored ?? false;
+  };
+
   const getComment = (cveId: string) => {
     const classification = getClassification(cveId);
     return classification?.comment || undefined;
@@ -131,11 +141,21 @@ export function ScanDetailsNormalized({
     return <div className="p-4">No findings available</div>;
   }
 
-  // Filter out false positives if needed
-  const filterFalsePositives = (items: any[]) => {
-    if (showFalsePositives) return items;
-    return items.filter(item => !isFalsePositive(item.cveId || item.id));
+  // Filter out false positives and/or ignored vulnerabilities depending on
+  // the parent's toggles. Defaults: hide both. See issue #154.
+  const filterClassified = (items: any[]) => {
+    return items.filter((item) => {
+      const cveId = item.cveId || item.id;
+      if (!showFalsePositives && isFalsePositive(cveId)) return false;
+      if (!showIgnored && isIgnored(cveId)) return false;
+      return true;
+    });
   };
+
+  // Kept as an alias for callers that previously imported the FP-only filter,
+  // so this PR can land without re-typing every callsite. Behavior matches
+  // the new combined filter.
+  const filterFalsePositives = filterClassified;
 
   return (
     <div className="space-y-6">
@@ -251,7 +271,7 @@ export function ScanDetailsNormalized({
         {/* Vulnerabilities Tab */}
         <TabsContent value="vulnerabilities">
           <VulnerabilitiesTab
-            vulnerabilities={filterFalsePositives(findings.vulnerabilities?.findings || [])}
+            vulnerabilities={filterClassified(findings.vulnerabilities?.findings || [])}
             vulnerabilitySearch={vulnerabilitySearch}
             onVulnerabilitySearchChange={setVulnerabilitySearch}
             sortField={sortField}
@@ -259,6 +279,7 @@ export function ScanDetailsNormalized({
             onSortFieldChange={setSortField}
             onSortOrderToggle={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
             isFalsePositive={isFalsePositive}
+            isIgnored={isIgnored}
             getComment={getComment}
             getSourceBadge={getSourceBadge}
             onVulnerabilityClick={(vuln) => {
@@ -346,6 +367,8 @@ export function ScanDetailsNormalized({
                   cveId: classification.cveId,
                   packageName: selectedPackageName,
                   isFalsePositive: classification.isFalsePositive,
+                  isIgnored: classification.isIgnored,
+                  ignoreReason: classification.ignoreReason,
                   comment: classification.comment,
                   createdBy: classification.createdBy
                 })
