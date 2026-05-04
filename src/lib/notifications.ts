@@ -51,6 +51,14 @@ export class NotificationService {
       promises.push(this.sendAppriseNotification(payload));
     }
 
+    if (config.discordWebhookUrl) {
+      promises.push(this.sendDiscordNotification(payload));
+    }
+
+    if (config.ntfyServerUrl) {
+      promises.push(this.sendNtfyNotification(payload));
+    }
+
     if (promises.length === 0) {
       logger.debug('No webhook URLs configured, skipping notifications');
       return;
@@ -415,6 +423,182 @@ export class NotificationService {
         imageName,
         vulnerabilityCount: vulnerabilities
       });
+    }
+  }
+
+  /**
+   * Send notification to a Discord channel via its incoming webhook URL.
+   *
+   * Discord webhooks accept a JSON body with optional `embeds`. We use a
+   * single rich embed so the severity color and key facts (image, scanId,
+   * vuln counts) render with the standard Discord styling, mirroring the
+   * fact-rich shape of the Teams card and Slack attachment.
+   *
+   * See HarborGuard issue #155.
+   */
+  private async sendDiscordNotification(payload: NotificationPayload): Promise<void> {
+    if (!config.discordWebhookUrl) return;
+
+    try {
+      const discordMessage = this.formatDiscordMessage(payload);
+
+      const response = await fetch(config.discordWebhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(discordMessage),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Discord webhook returned ${response.status}: ${response.statusText}`);
+      }
+
+      logger.webhook('Successfully sent Discord notification');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Failed to send Discord notification:', errorMessage);
+      throw error;
+    }
+  }
+
+  /**
+   * Send notification to ntfy.
+   *
+   * ntfy accepts the message body as raw text on POST to
+   * `<server>/<topic>`, with optional metadata in HTTP headers (Title,
+   * Priority, Tags). When NTFY_TOPIC is set we treat NTFY_SERVER_URL as
+   * the bare server origin and append the topic; otherwise we assume the
+   * full topic URL was supplied.
+   *
+   * See https://docs.ntfy.sh/publish/ and HarborGuard issue #155.
+   */
+  private async sendNtfyNotification(payload: NotificationPayload): Promise<void> {
+    if (!config.ntfyServerUrl) return;
+
+    try {
+      const url = config.ntfyTopic
+        ? `${config.ntfyServerUrl.replace(/\/$/, '')}/${encodeURIComponent(config.ntfyTopic)}`
+        : config.ntfyServerUrl;
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'text/plain; charset=utf-8',
+        Title: payload.title,
+        Priority: String(this.getNtfyPriority(payload.severity)),
+        Tags: this.getNtfyTags(payload.severity).join(','),
+      };
+      if (config.ntfyAccessToken) {
+        headers.Authorization = `Bearer ${config.ntfyAccessToken}`;
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: this.formatNtfyBody(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`ntfy server returned ${response.status}: ${response.statusText}`);
+      }
+
+      logger.webhook('Successfully sent ntfy notification');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Failed to send ntfy notification:', errorMessage);
+      throw error;
+    }
+  }
+
+  /**
+   * Format message for Discord. Color is the same hex string the rest of
+   * the app uses, converted to the integer Discord expects (it doesn't
+   * accept the leading `#`).
+   */
+  private formatDiscordMessage(payload: NotificationPayload): unknown {
+    const colorHex = this.getSeverityColor(payload.severity).replace('#', '');
+    const color = parseInt(colorHex, 16);
+    const severityIcon = this.getSeverityIcon(payload.severity);
+
+    const fields: Array<{ name: string; value: string; inline?: boolean }> = [
+      { name: 'Severity', value: payload.severity.toUpperCase(), inline: true },
+    ];
+    if (payload.imageName) {
+      fields.push({ name: 'Image', value: payload.imageName, inline: true });
+    }
+    if (payload.scanId) {
+      fields.push({ name: 'Scan ID', value: payload.scanId, inline: true });
+    }
+    if (payload.vulnerabilityCount) {
+      const v = payload.vulnerabilityCount;
+      fields.push({
+        name: 'Vulnerabilities',
+        value: `Critical: ${v.critical} · High: ${v.high} · Medium: ${v.medium} · Low: ${v.low}`,
+        inline: false,
+      });
+    }
+
+    return {
+      username: 'Harbor Guard',
+      embeds: [
+        {
+          title: `${severityIcon} ${payload.title}`,
+          description: payload.message,
+          color: Number.isNaN(color) ? undefined : color,
+          fields,
+          footer: { text: 'Harbor Guard' },
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    };
+  }
+
+  /**
+   * Format the body for ntfy. ntfy renders the body as plain text, so a
+   * compact multi-line summary reads well on the mobile + web clients.
+   */
+  private formatNtfyBody(payload: NotificationPayload): string {
+    const lines = [payload.message];
+    if (payload.imageName) {
+      lines.push(`Image: ${payload.imageName}`);
+    }
+    if (payload.scanId) {
+      lines.push(`Scan: ${payload.scanId}`);
+    }
+    if (payload.vulnerabilityCount) {
+      const v = payload.vulnerabilityCount;
+      lines.push(`Vulns: critical=${v.critical} high=${v.high} medium=${v.medium} low=${v.low}`);
+    }
+    return lines.join('\n');
+  }
+
+  /**
+   * Map severity → ntfy priority (1=min, 5=max). Mirrors the Gotify
+   * priority mapping shape so users get the same ordering across both
+   * push systems.
+   */
+  private getNtfyPriority(severity: string): number {
+    switch (severity) {
+      case 'critical': return 5;
+      case 'high':     return 4;
+      case 'medium':   return 3;
+      case 'low':      return 2;
+      case 'info':     return 1;
+      default:         return 3;
+    }
+  }
+
+  /**
+   * Map severity → ntfy tag emojis (used by ntfy clients to render an
+   * inline glyph).
+   */
+  private getNtfyTags(severity: string): string[] {
+    switch (severity) {
+      case 'critical': return ['rotating_light', 'shield'];
+      case 'high':     return ['warning', 'shield'];
+      case 'medium':   return ['zap'];
+      case 'low':      return ['memo'];
+      case 'info':     return ['information_source'];
+      default:         return ['shield'];
     }
   }
 
