@@ -159,15 +159,25 @@ export class ScannerService {
         this.updateJobStatus(requestId, 'RUNNING', 90, undefined, 'Storing results');
         await ingestEnvelope(scanId, envelope);
 
-        // Send notifications
-        const { critical, high } = envelope.aggregates.vulnerabilityCounts;
-        if (critical > 0 || high > 0) {
-          await notificationService.notifyScanComplete(
-            `${request.image}:${request.tag}`,
-            scanId,
-            envelope.aggregates.vulnerabilityCounts,
-          );
-        }
+        // Send notifications. Internally, notifyScanComplete only fires the
+        // human-readable notifiers (Teams/Slack/etc.) on critical/high counts,
+        // but always runs the webhook notifier (when configured) so the diff
+        // vs. the prior scan can include medium/low drift.
+        await notificationService.notifyScanComplete(
+          `${request.image}:${request.tag}`,
+          scanId,
+          envelope.aggregates.vulnerabilityCounts,
+          {
+            imageId,
+            context: {
+              scanId,
+              image: request.image,
+              tag: request.tag,
+              registry: request.registry,
+              scannedAt: new Date(),
+            },
+          },
+        );
 
         this.updateJobStatus(requestId, 'SUCCESS', 100, undefined, 'Scan completed successfully');
         await scanQueue.completeScan(requestId);

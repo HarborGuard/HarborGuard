@@ -5,6 +5,7 @@
 
 import { config } from './config';
 import { logger } from './logger';
+import { webhookNotifier, type WebhookScanContext } from './notifiers/webhook';
 import { getSeverityHashColor } from './utils/severity-utils';
 
 interface NotificationPayload {
@@ -402,11 +403,12 @@ export class NotificationService {
   async notifyScanComplete(
     imageName: string,
     scanId: string,
-    vulnerabilities: { critical: number; high: number; medium: number; low: number }
+    vulnerabilities: { critical: number; high: number; medium: number; low: number },
+    webhookContext?: { context: WebhookScanContext; imageId: string }
   ): Promise<void> {
     if (vulnerabilities.critical > 0 || vulnerabilities.high > 0) {
       const severity = vulnerabilities.critical > 0 ? 'critical' : 'high';
-      
+
       await this.sendNotification({
         title: 'High-Risk Vulnerabilities Detected',
         message: `Scan completed for ${imageName} with ${vulnerabilities.critical + vulnerabilities.high} high-risk vulnerabilities found.`,
@@ -415,6 +417,20 @@ export class NotificationService {
         imageName,
         vulnerabilityCount: vulnerabilities
       });
+    }
+
+    // The webhook notifier runs on every completed scan (when configured) — its
+    // own internal diff-vs-prior-scan logic decides whether to actually fire.
+    // It is intentionally not gated on `notifyOnHighSeverity` because users
+    // wiring a webhook into automation may want to track every new finding,
+    // including medium/low severity drift between scans.
+    if (webhookContext && config.webhookNotifierUrl) {
+      try {
+        await webhookNotifier.notify(webhookContext.context, webhookContext.imageId);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error('Webhook notifier dispatch failed:', errorMessage);
+      }
     }
   }
 

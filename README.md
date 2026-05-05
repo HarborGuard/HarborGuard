@@ -87,6 +87,10 @@ Harbor Guard supports comprehensive configuration through environment variables.
 | `APPRISE_API_URL` | Apprise API URL for multi-service notifications | *none* | Valid HTTP/HTTPS URL | `APPRISE_API_URL=https://apprise.example.com` |
 | `APPRISE_CONFIG_KEY` | Apprise configuration key (optional) | *none* | Configuration key string | `APPRISE_CONFIG_KEY=harborguard` |
 | `APPRISE_URLS` | Direct Apprise notification URLs (comma-separated) | *none* | Comma-separated service URLs | `APPRISE_URLS=mailto://user:pass@gmail.com,discord://webhook/...` |
+| `WEBHOOK_NOTIFIER_URL` | Outbound webhook URL — POSTs JSON of newly-discovered vulnerabilities (vs. the prior scan of the same image:tag) | *none* | Valid HTTP/HTTPS URL | `WEBHOOK_NOTIFIER_URL=https://example.com/hooks/harborguard` |
+| `WEBHOOK_NOTIFIER_HEADERS` | Optional JSON object of extra request headers (e.g. auth) | *none* | JSON string | `WEBHOOK_NOTIFIER_HEADERS='{"Authorization":"Bearer xyz"}'` |
+| `WEBHOOK_NOTIFIER_TIMEOUT_MS` | Per-request timeout for the webhook notifier | `10000` | `100-120000` | `WEBHOOK_NOTIFIER_TIMEOUT_MS=5000` |
+| `WEBHOOK_NOTIFIER_ALL_VULNS` | When `true`, fire on every scan even if no new vulns vs. the prior scan | `false` | `true`, `false` | `WEBHOOK_NOTIFIER_ALL_VULNS=true` |
 | `NOTIFY_ON_HIGH_SEVERITY` | Send notifications only for high/critical findings | `true` | `true`, `false` | `NOTIFY_ON_HIGH_SEVERITY=false` |
 | **Monitoring & Health Checks** |
 | `HEALTH_CHECK_ENABLED` | Enable `/api/health` and `/api/ready` endpoints | `true` | `true`, `false` | `HEALTH_CHECK_ENABLED=false` |
@@ -161,6 +165,12 @@ TEAMS_WEBHOOK_URL=https://outlook.office.com/webhook/your-webhook-url
 # APPRISE_API_URL=https://apprise.example.com
 # APPRISE_URLS=discord://webhook/...,mailto://user:pass@gmail.com
 
+# Option 5: Generic outbound webhook for newly-discovered vulnerabilities
+# WEBHOOK_NOTIFIER_URL=https://example.com/hooks/harborguard
+# WEBHOOK_NOTIFIER_HEADERS='{"Authorization":"Bearer xyz"}'
+# WEBHOOK_NOTIFIER_TIMEOUT_MS=10000
+# WEBHOOK_NOTIFIER_ALL_VULNS=false
+
 NOTIFY_ON_HIGH_SEVERITY=true
 CLEANUP_OLD_SCANS_DAYS=60
 HEALTH_CHECK_ENABLED=true
@@ -189,6 +199,44 @@ docker run -p 8080:8080 \
 ```
 
 </details>
+
+### Webhook Notifier Payload
+
+When `WEBHOOK_NOTIFIER_URL` is set, Harbor Guard POSTs JSON to that URL after each successful scan whenever the scan introduces vulnerabilities not present in the most recent prior completed scan of the same `image:tag`. With no prior scan, every current finding is reported as new. By default no request is sent when there is no diff; set `WEBHOOK_NOTIFIER_ALL_VULNS=true` to receive a payload on every scan.
+
+```json
+{
+  "event": "new_vulnerabilities",
+  "scanId": "clxyz123...",
+  "image": "alpine",
+  "tag": "3.20",
+  "repository": "docker.io",
+  "scannedAt": "2026-01-01T00:00:00.000Z",
+  "newVulnerabilities": [
+    {
+      "cveId": "CVE-2024-12345",
+      "severity": "HIGH",
+      "cvssScore": 7.5,
+      "packageName": "openssl",
+      "packageVersion": "3.3.0-r0",
+      "fixedVersion": "3.3.1-r0",
+      "description": "..."
+    }
+  ],
+  "totalVulnerabilities": 17,
+  "comparisonScanId": "clabc456..."
+}
+```
+
+To smoke-test the receiver before enabling Harbor Guard:
+
+```bash
+curl -X POST "$WEBHOOK_NOTIFIER_URL" \
+  -H "Content-Type: application/json" \
+  -d '{"event":"new_vulnerabilities","scanId":"test","image":"alpine","tag":"3.20","repository":null,"scannedAt":"2026-01-01T00:00:00Z","newVulnerabilities":[],"totalVulnerabilities":0,"comparisonScanId":null}'
+```
+
+Transient 5xx responses are retried up to 3 times with exponential backoff; 4xx responses fail immediately. Failures are logged but never block scan completion.
 
 ### Development Setup
 

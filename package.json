@@ -11,6 +11,7 @@
     "start": "node scripts/init-database.js && next start -p ${PORT:-3000}",
     "start:dev": "next start",
     "lint": "next lint",
+    "test": "npx tsx --test src/lib/notifiers/*.test.ts",
     "test:build": "npx prisma generate && npx tsc --noEmit",
     "prebuild": "npx prisma generate",
     "db:init": "node scripts/init-database.js",
@@ -81,6 +82,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "tailwindcss": "^4",
+    "tsx": "^4.19.2",
     "tw-animate-css": "^1.3.6",
     "typescript": "^5"
   }
