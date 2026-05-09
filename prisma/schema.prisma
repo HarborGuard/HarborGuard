@@ -544,6 +544,13 @@ model CveClassification {
   id                   String             @id @default(cuid())
   imageVulnerabilityId String
   isFalsePositive      Boolean            @default(false)
+  // isIgnored marks a vulnerability as known/accepted-risk so it stops appearing
+  // in the default vulnerability lists. Distinct from isFalsePositive (where the
+  // scanner is wrong); ignored means the scanner is right but the user has
+  // chosen to accept the risk (e.g. low-severity CVE on an internal-only image,
+  // CVE awaiting upstream package patch). See issue #154.
+  isIgnored            Boolean            @default(false)
+  ignoreReason         String?
   comment              String?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
@@ -555,6 +562,7 @@ model CveClassification {
   @@index([imageVulnerabilityId])
   @@index([imageId])
   @@index([isFalsePositive])
+  @@index([isIgnored])
   @@map("cve_classifications")
 }
 

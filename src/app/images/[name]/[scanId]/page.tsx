@@ -63,6 +63,10 @@ export default function ScanResultsPage() {
     React.useState(false);
   const [selectedCveId, setSelectedCveId] = React.useState<string>("");
   const [showFalsePositives, setShowFalsePositives] = React.useState(true);
+  // Default-hide ignored vulnerabilities so the user's risk-accepted findings
+  // don't pollute the main list. Toggle exposed via the same control surface
+  // as showFalsePositives. Tracks issue #154.
+  const [showIgnored, setShowIgnored] = React.useState(false);
 
   // Vulnerability details modal state
   const [selectedVulnerability, setSelectedVulnerability] =
@@ -300,6 +304,7 @@ export default function ScanResultsPage() {
             scanId={scanId}
             scanData={scanData}
             showFalsePositives={showFalsePositives}
+            showIgnored={showIgnored}
             consolidatedClassifications={consolidatedClassifications}
             onClassificationChange={fetchConsolidatedClassifications}
           />
