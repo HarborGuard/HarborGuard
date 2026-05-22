@@ -27,6 +27,15 @@ export interface AppConfig {
   appriseApiUrl?: string;
   appriseConfigKey?: string;
   appriseUrls?: string;
+  // Generic outbound webhook notifier — POSTs JSON describing newly-discovered
+  // vulnerabilities (i.e. CVEs absent from the prior scan of the same image:tag)
+  // to a user-configured URL. See src/lib/notifiers/webhook.ts.
+  webhookNotifierUrl?: string;
+  // Optional JSON object of additional request headers, e.g. `{"Authorization":"Bearer ..."}`.
+  webhookNotifierHeaders?: string;
+  webhookNotifierTimeoutMs?: number;
+  // When true, fire on every scan even if no new vulns vs. the prior scan.
+  webhookNotifierAllVulns: boolean;
   notifyOnHighSeverity: boolean;
   
   // Monitoring
@@ -67,6 +76,12 @@ function parseEnvConfig(): AppConfig {
     appriseApiUrl: process.env.APPRISE_API_URL,
     appriseConfigKey: process.env.APPRISE_CONFIG_KEY,
     appriseUrls: process.env.APPRISE_URLS,
+    webhookNotifierUrl: process.env.WEBHOOK_NOTIFIER_URL,
+    webhookNotifierHeaders: process.env.WEBHOOK_NOTIFIER_HEADERS,
+    webhookNotifierTimeoutMs: process.env.WEBHOOK_NOTIFIER_TIMEOUT_MS
+      ? parseInt(process.env.WEBHOOK_NOTIFIER_TIMEOUT_MS)
+      : undefined,
+    webhookNotifierAllVulns: process.env.WEBHOOK_NOTIFIER_ALL_VULNS?.toLowerCase() === 'true',
     notifyOnHighSeverity: process.env.NOTIFY_ON_HIGH_SEVERITY?.toLowerCase() === 'true',
     
     // Monitoring
@@ -140,7 +155,19 @@ function validateConfig(config: AppConfig): void {
   if (config.appriseApiUrl && !config.appriseApiUrl.startsWith('http')) {
     errors.push('APPRISE_API_URL must start with http:// or https://');
   }
-  
+
+  // Validate webhook notifier configuration
+  if (config.webhookNotifierUrl && !config.webhookNotifierUrl.startsWith('http')) {
+    errors.push('WEBHOOK_NOTIFIER_URL must start with http:// or https://');
+  }
+
+  if (config.webhookNotifierTimeoutMs !== undefined &&
+      (Number.isNaN(config.webhookNotifierTimeoutMs) ||
+       config.webhookNotifierTimeoutMs < 100 ||
+       config.webhookNotifierTimeoutMs > 120000)) {
+    errors.push('WEBHOOK_NOTIFIER_TIMEOUT_MS must be a number between 100 and 120000');
+  }
+
   if (errors.length > 0) {
     console.error('[CONFIG] Configuration validation errors:');
     errors.forEach(error => console.error(`[CONFIG] - ${error}`));
