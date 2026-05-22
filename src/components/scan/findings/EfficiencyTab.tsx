@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { IconSearch } from "@tabler/icons-react";
+import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Card,
@@ -59,7 +59,7 @@ export function EfficiencyTab({
             </CardDescription>
           </div>
           <div className="relative w-64">
-            <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search efficiency issues..."
               value={efficiencySearch}
@@ -73,16 +73,16 @@ export function EfficiencyTab({
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-sm font-medium">Total Size</p>
-              <p className="text-2xl font-bold">
+              <p className="text-caption uppercase tracking-widest text-muted-foreground/50">Total Size</p>
+              <p className="text-2xl tracking-tight">
                 {totalSizeBytes ?
                   `${(BigInt(totalSizeBytes) / BigInt(1024) / BigInt(1024)).toString()} MB` :
                   '0 MB'}
               </p>
             </div>
             <div>
-              <p className="text-sm font-medium">Wasted Space</p>
-              <p className="text-2xl font-bold text-orange-500">
+              <p className="text-caption uppercase tracking-widest text-muted-foreground/50">Wasted Space</p>
+              <p className="text-2xl tracking-tight text-orange-500">
                 {totalWastedBytes ?
                   `${(BigInt(totalWastedBytes) / BigInt(1024) / BigInt(1024)).toString()} MB` :
                   '0 MB'}

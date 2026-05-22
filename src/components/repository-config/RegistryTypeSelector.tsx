@@ -2,7 +2,7 @@
 
 import React from "react"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { IconBrandDocker, IconBrandGithub, IconBrandGitlab, IconServer, IconPackage, IconCloud, IconBrandGoogle, IconBrandGit } from "@tabler/icons-react"
+import { Container, Github, GitlabIcon, Server, Package, Cloud, Globe, GitBranch } from "lucide-react"
 
 type RepositoryType = 'dockerhub' | 'ghcr' | 'gitlab' | 'generic' | 'nexus' | 'acr' | 'gcr' | 'gitea'
 
@@ -15,56 +15,56 @@ const repositoryTypes = [
     type: 'dockerhub' as const,
     title: 'Docker Hub',
     description: 'Connect to Docker Hub private repositories',
-    icon: <IconBrandDocker className="h-8 w-8" />,
+    icon: <Container className="h-8 w-8" />,
     registryUrl: 'docker.io',
   },
   {
     type: 'ghcr' as const,
     title: 'GitHub Container Registry',
     description: 'Connect to GitHub Container Registry (ghcr.io)',
-    icon: <IconBrandGithub className="h-8 w-8" />,
+    icon: <Github className="h-8 w-8" />,
     registryUrl: 'ghcr.io',
   },
   {
     type: 'gitlab' as const,
     title: 'GitLab Container Registry',
     description: 'Connect to GitLab Container Registry with JWT authentication',
-    icon: <IconBrandGitlab className="h-8 w-8" />,
+    icon: <GitlabIcon className="h-8 w-8" />,
     registryUrl: '',
   },
   {
     type: 'gitea' as const,
     title: 'Gitea / Forgejo',
     description: 'Connect to Gitea or Forgejo container registry',
-    icon: <IconBrandGit className="h-8 w-8" />,
+    icon: <GitBranch className="h-8 w-8" />,
     registryUrl: '',
   },
   {
     type: 'generic' as const,
     title: 'Generic Registry',
     description: 'Connect to any OCI-compliant container registry',
-    icon: <IconServer className="h-8 w-8" />,
+    icon: <Server className="h-8 w-8" />,
     registryUrl: '',
   },
   {
     type: 'nexus' as const,
     title: 'Sonatype Nexus3',
     description: 'Connect to Nexus3 Docker repositories',
-    icon: <IconPackage className="h-8 w-8" />,
+    icon: <Package className="h-8 w-8" />,
     registryUrl: '',
   },
   {
     type: 'acr' as const,
     title: 'Azure Container Registry',
     description: 'Connect to Azure Container Registry (azurecr.io)',
-    icon: <IconCloud className="h-8 w-8" />,
+    icon: <Cloud className="h-8 w-8" />,
     registryUrl: '',
   },
   {
     type: 'gcr' as const,
     title: 'Google Artifact Registry',
     description: 'Connect to Google Artifact Registry (pkg.dev)',
-    icon: <IconBrandGoogle className="h-8 w-8" />,
+    icon: <Globe className="h-8 w-8" />,
     registryUrl: '',
   },
 ]
@@ -78,15 +78,15 @@ export function RegistryTypeSelector({ onTypeSelect }: RegistryTypeSelectorProps
       {repositoryTypes.map((type) => (
         <Card
           key={type.type}
-          className="cursor-pointer hover:bg-gray-50 transition-colors"
+          className="cursor-pointer border border-white/10 hover:border-accent/50 hover:bg-white/5 rounded-none transition-colors bg-surface-1"
           onClick={() => onTypeSelect(type.type)}
         >
           <CardHeader>
             <div className="flex items-center gap-3">
-              {type.icon}
+              <div className="text-muted-foreground/40">{type.icon}</div>
               <div>
-                <CardTitle className="text-base">{type.title}</CardTitle>
-                <CardDescription>{type.description}</CardDescription>
+                <CardTitle className="text-body-sm uppercase tracking-caps text-foreground">{type.title}</CardTitle>
+                <CardDescription className="text-caption uppercase tracking-widest text-muted-foreground/50">{type.description}</CardDescription>
               </div>
             </div>
           </CardHeader>

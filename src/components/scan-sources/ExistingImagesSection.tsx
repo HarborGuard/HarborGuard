@@ -1,6 +1,6 @@
 "use client"
 
-import { IconSearch } from "@tabler/icons-react"
+import { Search } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
@@ -39,11 +39,11 @@ export function ExistingImagesSection({
     <>
       <div className="space-y-4">
         <div className="flex items-center gap-2">
-          <h3 className="text-lg font-semibold">Previously Scanned Images</h3>
+          <h3 className="text-sm uppercase tracking-wide-caps text-foreground">Previously Scanned Images</h3>
         </div>
 
         <div className="relative">
-          <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
             placeholder="Search existing images..."
             value={searchQuery}
@@ -61,7 +61,7 @@ export function ExistingImagesSection({
                 onClick={() => onSelectImage(image)}
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{image.name}</p>
+                  <p className="text-body-sm truncate">{image.name}</p>
                   <p className="text-xs text-muted-foreground">
                     Last scan: {new Date(image.lastScan).toLocaleDateString()}
                   </p>

@@ -2,11 +2,11 @@
 
 import * as React from "react";
 import {
-  IconShield,
-  IconSearch,
-  IconMessage,
-  IconX,
-} from "@tabler/icons-react";
+  Shield,
+  Search,
+  MessageSquare,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { VulnerabilityUrlMenu } from "@/components/shared/vulnerability-url-menu";
@@ -94,13 +94,13 @@ export function GrypeResultsTab({
   }, [grypeResults, grypeSearch, showFalsePositives, isFalsePositive]);
 
   return (
-    <Card>
+    <Card className="bg-surface-1 border-white/10 rounded-none">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <IconShield className="h-5 w-5" />
+        <CardTitle className="flex items-center gap-2 text-body-sm uppercase tracking-caps text-foreground">
+          <Shield className="h-4 w-4 text-accent" />
           Grype Vulnerability Scanner
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-caption uppercase tracking-widest text-muted-foreground/50">
           Container vulnerability scanner by Anchore
         </CardDescription>
       </CardHeader>
@@ -109,19 +109,19 @@ export function GrypeResultsTab({
           {/* Search and Filter Bar */}
           <div className="flex items-center gap-4">
             <div className="relative flex-1">
-              <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground/40 h-4 w-4" />
               <Input
                 placeholder="Search vulnerabilities, packages, or CVE IDs..."
                 value={grypeSearch}
                 onChange={(e) => setGrypeSearch(e.target.value)}
-                className="pl-10"
+                className="pl-10 rounded-none border-white/10 bg-transparent text-body-sm placeholder:text-muted-foreground/30 placeholder:uppercase placeholder:tracking-caps"
               />
             </div>
             <Button
               variant={showFalsePositives ? "outline" : "secondary"}
               size="sm"
               onClick={() => setShowFalsePositives(!showFalsePositives)}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 rounded-none border-white/10 hover:bg-white/5 uppercase tracking-widest text-caption"
               disabled={classificationsLoading}
             >
               {classificationsLoading && (
@@ -129,21 +129,22 @@ export function GrypeResultsTab({
               )}
               {showFalsePositives ? "Hide" : "Show"} False Positives
             </Button>
-            <div className="text-sm text-muted-foreground">
+            <div className="text-caption uppercase tracking-widest text-muted-foreground/50">
               {filteredGrypeVulns.length} of{" "}
               {grypeResults?.matches?.length || 0} vulnerabilities
             </div>
           </div>
 
+          <div className="border border-white/10 overflow-hidden rounded-none">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Actions</TableHead>
-                <TableHead>Severity</TableHead>
-                <TableHead>Vulnerability</TableHead>
-                <TableHead>Package</TableHead>
-                <TableHead>Version</TableHead>
-                <TableHead>Fix Available</TableHead>
+              <TableRow className="border-white/10 hover:bg-transparent">
+                <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">Actions</TableHead>
+                <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">Severity</TableHead>
+                <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">Vulnerability</TableHead>
+                <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">Package</TableHead>
+                <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">Version</TableHead>
+                <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">Fix Available</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -159,9 +160,9 @@ export function GrypeResultsTab({
                 return (
                   <TableRow
                     key={index}
-                    className={`${
-                      isMarkedFalsePositive ? "opacity-50" : ""
-                    } hover:bg-muted/50 cursor-pointer`}
+                    className={`border-white/10 hover:bg-white/5 cursor-pointer${
+                      isMarkedFalsePositive ? " opacity-50" : ""
+                    }`}
                     onClick={() => onVulnerabilityClick(match, "grype")}
                   >
                     <TableCell onClick={(e) => e.stopPropagation()}>
@@ -174,9 +175,9 @@ export function GrypeResultsTab({
                               match.vulnerability.id
                             )
                           }
-                          className="flex items-center gap-1"
+                          className="flex items-center gap-1 rounded-none border-white/10 hover:bg-white/5 uppercase tracking-widest text-caption"
                         >
-                          <IconMessage className="h-4 w-4" />
+                          <MessageSquare className="h-4 w-4" />
                           {classification ? "Edit" : "Classify"}
                         </Button>
                         {classification && (
@@ -188,9 +189,9 @@ export function GrypeResultsTab({
                                 match.vulnerability.id
                               )
                             }
-                            className="text-red-500 hover:text-red-700"
+                            className="text-red-400 hover:text-red-300 hover:bg-red-950/20"
                           >
-                            <IconX className="h-4 w-4" />
+                            <X className="h-4 w-4" />
                           </Button>
                         )}
                         <VulnerabilityUrlMenu
@@ -207,11 +208,12 @@ export function GrypeResultsTab({
                               match.vulnerability.severity
                             ) as any
                           }
+                          className="rounded-none uppercase tracking-widest text-caption"
                         >
                           {match.vulnerability.severity}
                         </Badge>
                         {isMarkedFalsePositive && (
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="rounded-none uppercase tracking-widest text-caption border-white/10">
                             False Positive
                           </Badge>
                         )}
@@ -220,17 +222,17 @@ export function GrypeResultsTab({
                     <TableCell>
                       <div>
                         <div className="flex items-center gap-2">
-                          <p className="font-medium">
+                          <p className="text-body-sm text-foreground">
                             {match.vulnerability.id}
                           </p>
                           {comment && (
-                            <IconMessage
-                              className="h-4 w-4 text-muted-foreground"
+                            <MessageSquare
+                              className="h-4 w-4 text-muted-foreground/40"
                               title={comment}
                             />
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-caption text-muted-foreground/60 mt-0.5">
                           {match.vulnerability.description?.slice(
                             0,
                             80
@@ -238,22 +240,22 @@ export function GrypeResultsTab({
                           ...
                         </p>
                         {comment && (
-                          <p className="text-xs text-blue-600 mt-1">
-                            {"\uD83D\uDCAC"} {comment.slice(0, 50)}
+                          <p className="text-caption text-accent mt-1">
+                            {comment.slice(0, 50)}
                             {comment.length > 50 ? "..." : ""}
                           </p>
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>{match.artifact.name}</TableCell>
-                    <TableCell>{match.artifact.version}</TableCell>
+                    <TableCell className="text-body-sm">{match.artifact.name}</TableCell>
+                    <TableCell className="text-body-sm text-muted-foreground/60">{match.artifact.version}</TableCell>
                     <TableCell>
                       {match.vulnerability.fix?.versions?.[0] ? (
-                        <Badge variant="default">
+                        <Badge className="rounded-none uppercase tracking-widest text-caption bg-green-900/30 text-green-400 border-green-500/30">
                           {match.vulnerability.fix.versions[0]}
                         </Badge>
                       ) : (
-                        <Badge variant="secondary">No fix</Badge>
+                        <Badge variant="secondary" className="rounded-none uppercase tracking-widest text-caption">No fix</Badge>
                       )}
                     </TableCell>
                   </TableRow>
@@ -261,6 +263,7 @@ export function GrypeResultsTab({
               })}
             </TableBody>
           </Table>
+          </div>
         </div>
       </CardContent>
     </Card>

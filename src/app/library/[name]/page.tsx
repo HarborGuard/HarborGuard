@@ -4,14 +4,14 @@ import * as React from "react";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  IconPackage,
-  IconBug,
-  IconShield,
-  IconExternalLink,
-  IconSearch,
-  IconSortAscending,
-  IconSortDescending,
-} from "@tabler/icons-react";
+  Package,
+  Bug,
+  Shield,
+  ExternalLink,
+  Search,
+  ArrowUpAZ,
+  ArrowDownAZ,
+} from "lucide-react";
 
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { SiteHeader } from "@/components/layout/site-header";
@@ -333,7 +333,7 @@ export default function LibraryDetailsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-screen text-caption uppercase tracking-widest text-muted-foreground/40">
         Loading library data...
       </div>
     );
@@ -344,68 +344,68 @@ export default function LibraryDetailsPage() {
       <div className="@container/main flex flex-1 flex-col gap-2 overflow-auto">
         <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6 px-4 lg:px-6">
           {/* Library Overview */}
-          <Card>
+          <Card className="bg-surface-1 border-white/10 rounded-none">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <IconPackage className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-body-sm uppercase tracking-caps text-foreground">
+                <Package className="h-4 w-4 text-accent" />
                 {libraryName}
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-caption uppercase tracking-widest text-muted-foreground/50">
                 Security analysis for library across all scanned images
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                 <div className="text-center">
-                  <p className="text-2xl font-bold">{stats.total}</p>
-                  <p className="text-sm text-muted-foreground">Total CVEs</p>
+                  <p className="text-2xl tracking-tight text-foreground">{stats.total}</p>
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">Total CVEs</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-red-600">
+                  <p className="text-2xl tracking-tight text-red-400">
                     {stats.critical}
                   </p>
-                  <p className="text-sm text-muted-foreground">Critical</p>
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">Critical</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-orange-600">
+                  <p className="text-2xl tracking-tight text-orange-400">
                     {stats.high}
                   </p>
-                  <p className="text-sm text-muted-foreground">High</p>
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">High</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-yellow-600">
+                  <p className="text-2xl tracking-tight text-yellow-400">
                     {stats.medium}
                   </p>
-                  <p className="text-sm text-muted-foreground">Medium</p>
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">Medium</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-blue-600">
+                  <p className="text-2xl tracking-tight text-blue-400">
                     {stats.low}
                   </p>
-                  <p className="text-sm text-muted-foreground">Low</p>
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">Low</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold">{stats.affectedImages}</p>
-                  <p className="text-sm text-muted-foreground">Images</p>
+                  <p className="text-2xl tracking-tight text-foreground">{stats.affectedImages}</p>
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">Images</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-green-600">
+                  <p className="text-2xl tracking-tight text-green-400">
                     {stats.fixablePercent}%
                   </p>
-                  <p className="text-sm text-muted-foreground">Fixable</p>
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">Fixable</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Vulnerabilities Table */}
-          <Card>
+          <Card className="bg-surface-1 border-white/10 rounded-none">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <IconBug className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-body-sm uppercase tracking-caps text-foreground">
+                <Bug className="h-4 w-4 text-accent" />
                 Vulnerabilities
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-caption uppercase tracking-widest text-muted-foreground/50">
                 All vulnerabilities found in {libraryName} across scanned images
               </CardDescription>
             </CardHeader>
@@ -414,138 +414,139 @@ export default function LibraryDetailsPage() {
                 {/* Search Bar */}
                 <div className="flex items-center gap-4">
                   <div className="relative flex-1">
-                    <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground/40 h-4 w-4" />
                     <Input
                       placeholder="Search vulnerabilities, CVEs, or images..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 rounded-none border-white/10 bg-transparent text-body-sm placeholder:text-muted-foreground/30 placeholder:tracking-caps placeholder:uppercase"
                     />
                   </div>
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-caption uppercase tracking-widest text-muted-foreground/50">
                     {filteredVulnerabilities.length} of {vulnerabilities.length}{" "}
                     vulnerabilities
                   </div>
                 </div>
 
                 {/* Table */}
-                <div className="border rounded-lg">
+                <div className="border border-white/10 overflow-hidden rounded-none">
                   <Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>
+                      <TableRow className="border-white/10 hover:bg-transparent">
+                        <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">
                           <Button
                             variant="ghost"
-                            className="h-auto p-0 font-medium"
+                            className="h-auto p-0 text-caption uppercase tracking-widest hover:bg-transparent hover:text-foreground"
                             onClick={() => handleSort("severity")}
                           >
                             Severity
                             {sortField === "severity" &&
                               (sortOrder === "asc" ? (
-                                <IconSortAscending className="ml-1 h-4 w-4" />
+                                <ArrowUpAZ className="ml-1 h-4 w-4" />
                               ) : (
-                                <IconSortDescending className="ml-1 h-4 w-4" />
+                                <ArrowDownAZ className="ml-1 h-4 w-4" />
                               ))}
                           </Button>
                         </TableHead>
-                        <TableHead>
+                        <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">
                           <Button
                             variant="ghost"
-                            className="h-auto p-0 font-medium"
+                            className="h-auto p-0 text-caption uppercase tracking-widest hover:bg-transparent hover:text-foreground"
                             onClick={() => handleSort("id")}
                           >
                             CVE ID
                             {sortField === "id" &&
                               (sortOrder === "asc" ? (
-                                <IconSortAscending className="ml-1 h-4 w-4" />
+                                <ArrowUpAZ className="ml-1 h-4 w-4" />
                               ) : (
-                                <IconSortDescending className="ml-1 h-4 w-4" />
+                                <ArrowDownAZ className="ml-1 h-4 w-4" />
                               ))}
                           </Button>
                         </TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>
+                        <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">Description</TableHead>
+                        <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">
                           <Button
                             variant="ghost"
-                            className="h-auto p-0 font-medium"
+                            className="h-auto p-0 text-caption uppercase tracking-widest hover:bg-transparent hover:text-foreground"
                             onClick={() => handleSort("cvss")}
                           >
                             CVSS Score
                             {sortField === "cvss" &&
                               (sortOrder === "asc" ? (
-                                <IconSortAscending className="ml-1 h-4 w-4" />
+                                <ArrowUpAZ className="ml-1 h-4 w-4" />
                               ) : (
-                                <IconSortDescending className="ml-1 h-4 w-4" />
+                                <ArrowDownAZ className="ml-1 h-4 w-4" />
                               ))}
                           </Button>
                         </TableHead>
-                        <TableHead>Versions</TableHead>
-                        <TableHead>
+                        <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">Versions</TableHead>
+                        <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">
                           <Button
                             variant="ghost"
-                            className="h-auto p-0 font-medium"
+                            className="h-auto p-0 text-caption uppercase tracking-widest hover:bg-transparent hover:text-foreground"
                             onClick={() => handleSort("image")}
                           >
                             Found In
                             {sortField === "image" &&
                               (sortOrder === "asc" ? (
-                                <IconSortAscending className="ml-1 h-4 w-4" />
+                                <ArrowUpAZ className="ml-1 h-4 w-4" />
                               ) : (
-                                <IconSortDescending className="ml-1 h-4 w-4" />
+                                <ArrowDownAZ className="ml-1 h-4 w-4" />
                               ))}
                           </Button>
                         </TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredVulnerabilities.map((vuln, index) => (
-                        <TableRow key={`${vuln.id}-${vuln.scanId}-${index}`}>
+                        <TableRow key={`${vuln.id}-${vuln.scanId}-${index}`} className="border-white/10 hover:bg-white/5">
                           <TableCell>
                             <Badge
                               variant={getSeverityBadgeVariant(vuln.severity) as any}
+                              className="rounded-none uppercase tracking-widest text-caption"
                             >
                               {vuln.severity}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <p className="font-medium font-mono text-sm">
+                            <p className="font-mono text-body-sm text-foreground uppercase">
                               {vuln.id}
                             </p>
                           </TableCell>
                           <TableCell>
                             <p
-                              className="text-sm max-w-md truncate"
+                              className="text-body-sm max-w-md truncate text-muted-foreground"
                               title={vuln.description}
                             >
                               {vuln.description || "No description available"}
                             </p>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline">
+                            <Badge variant="outline" className="rounded-none uppercase tracking-widest text-caption border-white/10">
                               {vuln.cvss ? vuln.cvss.toFixed(1) : "N/A"}
                             </Badge>
                           </TableCell>
                           <TableCell>
                             <div className="space-y-1">
-                              <p className="text-sm">
-                                <span className="font-medium">Installed:</span>{" "}
+                              <p className="text-caption uppercase tracking-widest text-muted-foreground/60">
+                                <span>Installed:</span>{" "}
                                 {vuln.installedVersion}
                               </p>
                               {vuln.fixedVersion ? (
-                                <p className="text-sm">
-                                  <span className="font-medium">Fixed:</span>{" "}
+                                <p className="text-caption uppercase tracking-widest text-green-400">
+                                  <span>Fixed:</span>{" "}
                                   {vuln.fixedVersion}
                                 </p>
                               ) : (
-                                <Badge variant="secondary" className="text-xs">
+                                <Badge variant="secondary" className="rounded-none uppercase tracking-widest text-caption">
                                   No fix available
                                 </Badge>
                               )}
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="rounded-none uppercase tracking-widest text-caption border-white/10">
                               {vuln.imageName}:{vuln.imageTag}
                             </Badge>
                           </TableCell>
@@ -562,7 +563,7 @@ export default function LibraryDetailsPage() {
                 </div>
 
                 {filteredVulnerabilities.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
+                  <div className="text-center py-8 text-caption uppercase tracking-widest text-muted-foreground/40">
                     {search
                       ? `No vulnerabilities found matching "${search}"`
                       : `No vulnerabilities found for ${libraryName}`}

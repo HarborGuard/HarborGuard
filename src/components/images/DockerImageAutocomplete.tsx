@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useState, useCallback, useRef } from "react"
-import { IconBrandDocker, IconStar, IconDownload, IconSearch } from "@tabler/icons-react"
+import { Container, Star, Download, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -103,7 +103,7 @@ export function DockerImageAutocomplete({
   return (
     <div className={cn("relative docker-autocomplete-container", className)}>
       <div className="relative">
-        <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
         <Input
           ref={inputRef}
           value={value}
@@ -134,7 +134,7 @@ export function DockerImageAutocomplete({
             >
               <div className="flex items-center gap-3 w-full min-w-0">
                 <div className="flex-shrink-0">
-                  <IconBrandDocker className={cn(
+                  <Container className={cn(
                     "h-8 w-8",
                     image.is_official ? "text-blue-600" : "text-gray-600"
                   )} />
@@ -142,7 +142,7 @@ export function DockerImageAutocomplete({
                 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm truncate">
+                    <span className="text-body-sm truncate">
                       {image.name}
                     </span>
                     {image.is_official && (
@@ -158,11 +158,11 @@ export function DockerImageAutocomplete({
                   
                   <div className="flex items-center gap-4 mt-2">
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <IconStar className="h-3 w-3" />
+                      <Star className="h-3 w-3" />
                       {formatNumber(image.star_count)}
                     </div>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <IconDownload className="h-3 w-3" />
+                      <Download className="h-3 w-3" />
                       {formatNumber(image.pull_count)}
                     </div>
                   </div>

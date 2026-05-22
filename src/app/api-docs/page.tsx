@@ -44,9 +44,16 @@ export default function ApiDocs() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="swagger-ui-wrapper">
-        <SwaggerUI 
+    <div className="flex flex-col min-h-screen bg-background">
+      <div className="px-6 py-8 border-b border-white/10">
+        <p className="text-caption uppercase tracking-headline text-muted-foreground/30 mb-1">Developer</p>
+        <h1 className="text-2xl tracking-tight text-foreground">API Reference</h1>
+        <p className="text-body-sm uppercase tracking-widest text-muted-foreground mt-1">
+          Interactive REST API documentation — explore endpoints and try requests live
+        </p>
+      </div>
+      <div className="swagger-ui-wrapper flex-1">
+        <SwaggerUI
           url="/api/openapi.json"
           docExpansion="list"
           defaultModelsExpandDepth={-1}
@@ -60,42 +67,42 @@ export default function ApiDocs() {
         .swagger-ui-wrapper {
           background: var(--background);
         }
-        
+
         .swagger-ui .topbar {
           display: none;
         }
-        
+
         .swagger-ui .info {
           margin: 2rem 0;
         }
-        
+
         .swagger-ui .scheme-container {
           background: var(--card);
-          border-radius: 0.5rem;
+          border-radius: 0;
           padding: 1rem;
         }
-        
-        /* Better integration with HarborGuard's theme */
+
+        /* Sharp corners to match HarborGuard's 0px radius idiom */
         .swagger-ui .btn {
-          border-radius: 0.375rem;
+          border-radius: 0;
         }
-        
+
         .swagger-ui select {
-          border-radius: 0.375rem;
+          border-radius: 0;
         }
-        
+
         .swagger-ui .responses-inner {
           background: var(--card);
-          border-radius: 0.375rem;
+          border-radius: 0;
         }
-        
+
         .swagger-ui .opblock {
-          border-radius: 0.375rem;
+          border-radius: 0;
           margin-bottom: 1rem;
         }
-        
+
         .swagger-ui .opblock-summary {
-          border-radius: 0.375rem;
+          border-radius: 0;
         }
       `}</style>
     </div>

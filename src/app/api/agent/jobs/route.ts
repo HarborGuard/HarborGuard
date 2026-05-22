@@ -43,14 +43,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(
-      claimedJobs.map((j) => ({
+    return NextResponse.json({
+      jobs: claimedJobs.map((j) => ({
         id: j.id,
         type: j.type,
         createdAt: j.createdAt.toISOString(),
         ...(j.payload as object),
       })),
-    );
+    });
   } catch (error) {
     console.error('Job polling error:', error);
     return NextResponse.json({ error: 'Failed to poll jobs' }, { status: 500 });

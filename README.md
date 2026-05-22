@@ -1,7 +1,11 @@
-<p align="center">
-  <img src="assets/harborguard-dark.png" alt="HarborGuard Logo" width="56" height="56" style="vertical-align: middle;">
-  <img src="assets/harborguard-text.png" alt="HarborGuard" height="40" style="vertical-align: middle; margin-left: 12px;">
-</p>
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/harborguard-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="assets/harborguard-light.png">
+    <img src="assets/harborguard-dark.png" alt="HarborGuard Logo" width="48" height="48" style="vertical-align: middle;">
+  </picture>
+  &nbsp;harborguard
+</h1>
 
 [![Stars](https://img.shields.io/github/stars/HarborGuard/HarborGuard?color=5B5BD6&style=flat-square)](https://github.com/HarborGuard/HarborGuard)
 [![Downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fipitio.github.io%2Fbackage%2FHarborGuard%2FHarborGuard%2Fharborguard.json&query=%24.downloads&label=downloads&color=2496ED&style=flat-square&logo=docker)](https://github.com/HarborGuard/HarborGuard/pkgs/container/harborguard)

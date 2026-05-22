@@ -33,6 +33,10 @@
       "description": "Agents operations"
     },
     {
+      "name": "Api Keys",
+      "description": "Api Keys operations"
+    },
+    {
       "name": "Audit Logs",
       "description": "Audit logging and history"
     },
@@ -57,12 +61,20 @@
       "description": "Kubernetes operations"
     },
     {
+      "name": "Members",
+      "description": "Members operations"
+    },
+    {
       "name": "Openapi.json",
       "description": "Openapi.json operations"
     },
     {
       "name": "Patches",
       "description": "Patches operations"
+    },
+    {
+      "name": "Personal Access Tokens",
+      "description": "Personal Access Tokens operations"
     },
     {
       "name": "Ready",
@@ -83,6 +95,14 @@
     {
       "name": "Scheduled Scans",
       "description": "Scheduled Scans operations"
+    },
+    {
+      "name": "Settings",
+      "description": "Settings operations"
+    },
+    {
+      "name": "Teams",
+      "description": "Teams operations"
     },
     {
       "name": "Version",
@@ -268,6 +288,92 @@
         "summary": "POST /api/agents",
         "tags": [
           "Agents"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "name parameter"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/api-keys/{keyId}": {
+      "delete": {
+        "summary": "DELETE /api/api-keys/{keyId}",
+        "tags": [
+          "Api Keys"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "keyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "keyId parameter"
+          }
+        ]
+      },
+      "post": {
+        "summary": "POST /api/api-keys/{keyId}",
+        "tags": [
+          "Api Keys"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "keyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "keyId parameter"
+          }
+        ]
+      }
+    },
+    "/api/api-keys": {
+      "get": {
+        "summary": "GET /api/api-keys",
+        "tags": [
+          "Api Keys"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/api-keys",
+        "tags": [
+          "Api Keys"
         ],
         "responses": {
           "200": {
@@ -1148,6 +1254,118 @@
         }
       }
     },
+    "/api/members/{memberId}": {
+      "get": {
+        "summary": "GET /api/members/{memberId}",
+        "tags": [
+          "Members"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "memberId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "memberId parameter"
+          }
+        ]
+      },
+      "put": {
+        "summary": "PUT /api/members/{memberId}",
+        "tags": [
+          "Members"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "memberId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "memberId parameter"
+          }
+        ]
+      },
+      "delete": {
+        "summary": "DELETE /api/members/{memberId}",
+        "tags": [
+          "Members"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "memberId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "memberId parameter"
+          }
+        ]
+      }
+    },
+    "/api/members": {
+      "get": {
+        "summary": "GET /api/members",
+        "tags": [
+          "Members"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/members",
+        "tags": [
+          "Members"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "email parameter"
+                  },
+                  "role": {
+                    "type": "string",
+                    "description": "role parameter"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/openapi.json": {
       "get": {
         "summary": "GET /api/openapi.json",
@@ -1255,6 +1473,70 @@
         "responses": {
           "200": {
             "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/personal-access-tokens/{tokenId}": {
+      "delete": {
+        "summary": "DELETE /api/personal-access-tokens/{tokenId}",
+        "tags": [
+          "Personal Access Tokens"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "tokenId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "tokenId parameter"
+          }
+        ]
+      }
+    },
+    "/api/personal-access-tokens": {
+      "get": {
+        "summary": "GET /api/personal-access-tokens",
+        "tags": [
+          "Personal Access Tokens"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/personal-access-tokens",
+        "tags": [
+          "Personal Access Tokens"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "name parameter"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -2344,10 +2626,138 @@
                   "selectedImageIds = []": {
                     "type": "string",
                     "description": "selectedImageIds = [] parameter"
-                  },
-                  "source = 'MANUAL'": {
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "summary": "GET /api/settings",
+        "tags": [
+          "Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      },
+      "put": {
+        "summary": "PUT /api/settings",
+        "tags": [
+          "Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/teams/{teamId}": {
+      "get": {
+        "summary": "GET /api/teams/{teamId}",
+        "tags": [
+          "Teams"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "teamId parameter"
+          }
+        ]
+      },
+      "put": {
+        "summary": "PUT /api/teams/{teamId}",
+        "tags": [
+          "Teams"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "teamId parameter"
+          }
+        ]
+      },
+      "delete": {
+        "summary": "DELETE /api/teams/{teamId}",
+        "tags": [
+          "Teams"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "teamId parameter"
+          }
+        ]
+      }
+    },
+    "/api/teams": {
+      "get": {
+        "summary": "GET /api/teams",
+        "tags": [
+          "Teams"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/teams",
+        "tags": [
+          "Teams"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
                     "type": "string",
-                    "description": "source = 'MANUAL' parameter"
+                    "description": "name parameter"
                   }
                 }
               }

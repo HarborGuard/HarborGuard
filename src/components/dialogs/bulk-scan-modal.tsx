@@ -60,24 +60,29 @@ export function BulkScanModal({ children }: BulkScanModalProps) {
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Layers2Icon className="h-5 w-5" />
-            Bulk Image Scanning
-          </DialogTitle>
-          <DialogDescription>
-            Scan multiple container images at once using pattern matching
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto border-white/10 rounded-none shadow-2xl p-0">
+        <div className="p-8 border-b border-white/10 bg-surface-1 shrink-0">
+          <DialogHeader className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Layers2Icon className="h-4 w-4 text-accent" />
+              <DialogTitle className="text-sm uppercase tracking-wide-caps text-foreground">
+                Bulk Image Scanning
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-body-sm text-muted-foreground uppercase tracking-widest">
+              Scan multiple container images at once using pattern matching
+            </DialogDescription>
+          </DialogHeader>
+        </div>
 
+        <div className="p-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="new" className="flex items-center gap-2">
+          <TabsList className="grid w-full grid-cols-2 rounded-none border border-white/10 bg-surface-1 h-auto p-0">
+            <TabsTrigger value="new" className="flex items-center gap-2 rounded-none text-caption uppercase tracking-widest data-[state=active]:bg-white/5">
               <Play className="h-4 w-4" />
               New Bulk Scan
             </TabsTrigger>
-            <TabsTrigger value="jobs" className="flex items-center gap-2">
+            <TabsTrigger value="jobs" className="flex items-center gap-2 rounded-none text-caption uppercase tracking-widest data-[state=active]:bg-white/5">
               <Activity className="h-4 w-4" />
               Active Jobs
             </TabsTrigger>
@@ -112,10 +117,10 @@ export function BulkScanModal({ children }: BulkScanModalProps) {
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Filter className="h-5 w-5" />
-                  Image Filters
-                </h3>
+                <div className="flex items-center gap-3">
+                  <Filter className="h-4 w-4 text-accent" />
+                  <h3 className="text-sm uppercase tracking-wide-caps text-foreground">Image Filters</h3>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -169,10 +174,10 @@ export function BulkScanModal({ children }: BulkScanModalProps) {
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  Scanner Configuration
-                </h3>
+                <div className="flex items-center gap-3">
+                  <Settings className="h-4 w-4 text-accent" />
+                  <h3 className="text-sm uppercase tracking-wide-caps text-foreground">Scanner Configuration</h3>
+                </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {[
@@ -200,11 +205,11 @@ export function BulkScanModal({ children }: BulkScanModalProps) {
                             <div className="grid gap-1.5 leading-none">
                               <Label
                                 htmlFor={scanner.key}
-                                className="text-sm font-medium leading-none"
+                                className="text-body-sm uppercase tracking-caps text-foreground"
                               >
                                 {scanner.label}
                               </Label>
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-caption text-muted-foreground/50 uppercase tracking-widest mt-0.5">
                                 {scanner.description}
                               </p>
                             </div>
@@ -221,11 +226,11 @@ export function BulkScanModal({ children }: BulkScanModalProps) {
                                 <div className="grid gap-1.5 leading-none">
                                   <Label
                                     htmlFor={scanner.key}
-                                    className="text-sm font-medium leading-none cursor-not-allowed"
+                                    className="text-body-sm uppercase tracking-caps text-foreground cursor-not-allowed"
                                   >
                                     {scanner.label}
                                   </Label>
-                                  <p className="text-xs text-muted-foreground">
+                                  <p className="text-caption text-muted-foreground/50 uppercase tracking-widest mt-0.5">
                                     {scanner.description}
                                   </p>
                                 </div>
@@ -242,7 +247,7 @@ export function BulkScanModal({ children }: BulkScanModalProps) {
                 </div>
               </div>
 
-              <Button type="submit" disabled={loading} className="w-full">
+              <Button type="submit" disabled={loading} className="w-full rounded-none uppercase tracking-widest text-caption">
                 {loading ? "Starting Bulk Scan..." : "Start Bulk Scan"}
               </Button>
             </form>
@@ -256,6 +261,7 @@ export function BulkScanModal({ children }: BulkScanModalProps) {
             />
           </TabsContent>
         </Tabs>
+        </div>
       </DialogContent>
     </Dialog>
   );

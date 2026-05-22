@@ -13,17 +13,17 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  IconPlus,
-  IconTrash,
-  IconTestPipe,
-  IconBrandDocker,
-  IconBrandGithub,
-  IconBrandGitlab,
-  IconServer,
-  IconGitBranch,
-  IconRefresh,
-  IconLoader2,
-} from "@tabler/icons-react";
+  Plus,
+  Trash2,
+  FlaskConical,
+  Container,
+  Github,
+  GitlabIcon,
+  Server,
+  GitBranch,
+  RefreshCw,
+  Loader2,
+} from "lucide-react";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AddRepositoryDialog } from "@/components/dialogs/add-repository-dialog";
 import { toast } from "sonner";
@@ -155,13 +155,13 @@ export default function RepositoriesPage() {
   const getRepositoryIcon = (type: string) => {
     switch (type) {
       case "DOCKERHUB":
-        return <IconBrandDocker className="h-5 w-5" />;
+        return <Container className="h-4 w-4" />;
       case "GHCR":
-        return <IconBrandGithub className="h-5 w-5" />;
+        return <Github className="h-4 w-4" />;
       case "GITLAB":
-        return <IconBrandGitlab className="h-5 w-5" />;
+        return <GitlabIcon className="h-4 w-4" />;
       default:
-        return <IconServer className="h-5 w-5" />;
+        return <Server className="h-4 w-4" />;
     }
   };
 
@@ -169,14 +169,14 @@ export default function RepositoriesPage() {
     switch (status) {
       case "ACTIVE":
         return (
-          <Badge variant="default" className="bg-green-100 text-green-800">
+          <Badge variant="default" className="bg-green-900/30 text-green-400 border-green-500/30 rounded-none uppercase tracking-widest text-caption">
             Active
           </Badge>
         );
       case "ERROR":
-        return <Badge variant="destructive">Error</Badge>;
+        return <Badge variant="destructive" className="rounded-none uppercase tracking-widest text-caption">Error</Badge>;
       default:
-        return <Badge variant="secondary">Untested</Badge>;
+        return <Badge variant="secondary" className="rounded-none uppercase tracking-widest text-caption">Untested</Badge>;
     }
   };
 
@@ -269,26 +269,28 @@ export default function RepositoriesPage() {
     <div className="flex-1 overflow-auto">
       <div className="@container/main flex flex-col gap-2 p-4 lg:p-6">
         <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">
+          <div className="flex items-start justify-between gap-4 mb-8">
+            <div className="space-y-1">
+              <p className="text-caption uppercase tracking-headline text-muted-foreground/30">Configuration</p>
+              <h1 className="text-2xl tracking-tight text-foreground">
                 Repositories
               </h1>
-              <p className="text-muted-foreground">
+              <p className="text-body-sm text-muted-foreground uppercase tracking-widest">
                 Manage your private container registries and repositories
               </p>
             </div>
             <div className="flex gap-2">
-              <Button 
-                onClick={handleSyncAll} 
+              <Button
+                onClick={handleSyncAll}
                 variant="outline"
                 disabled={repositories.length === 0}
+                className="rounded-none border-white/10 hover:bg-white/5 uppercase tracking-widest text-caption"
               >
-                <IconRefresh className="mr-2 h-4 w-4" />
+                <RefreshCw className="mr-2 h-4 w-4" />
                 Sync All
               </Button>
-              <Button onClick={() => setIsAddDialogOpen(true)}>
-                <IconPlus className="mr-2 h-4 w-4" />
+              <Button onClick={() => setIsAddDialogOpen(true)} className="rounded-none uppercase tracking-widest text-caption">
+                <Plus className="mr-2 h-4 w-4" />
                 Add Repository
               </Button>
             </div>
@@ -296,24 +298,24 @@ export default function RepositoriesPage() {
 
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="text-muted-foreground">
+              <div className="text-caption uppercase tracking-widest text-muted-foreground/40">
                 Loading repositories...
               </div>
             </div>
           ) : repositories.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <IconGitBranch className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">
+            <Card className="bg-surface-1 border-white/10 rounded-none">
+              <CardContent className="flex flex-col items-center justify-center py-16 space-y-4">
+                <GitBranch className="h-12 w-12 text-muted-foreground/30 mx-auto" />
+                <p className="text-body-sm uppercase tracking-widest text-foreground">
                   No repositories configured
-                </h3>
-                <p className="text-muted-foreground text-center mb-6">
+                </p>
+                <p className="text-caption uppercase tracking-widest text-muted-foreground/40 text-center max-w-md mx-auto">
                   Add your first private repository to start scanning container
                   images from Docker Hub, GitHub Container Registry, or other
                   registries.
                 </p>
-                <Button onClick={() => setIsAddDialogOpen(true)}>
-                  <IconPlus className="mr-2 h-4 w-4" />
+                <Button onClick={() => setIsAddDialogOpen(true)} className="rounded-none uppercase tracking-widest text-caption">
+                  <Plus className="mr-2 h-4 w-4" />
                   Add Repository
                 </Button>
               </CardContent>
@@ -321,53 +323,53 @@ export default function RepositoriesPage() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {repositories.map((repo) => (
-                <Card key={repo.id}>
+                <Card key={repo.id} className="bg-surface-1 border-white/10 rounded-none">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-3 text-accent">
                         {getRepositoryIcon(repo.type)}
-                        <CardTitle className="text-base">{repo.name}</CardTitle>
+                        <CardTitle className="text-sm uppercase tracking-wide-caps text-foreground">{repo.name}</CardTitle>
                       </div>
                       {getStatusBadge(repo.status)}
                     </div>
-                    <CardDescription className="text-sm">
+                    <CardDescription className="text-caption uppercase tracking-widest text-muted-foreground/40">
                       {repo.type === 'GENERIC' && repo.protocol ? `${repo.protocol}://${repo.registryUrl}` : repo.registryUrl}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
                       {repo.username && (
-                        <div className="text-sm">
-                          <span className="font-medium">Username:</span>{" "}
-                          {repo.username}
+                        <div className="flex items-center gap-2">
+                          <span className="text-caption uppercase tracking-widest text-muted-foreground/50">Username:</span>
+                          <span className="text-body-sm text-foreground">{repo.username}</span>
                         </div>
                       )}
                       {repo.repositoryCount !== undefined && (
-                        <div className="text-sm">
-                          <span className="font-medium">Repositories:</span>{" "}
-                          {repo.repositoryCount}
+                        <div className="flex items-center gap-2">
+                          <span className="text-caption uppercase tracking-widest text-muted-foreground/50">Repositories:</span>
+                          <span className="text-body-sm text-foreground">{repo.repositoryCount}</span>
                         </div>
                       )}
                       {repo.lastTested && (
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-caption uppercase tracking-widest text-muted-foreground/40">
                           Last tested:{" "}
                           {new Date(repo.lastTested).toLocaleDateString()}
                         </div>
                       )}
                       {syncStatuses[repo.id] && (
-                        <div className="text-sm">
+                        <div className="text-body-sm">
                           {syncStatuses[repo.id].syncing ? (
-                            <span className="flex items-center text-blue-600">
-                              <IconLoader2 className="mr-1 h-3 w-3 animate-spin" />
+                            <span className="flex items-center text-accent text-caption uppercase tracking-widest">
+                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                               Syncing...
                             </span>
                           ) : syncStatuses[repo.id].lastSync ? (
-                            <span className="text-muted-foreground">
+                            <span className="text-caption uppercase tracking-widest text-muted-foreground/40">
                               Last sync: {new Date(syncStatuses[repo.id].lastSync!).toLocaleTimeString()}
                             </span>
                           ) : null}
                           {syncStatuses[repo.id].error && (
-                            <span className="text-red-600 text-xs">
+                            <span className="text-red-400 text-caption uppercase tracking-widest">
                               {syncStatuses[repo.id].error}
                             </span>
                           )}
@@ -379,12 +381,12 @@ export default function RepositoriesPage() {
                           variant="outline"
                           onClick={() => handleSyncRepository(repo.id)}
                           disabled={syncingRepos.has(repo.id) || syncStatuses[repo.id]?.syncing}
-                          className="flex-1"
+                          className="flex-1 rounded-none border-white/10 hover:bg-white/5 uppercase tracking-widest text-caption"
                         >
                           {syncingRepos.has(repo.id) || syncStatuses[repo.id]?.syncing ? (
-                            <IconLoader2 className="mr-1 h-3 w-3 animate-spin" />
+                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                           ) : (
-                            <IconRefresh className="mr-1 h-3 w-3" />
+                            <RefreshCw className="mr-1 h-3 w-3" />
                           )}
                           Sync
                         </Button>
@@ -392,18 +394,18 @@ export default function RepositoriesPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => handleTestConnection(repo.id)}
-                          className="flex-1"
+                          className="flex-1 rounded-none border-white/10 hover:bg-white/5 uppercase tracking-widest text-caption"
                         >
-                          <IconTestPipe className="mr-1 h-3 w-3" />
+                          <FlaskConical className="mr-1 h-3 w-3" />
                           Test
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleRemoveRepository(repo.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="rounded-none border-white/10 hover:bg-red-950/20 text-red-400 hover:text-red-300 hover:border-red-500/30"
                         >
-                          <IconTrash className="h-3 w-3" />
+                          <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
                     </div>

@@ -8,12 +8,12 @@ export function packageInfoCell<T>({ value, row }: CellRendererProps<T>) {
     const { name, version, type } = value as any
     return (
       <div className="flex flex-col">
-        <span className="font-mono text-sm">{name}</span>
+        <span className="font-mono text-body-sm">{name}</span>
         {version && (
-          <span className="text-xs text-muted-foreground">v{version}</span>
+          <span className="text-caption uppercase tracking-widest text-muted-foreground/60">v{version}</span>
         )}
         {type && (
-          <span className="text-xs text-muted-foreground">{type}</span>
+          <span className="text-caption uppercase tracking-widest text-muted-foreground/60">{type}</span>
         )}
       </div>
     )
@@ -26,12 +26,12 @@ export function packageInfoCell<T>({ value, row }: CellRendererProps<T>) {
 
   return (
     <div className="flex flex-col">
-      <span className="font-mono text-sm">{packageName}</span>
+      <span className="font-mono text-body-sm">{packageName}</span>
       {version && (
-        <span className="text-xs text-muted-foreground">v{version}</span>
+        <span className="text-caption uppercase tracking-widest text-muted-foreground/60">v{version}</span>
       )}
       {packageType && (
-        <span className="text-xs text-muted-foreground">{packageType}</span>
+        <span className="text-caption uppercase tracking-widest text-muted-foreground/60">{packageType}</span>
       )}
     </div>
   )

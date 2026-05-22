@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useScanning } from "@/contexts/ScanningContext";
 import { DeleteImageDialog } from "@/components/dialogs/delete-image-dialog";
-import { IconRefresh, IconTrash } from "@tabler/icons-react";
+import { RefreshCw, Trash2 } from "lucide-react";
 import * as React from "react";
 import { SectionCards } from "@/components/analysis/section-cards";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -48,7 +48,7 @@ export default function Page() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-screen text-red-500">
+      <div className="flex items-center justify-center h-screen text-red-400 text-caption uppercase tracking-widest">
         Error: {error}
       </div>
     );
@@ -65,23 +65,23 @@ export default function Page() {
         {showSkeleton ? (
           <>
             {/* VulnerabilityScatterplot Skeleton */}
-            <div className="bg-card rounded-lg border shadow-xs">
+            <div className="bg-surface-1 border border-white/10 p-6">
               <div className="mb-4">
-                <Skeleton className="h-6 w-64 mb-2" />
-                <Skeleton className="h-4 w-96" />
+                <Skeleton className="h-5 w-64 mb-2" />
+                <Skeleton className="h-3 w-96" />
               </div>
               <div className="mb-4 flex justify-end gap-2">
-                <Skeleton className="h-8 w-12" />
-                <Skeleton className="h-8 w-12" />
-                <Skeleton className="h-8 w-12" />
-                <Skeleton className="h-8 w-12" />
+                <Skeleton className="h-7 w-12" />
+                <Skeleton className="h-7 w-12" />
+                <Skeleton className="h-7 w-12" />
+                <Skeleton className="h-7 w-12" />
               </div>
               <Skeleton className="h-[250px] w-full" />
             </div>
 
             {/* DataTable Skeleton */}
-            <div className="bg-card rounded-lg border shadow-xs">
-              <Skeleton className="h-6 w-32 mb-4" />
+            <div className="bg-surface-1 border border-white/10 p-6">
+              <Skeleton className="h-5 w-32 mb-4" />
               <div className="space-y-3">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <div
@@ -123,7 +123,7 @@ export default function Page() {
               onRowClick={handleRowClick}
               contextMenuItems={getContextMenuItems}
               initialSorting={[{ id: "lastScan", desc: true }]}
-              className="bg-card rounded-lg border shadow-xs p-6"
+              className="bg-surface-1 border border-white/10 p-6"
             />
 
             {/* Dialogs */}
@@ -248,12 +248,12 @@ export default function Page() {
     if (tagCount > 1) {
       items.push({
         label: 'Rescan Image',
-        icon: <IconRefresh className="mr-2 h-4 w-4" />,
+        icon: <RefreshCw className="mr-2 h-4 w-4" />,
         action: () => {}, // No-op for parent with subItems
         subItems: [
           ...tags.map((tag: string) => ({
             label: `Scan :${tag}`,
-            icon: <IconRefresh className="mr-2 h-4 w-4" />,
+            icon: <RefreshCw className="mr-2 h-4 w-4" />,
             action: () => handleRescan(row.imageName, row.imageId, tag),
           })),
           {
@@ -263,7 +263,7 @@ export default function Page() {
           },
           {
             label: `Scan All ${tags.length} Tags`,
-            icon: <IconRefresh className="mr-2 h-4 w-4" />,
+            icon: <RefreshCw className="mr-2 h-4 w-4" />,
             action: () => handleRescanAll(row, tags),
           },
         ],
@@ -271,14 +271,14 @@ export default function Page() {
     } else {
       items.push({
         label: 'Rescan Image',
-        icon: <IconRefresh className="mr-2 h-4 w-4" />,
+        icon: <RefreshCw className="mr-2 h-4 w-4" />,
         action: () => handleRescan(row.imageName, row.imageId),
       })
     }
 
     items.push({
       label: 'Delete Image',
-      icon: <IconTrash className="mr-2 h-4 w-4" />,
+      icon: <Trash2 className="mr-2 h-4 w-4" />,
       action: () => handleDelete(row.imageName),
       variant: 'destructive',
       separator: true,

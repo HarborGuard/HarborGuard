@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils"
-import { IconShield, IconScan } from "@tabler/icons-react"
+import { Shield, ScanLine } from "lucide-react"
 import { Skeleton } from "./skeleton"
 
 interface LoadingSpinnerProps {
@@ -36,7 +36,7 @@ export function LoadingState({
   size = "md",
   showIcon = true 
 }: LoadingStateProps) {
-  const Icon = showIcon ? IconShield : null
+  const Icon = showIcon ? Shield : null
   
   return (
     <div className={cn("flex flex-col items-center justify-center space-y-4 p-8", className)}>
@@ -99,7 +99,7 @@ export function ScanLoading({ className }: ScanLoadingProps) {
   return (
     <div className={cn("flex items-center justify-center space-y-4 p-8", className)}>
       <div className="flex items-center space-x-3">
-        <IconScan className="h-6 w-6 text-primary animate-pulse" />
+        <ScanLine className="h-6 w-6 text-primary animate-pulse" />
         <LoadingSpinner />
       </div>
       

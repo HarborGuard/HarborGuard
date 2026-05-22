@@ -8,14 +8,15 @@ import { ColumnDefinition, ContextMenuItem } from "@/components/table/types";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
-  IconCalendarEvent,
-  IconEdit,
-  IconEye,
-  IconHistory,
-  IconPlayerPlay,
-  IconPlus,
-  IconTrash,
-} from "@tabler/icons-react";
+  CalendarDays,
+  Pencil,
+  Eye,
+  History,
+  Play,
+  Plus,
+  Trash2,
+  Calendar,
+} from "lucide-react";
 import { FullPageLoading } from "@/components/ui/loading";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -166,8 +167,8 @@ export default function ScheduledScansPage() {
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="font-medium cursor-help flex items-center gap-1">
-                      <span>{row.name}</span>
+                    <div className="cursor-help flex items-center gap-1">
+                      <span className="text-body-sm text-foreground">{row.name}</span>
                       <span className="text-muted-foreground">ⓘ</span>
                     </div>
                   </TooltipTrigger>
@@ -178,7 +179,7 @@ export default function ScheduledScansPage() {
               </TooltipProvider>
             );
           }
-          return <div className="font-medium">{row.name}</div>;
+          return <div className="text-body-sm text-foreground">{row.name}</div>;
         },
       },
     },
@@ -191,7 +192,7 @@ export default function ScheduledScansPage() {
         render: (row: any) => (
           <Badge
             variant={row.enabled ? "default" : "secondary"}
-            className={row.enabled ? "bg-green-500 hover:bg-green-600" : ""}
+            className={`rounded-none uppercase tracking-widest text-caption ${row.enabled ? "bg-green-900/30 text-green-400 border-green-500/30" : ""}`}
           >
             {row.enabled ? "Enabled" : "Disabled"}
           </Badge>
@@ -268,7 +269,7 @@ export default function ScheduledScansPage() {
               }}
               disabled={!row.enabled}
             >
-              <IconPlayerPlay className="h-4 w-4" />
+              <Play className="h-4 w-4" />
             </Button>
             <Button
               variant="ghost"
@@ -278,7 +279,7 @@ export default function ScheduledScansPage() {
                 router.push(`/scheduled-scans/history?search=${encodeURIComponent(row.name)}`);
               }}
             >
-              <IconHistory className="h-4 w-4" />
+              <History className="h-4 w-4" />
             </Button>
             <Button
               variant="ghost"
@@ -288,7 +289,7 @@ export default function ScheduledScansPage() {
                 setEditingScan(row);
               }}
             >
-              <IconEdit className="h-4 w-4" />
+              <Pencil className="h-4 w-4" />
             </Button>
             <Button
               variant="ghost"
@@ -298,7 +299,7 @@ export default function ScheduledScansPage() {
                 handleDeleteScan(row);
               }}
             >
-              <IconTrash className="h-4 w-4" />
+              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         ),
@@ -309,32 +310,32 @@ export default function ScheduledScansPage() {
   const getContextMenuItems = (row: any): ContextMenuItem[] => [
     {
       label: "Execute Now",
-      icon: <IconPlayerPlay className="h-4 w-4" />,
+      icon: <Play className="h-4 w-4" />,
       action: () => handleExecuteScan(row),
     },
     {
       label: "View Details",
-      icon: <IconEye className="h-4 w-4" />,
+      icon: <Eye className="h-4 w-4" />,
       action: modalAction(() => setEditingScan(row)),
     },
     {
       label: "View History",
-      icon: <IconHistory className="h-4 w-4" />,
+      icon: <History className="h-4 w-4" />,
       action: () => router.push(`/scheduled-scans/history?search=${encodeURIComponent(row.name)}`),
     },
     {
       label: "Edit",
-      icon: <IconEdit className="h-4 w-4" />,
+      icon: <Pencil className="h-4 w-4" />,
       action: modalAction(() => setEditingScan(row)),
     },
     {
       label: row.enabled ? "Disable" : "Enable",
-      icon: <IconCalendarEvent className="h-4 w-4" />,
+      icon: <CalendarDays className="h-4 w-4" />,
       action: () => handleToggleEnabled(row),
     },
     {
       label: "Delete",
-      icon: <IconTrash className="h-4 w-4" />,
+      icon: <Trash2 className="h-4 w-4" />,
       action: () => handleDeleteScan(row),
       variant: "destructive",
     },
@@ -359,18 +360,19 @@ export default function ScheduledScansPage() {
         <div className="flex flex-col gap-4 p-4 lg:p-6 md:gap-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold">Scheduled Scans</h1>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-caption uppercase tracking-headline text-muted-foreground/30 mb-1">Automation</p>
+              <h1 className="text-2xl tracking-tight text-foreground">Scheduled Scans</h1>
+              <p className="text-caption uppercase tracking-widest text-muted-foreground/50 mt-1">
                 Manage automated scanning schedules for your container images
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button className="cursor-pointer" variant={"secondary"} onClick={() => router.push('/scheduled-scans/history')}>
-                <IconHistory className=" h-4 w-4" />
+              <Button className="cursor-pointer rounded-none border-white/10 hover:bg-white/5 uppercase tracking-widest text-caption" variant={"outline"} onClick={() => router.push('/scheduled-scans/history')}>
+                <History className="h-4 w-4" />
                 Schedule History
               </Button>
-              <Button onClick={() => setCreateDialogOpen(true)}>
-                <IconPlus className=" h-4 w-4" />
+              <Button onClick={() => setCreateDialogOpen(true)} className="rounded-none uppercase tracking-widest text-caption">
+                <Plus className="h-4 w-4" />
                 New Schedule
               </Button>
             </div>
@@ -391,7 +393,7 @@ export default function ScheduledScansPage() {
             onRowClick={handleRowClick}
             onSelectionChange={setSelectedScans}
             contextMenuItems={getContextMenuItems}
-            className="bg-card rounded-lg border shadow-xs p-6"
+            className="bg-surface-1 border border-white/10 p-6"
           />
 
           {/* Create/Edit Dialog */}
@@ -404,19 +406,25 @@ export default function ScheduledScansPage() {
               }
             }}
           >
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingScan
-                    ? "Edit Scheduled Scan"
-                    : "Create Scheduled Scan"}
-                </DialogTitle>
-                <DialogDescription>
-                  {editingScan
-                    ? "Update the scheduled scan configuration"
-                    : "Set up a new automated scan schedule for container images"}
-                </DialogDescription>
-              </DialogHeader>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto border-white/10 rounded-none shadow-2xl p-0">
+              <div className="p-8 border-b border-white/10 bg-surface-1 shrink-0">
+                <DialogHeader className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="h-4 w-4 text-accent" />
+                    <DialogTitle className="text-sm uppercase tracking-wide-caps text-foreground">
+                      {editingScan
+                        ? "Edit Scheduled Scan"
+                        : "Create Scheduled Scan"}
+                    </DialogTitle>
+                  </div>
+                  <DialogDescription className="text-body-sm text-muted-foreground uppercase tracking-widest">
+                    {editingScan
+                      ? "Update the scheduled scan configuration"
+                      : "Set up a new automated scan schedule for container images"}
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+              <div className="p-8">
               <ScheduleScanForm
                 scan={editingScan}
                 onSubmit={async (data) => {
@@ -456,6 +464,7 @@ export default function ScheduledScansPage() {
                   setEditingScan(null);
                 }}
               />
+              </div>
             </DialogContent>
           </Dialog>
         </div>

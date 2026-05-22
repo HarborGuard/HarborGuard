@@ -6,7 +6,7 @@ import {
   CardTitle 
 } from "../ui/card"
 import { Skeleton } from "../ui/skeleton"
-import { IconTag, IconShield } from "@tabler/icons-react"
+import { Tag, Shield } from "lucide-react"
 
 export function ImagePageSkeleton() {
   return (
@@ -17,7 +17,7 @@ export function ImagePageSkeleton() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <IconTag className="h-5 w-5" />
+              <Tag className="h-5 w-5" />
               Image Information
             </CardTitle>
             <CardDescription>
@@ -40,7 +40,7 @@ export function ImagePageSkeleton() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <IconShield className="h-5 w-5" />
+              <Shield className="h-5 w-5" />
               Security Summary
             </CardTitle>
             <CardDescription>
@@ -65,7 +65,7 @@ export function ImagePageSkeleton() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <div className="animate-pulse">
-              <IconShield className="h-5 w-5" />
+              <Shield className="h-5 w-5" />
             </div>
             Loading Scan History
           </CardTitle>
@@ -139,7 +139,7 @@ export function ScanDetailsSkeleton() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <div className="animate-pulse">
-                  <IconShield className="h-5 w-5" />
+                  <Shield className="h-5 w-5" />
                 </div>
                 <Skeleton className="h-6 w-48" />
               </div>

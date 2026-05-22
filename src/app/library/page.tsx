@@ -3,10 +3,10 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
-  IconBug,
-  IconSearch,
-  IconExternalLink,
-} from "@tabler/icons-react";
+  Bug,
+  Search,
+  ExternalLink,
+} from "lucide-react";
 import { VulnerabilityDetailsModal } from "@/components/dialogs/vulnerability-details-modal";
 import {
   Card,
@@ -78,15 +78,15 @@ export default function LibraryHomePage() {
             <StatsLoadingSkeleton />
 
             {/* Table skeleton */}
-            <Card>
+            <Card className="bg-surface-1 border-white/10 rounded-none">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-body-sm uppercase tracking-caps text-muted-foreground/60">
                   <div className="animate-pulse">
-                    <IconBug className="h-5 w-5" />
+                    <Bug className="h-4 w-4" />
                   </div>
                   Loading Vulnerability Library
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-caption uppercase tracking-widest text-muted-foreground/40">
                   Loading all vulnerabilities found across scanned images...
                 </CardDescription>
               </CardHeader>
@@ -105,13 +105,13 @@ export default function LibraryHomePage() {
       <div className="@container/main flex flex-1 flex-col gap-2 overflow-auto">
         <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6 px-4 lg:px-6">
           {/* Vulnerability Overview Stats */}
-          <Card>
+          <Card className="bg-surface-1 border-white/10 rounded-none">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <IconBug className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-body-sm uppercase tracking-caps text-foreground">
+                <Bug className="h-4 w-4 text-accent" />
                 Vulnerability Library Overview
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-caption uppercase tracking-widest text-muted-foreground/50">
                 All vulnerabilities across scanned images with false positive
                 tracking
               </CardDescription>
@@ -119,61 +119,61 @@ export default function LibraryHomePage() {
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                 <div className="text-center">
-                  <p className="text-2xl font-bold">{stats.totalCves}</p>
-                  <p className="text-sm text-muted-foreground">Total CVEs</p>
+                  <p className="text-2xl tracking-tight text-foreground">{stats.totalCves}</p>
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">Total CVEs</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-red-600">
+                  <p className="text-2xl tracking-tight text-red-400">
                     {stats.criticalCves}
                   </p>
-                  <p className="text-sm text-muted-foreground">Critical</p>
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">Critical</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-orange-600">
+                  <p className="text-2xl tracking-tight text-orange-400">
                     {stats.highCves}
                   </p>
-                  <p className="text-sm text-muted-foreground">High</p>
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">High</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-orange-600">
+                  <p className="text-2xl tracking-tight text-orange-400">
                     {stats.highRiskCves}
                   </p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">
                     High CVSS (≥7.0)
                   </p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-green-600">
+                  <p className="text-2xl tracking-tight text-green-400">
                     {stats.fixableCves}
                   </p>
-                  <p className="text-sm text-muted-foreground">Fixable</p>
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">Fixable</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-purple-600">
+                  <p className="text-2xl tracking-tight text-purple-400">
                     {stats.cvesWithFalsePositives}
                   </p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">
                     With False Positives
                   </p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-blue-600">
+                  <p className="text-2xl tracking-tight text-blue-400">
                     {stats.fixablePercent}%
                   </p>
-                  <p className="text-sm text-muted-foreground">Fixable Rate</p>
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">Fixable Rate</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Vulnerabilities Table */}
-          <Card>
+          <Card className="bg-surface-1 border-white/10 rounded-none">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <IconBug className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-body-sm uppercase tracking-caps text-foreground">
+                <Bug className="h-4 w-4 text-accent" />
                 Vulnerability Library
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-caption uppercase tracking-widest text-muted-foreground/50">
                 All vulnerabilities found across scanned images with false
                 positive tracking
               </CardDescription>
@@ -183,12 +183,12 @@ export default function LibraryHomePage() {
                 {/* Search and Filters */}
                 <div className="flex items-center gap-4">
                   <div className="relative flex-1">
-                    <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground/40 h-4 w-4" />
                     <Input
                       placeholder="Search CVEs or descriptions..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 rounded-none border-white/10 bg-transparent text-body-sm placeholder:text-muted-foreground/30 placeholder:tracking-caps placeholder:uppercase"
                     />
                   </div>
                   <Select
@@ -197,10 +197,10 @@ export default function LibraryHomePage() {
                       setSeverityFilter(value === "all" ? "" : value)
                     }
                   >
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-32 rounded-none border-white/10 text-caption uppercase tracking-widest">
                       <SelectValue placeholder="Severity" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-overlay border-white/10 rounded-none">
                       <SelectItem value="all">All</SelectItem>
                       <SelectItem value="critical">Critical</SelectItem>
                       <SelectItem value="high">High</SelectItem>
@@ -208,7 +208,7 @@ export default function LibraryHomePage() {
                       <SelectItem value="low">Low</SelectItem>
                     </SelectContent>
                   </Select>
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-caption uppercase tracking-widest text-muted-foreground/50">
                     {pagination.total !== undefined
                       ? `${pagination.total} total vulnerabilities`
                       : `${vulnerabilities.length} vulnerabilities`}
@@ -242,7 +242,7 @@ export default function LibraryHomePage() {
                 />
 
                 {vulnerabilities.length === 0 && !loading && (
-                  <div className="text-center py-8 text-muted-foreground">
+                  <div className="text-center py-8 text-caption uppercase tracking-widest text-muted-foreground/40">
                     {search || severityFilter
                       ? `No vulnerabilities found matching current filters`
                       : "No vulnerabilities found"}
@@ -342,7 +342,7 @@ export default function LibraryHomePage() {
     return [
       {
         label: 'View Details',
-        icon: <IconExternalLink className="h-4 w-4 mr-1" />,
+        icon: <ExternalLink className="h-4 w-4 mr-1" />,
         action: (row) => {
           window.open(`https://nvd.nist.gov/vuln/detail/${row.cveId}`, '_blank');
         },

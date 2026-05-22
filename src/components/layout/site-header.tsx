@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { IconBrandGithub } from "@tabler/icons-react";
+import { Github, FileText, BookOpen } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -15,93 +15,99 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { LogsIcon, BookOpenIcon } from "lucide-react";
 import { generateBreadcrumbs } from "@/lib/breadcrumb-utils";
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
   const breadcrumbs = generateBreadcrumbs(pathname);
-  
+
   return (
-    <header className="sticky top-0 z-50 flex h-(--header-height) shrink-0 items-center gap-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
-      <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
-        <SidebarTrigger className="-ml-1" />
+    <header className="sticky top-0 z-50 flex h-(--header-height) shrink-0 items-center gap-2 border-b border-white/10 bg-overlay-light backdrop-blur-xl transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
+      <div className="flex w-full items-center gap-2 px-6">
+        <SidebarTrigger className="-ml-1 text-muted-foreground hover:text-foreground" />
         <Separator
           orientation="vertical"
-          className="mx-2 data-[orientation=vertical]:h-4"
+          className="mx-2 data-[orientation=vertical]:h-4 bg-white/10"
         />
         <Breadcrumb>
-          <BreadcrumbList>
+          <BreadcrumbList className="text-body-sm uppercase tracking-caps text-muted-foreground">
             {breadcrumbs.map((item, index) => (
               <div key={index} className="flex items-center">
                 <BreadcrumbItem>
                   {item.href ? (
                     <BreadcrumbLink asChild>
-                      <Link href={item.href}>{item.label}</Link>
+                      <Link
+                        href={item.href}
+                        className="hover:text-foreground transition-colors"
+                      >
+                        {item.label}
+                      </Link>
                     </BreadcrumbLink>
                   ) : (
-                    <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                    <BreadcrumbPage className="text-foreground">
+                      {item.label}
+                    </BreadcrumbPage>
                   )}
                 </BreadcrumbItem>
-                {index < breadcrumbs.length - 1 && <BreadcrumbSeparator />}
+                {index < breadcrumbs.length - 1 && (
+                  <BreadcrumbSeparator className="text-muted-foreground/40" />
+                )}
               </div>
             ))}
           </BreadcrumbList>
         </Breadcrumb>
-        
-        {/* Demo Mode Badge */}
+
         {isDemoMode && (
-          <Badge variant="secondary" className="ml-2 bg-orange-100 text-orange-800 border-orange-200">
+          <Badge
+            variant="outline"
+            className="ml-2 border-accent/40 text-accent uppercase tracking-caps text-caption"
+          >
             Demo Mode
           </Badge>
         )}
-        
+
         <div className="ml-auto flex items-center gap-2">
           <Button
-            variant="secondary"
+            variant="ghost"
             asChild
             size="sm"
-            className="hidden sm:flex"
+            className="hidden sm:flex text-muted-foreground hover:text-foreground hover:bg-white/5 uppercase tracking-caps text-body-sm"
           >
             <a
               href="/api-docs"
-              className="dark:text-foreground flex items-center gap-2"
+              className="flex items-center gap-2"
               title="API Documentation"
             >
-              <BookOpenIcon className="h-4 w-4" />
+              <BookOpen className="h-4 w-4" />
               API Docs
             </a>
           </Button>
 
           <Button
-            variant="secondary"
+            variant="ghost"
             asChild
-            size="sm"
-            className="hidden sm:flex"
+            size="icon"
+            className="hidden sm:flex text-muted-foreground hover:text-foreground hover:bg-white/5"
           >
-            <a
-              href="/audit-logs"
-              className="dark:text-foreground flex items-center gap-2"
-            >
-              <LogsIcon />
+            <a href="/audit-logs" title="Audit Logs">
+              <FileText className="h-4 w-4" />
             </a>
           </Button>
 
           <Button
-            variant="default"
+            variant="ghost"
             asChild
-            size="sm"
-            className="hidden sm:flex"
+            size="icon"
+            className="hidden sm:flex text-muted-foreground hover:text-foreground hover:bg-white/5"
           >
             <a
               href="https://github.com/HarborGuard/HarborGuard"
               rel="noopener noreferrer"
               target="_blank"
-              className="dark:text-foreground flex items-center gap-2"
+              title="GitHub"
             >
-              <IconBrandGithub className="h-4 w-4" />
-              GitHub
+              <Github className="h-4 w-4" />
             </a>
           </Button>
         </div>

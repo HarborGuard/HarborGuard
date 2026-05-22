@@ -1,12 +1,12 @@
 "use client";
 
 import {
-  IconBug,
-  IconPackage,
-  IconShield,
-  IconSettings,
-  IconStack,
-} from "@tabler/icons-react";
+  Bug,
+  Package,
+  Shield,
+  Settings,
+  Layers,
+} from "lucide-react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrivyResultsTab } from "./TrivyResultsTab";
@@ -54,7 +54,7 @@ export function RawScannerTabs({
   return (
     <Tabs defaultValue="trivy" className="w-full">
       <TabsList
-        className={`grid w-full ${
+        className={`grid w-full rounded-none border border-white/10 bg-surface-1 h-auto p-0 ${
           diveResults?.layer && diveResults.layer.length > 0 && osvResults
             ? "grid-cols-6"
             : (diveResults?.layer && diveResults.layer.length > 0) || osvResults
@@ -62,31 +62,31 @@ export function RawScannerTabs({
             : "grid-cols-4"
         }`}
       >
-        <TabsTrigger value="trivy" className="flex items-center gap-2">
-          <IconBug className="h-4 w-4" />
+        <TabsTrigger value="trivy" className="flex items-center gap-2 rounded-none text-caption uppercase tracking-widest data-[state=active]:bg-white/5">
+          <Bug className="h-4 w-4" />
           Trivy
         </TabsTrigger>
-        <TabsTrigger value="grype" className="flex items-center gap-2">
-          <IconShield className="h-4 w-4" />
+        <TabsTrigger value="grype" className="flex items-center gap-2 rounded-none text-caption uppercase tracking-widest data-[state=active]:bg-white/5">
+          <Shield className="h-4 w-4" />
           Grype
         </TabsTrigger>
-        <TabsTrigger value="syft" className="flex items-center gap-2">
-          <IconPackage className="h-4 w-4" />
+        <TabsTrigger value="syft" className="flex items-center gap-2 rounded-none text-caption uppercase tracking-widest data-[state=active]:bg-white/5">
+          <Package className="h-4 w-4" />
           Syft
         </TabsTrigger>
-        <TabsTrigger value="dockle" className="flex items-center gap-2">
-          <IconSettings className="h-4 w-4" />
+        <TabsTrigger value="dockle" className="flex items-center gap-2 rounded-none text-caption uppercase tracking-widest data-[state=active]:bg-white/5">
+          <Settings className="h-4 w-4" />
           Dockle
         </TabsTrigger>
         {osvResults && (
-          <TabsTrigger value="osv" className="flex items-center gap-2">
-            <IconPackage className="h-4 w-4" />
+          <TabsTrigger value="osv" className="flex items-center gap-2 rounded-none text-caption uppercase tracking-widest data-[state=active]:bg-white/5">
+            <Package className="h-4 w-4" />
             OSV
           </TabsTrigger>
         )}
         {diveResults?.layer && diveResults.layer.length > 0 && (
-          <TabsTrigger value="dive" className="flex items-center gap-2">
-            <IconStack className="h-4 w-4" />
+          <TabsTrigger value="dive" className="flex items-center gap-2 rounded-none text-caption uppercase tracking-widest data-[state=active]:bg-white/5">
+            <Layers className="h-4 w-4" />
             Layers ({diveResults.layer.length})
           </TabsTrigger>
         )}

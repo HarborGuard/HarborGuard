@@ -15,7 +15,7 @@ export default function NotFoundPage() {
           <div className="flex justify-center mb-4">
             <AlertCircle className="h-12 w-12 text-muted-foreground" />
           </div>
-          <CardTitle className="text-3xl font-bold">404 - Page Not Found</CardTitle>
+          <CardTitle className="text-3xl uppercase tracking-wide-caps text-foreground">404 - Page Not Found</CardTitle>
           <CardDescription className="text-lg mt-2">
             Oops! The page you're looking for doesn't exist.
           </CardDescription>

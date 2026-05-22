@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react"
 import {
-  IconRefresh,
-  IconBox,
-  IconCircleFilled,
-} from "@tabler/icons-react"
+  RefreshCw,
+  Box,
+  Circle,
+} from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -128,8 +128,8 @@ export function KubernetesTab({
     return (
       <div className="space-y-3">
         <div className="text-center py-8">
-          <IconBox className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-2 text-sm font-medium">Kubernetes Not Detected</h3>
+          <Box className="mx-auto h-12 w-12 text-muted-foreground" />
+          <h3 className="mt-2 text-body-sm uppercase tracking-widest text-foreground">Kubernetes Not Detected</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             Kubernetes not detected. Deploy HarborGuard in a Kubernetes cluster or set KUBECONFIG.
           </p>
@@ -143,7 +143,7 @@ export function KubernetesTab({
       {/* Cluster info and controls */}
       <div className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <IconBox className="h-4 w-4" />
+          <Box className="h-4 w-4" />
           <span>
             Cluster: {clusterName || "unknown"}
             {images.length > 0 && (
@@ -152,7 +152,7 @@ export function KubernetesTab({
           </span>
         </div>
         <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={loadingImages}>
-          <IconRefresh className={cn("h-4 w-4", loadingImages && "animate-spin")} />
+          <RefreshCw className={cn("h-4 w-4", loadingImages && "animate-spin")} />
         </Button>
       </div>
 
@@ -179,7 +179,7 @@ export function KubernetesTab({
       {/* Error state */}
       {error && (
         <div className="bg-destructive/10 border border-destructive/20 rounded-md p-4">
-          <h3 className="text-sm font-medium text-destructive">Error loading images</h3>
+          <h3 className="text-body-sm uppercase tracking-widest text-red-400">Error loading images</h3>
           <p className="mt-1 text-sm text-destructive/80">{error}</p>
           <Button onClick={handleRefresh} variant="outline" size="sm" className="mt-2">
             Try again
@@ -198,13 +198,13 @@ export function KubernetesTab({
       {/* No images */}
       {!loadingImages && !error && images.length === 0 && (
         <div className="text-center py-8">
-          <IconBox className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-2 text-sm font-medium">No Images Found</h3>
+          <Box className="mx-auto h-12 w-12 text-muted-foreground" />
+          <h3 className="mt-2 text-body-sm uppercase tracking-widest text-foreground">No Images Found</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             No container images found in running pods.
           </p>
           <Button onClick={handleRefresh} variant="outline" size="sm" className="mt-4">
-            <IconRefresh className="h-4 w-4 mr-2" />
+            <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
         </div>
@@ -230,8 +230,8 @@ export function KubernetesTab({
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <code className="font-medium text-sm truncate">{img.image}</code>
-                      <IconCircleFilled
+                      <code className="text-body-sm truncate">{img.image}</code>
+                      <Circle
                         className={cn("h-2 w-2", img.running ? "text-green-500" : "text-muted-foreground")}
                       />
                       {img.running ? (

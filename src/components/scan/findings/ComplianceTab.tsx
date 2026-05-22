@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { IconSearch } from "@tabler/icons-react";
+import { Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -79,7 +79,7 @@ export function ComplianceTab({
             </CardDescription>
           </div>
           <div className="relative w-64">
-            <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search compliance issues..."
               value={complianceSearch}

@@ -2,20 +2,20 @@
 
 import * as React from "react"
 import {
-  IconBrandDocker,
-  IconBrandGithub,
-  IconDeviceDesktop,
-  IconHexagonLetterK,
-  IconLink,
-  IconGitBranch,
-  IconStack2,
-  IconArrowLeft,
-  IconArrowRight,
-  IconSearch,
-  IconShieldCheck,
-  IconHistory,
-  IconCheck,
-} from "@tabler/icons-react"
+  Container,
+  Github,
+  Monitor,
+  Hexagon,
+  Link2,
+  GitBranch,
+  Layers,
+  ArrowLeft,
+  ArrowRight,
+  Search,
+  ShieldCheck,
+  History,
+  Check,
+} from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -25,6 +25,8 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
+  DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
@@ -69,22 +71,22 @@ function StepIndicator({ currentStep, totalSteps }: { currentStep: number; total
       {steps.slice(0, totalSteps).map((s, i) => (
         <React.Fragment key={s.step}>
           {i > 0 && (
-            <div className={cn("h-px w-8 transition-colors", currentStep > s.step - 1 ? "bg-primary" : "bg-border")} />
+            <div className={cn("h-px w-8 transition-colors", currentStep > s.step - 1 ? "bg-accent" : "bg-white/10")} />
           )}
           <div className="flex items-center gap-2">
             <div
               className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-all",
+                "flex h-7 w-7 items-center justify-center text-caption transition-all border",
                 currentStep === s.step
-                  ? "bg-primary text-primary-foreground shadow-sm"
+                  ? "bg-accent border-accent text-white"
                   : currentStep > s.step
-                    ? "bg-primary/20 text-primary"
-                    : "bg-muted text-muted-foreground"
+                    ? "bg-accent/20 border-accent/40 text-accent"
+                    : "bg-transparent border-white/10 text-muted-foreground"
               )}
             >
-              {currentStep > s.step ? <IconCheck className="h-4 w-4" /> : s.step}
+              {currentStep > s.step ? <Check className="h-3 w-3" /> : s.step}
             </div>
-            <span className={cn("text-sm hidden sm:inline", currentStep === s.step ? "font-medium" : "text-muted-foreground")}>
+            <span className={cn("text-caption uppercase tracking-widest hidden sm:inline", currentStep === s.step ? "text-foreground" : "text-muted-foreground/40")}>
               {s.label}
             </span>
           </div>
@@ -110,26 +112,26 @@ function SourceCard({
       onClick={onClick}
       disabled={source.available === false}
       className={cn(
-        "group relative flex flex-col items-center gap-3 rounded-xl border-2 p-5 text-center transition-all",
-        "hover:border-primary/50 hover:bg-muted/50 hover:shadow-sm",
+        "group relative flex flex-col items-center gap-3 border p-5 text-center transition-all",
+        "hover:border-accent/50 hover:bg-white/5",
         selected
-          ? "border-primary bg-primary/5 shadow-sm"
-          : "border-border",
-        source.available === false && "opacity-40 cursor-not-allowed hover:border-border hover:bg-transparent hover:shadow-none"
+          ? "border-accent bg-accent/5"
+          : "border-white/10",
+        source.available === false && "opacity-40 cursor-not-allowed hover:border-white/10 hover:bg-transparent"
       )}
     >
       <div className={cn(
-        "flex h-12 w-12 items-center justify-center rounded-lg transition-colors",
-        selected ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground group-hover:text-foreground"
+        "flex h-10 w-10 items-center justify-center transition-colors",
+        selected ? "text-accent" : "text-muted-foreground/40 group-hover:text-muted-foreground"
       )}>
         {source.icon}
       </div>
       <div>
-        <p className="font-medium text-sm">{source.label}</p>
-        <p className="text-xs text-muted-foreground mt-0.5">{source.description}</p>
+        <p className="text-body-sm uppercase tracking-caps">{source.label}</p>
+        <p className="text-caption text-muted-foreground/50 mt-0.5 uppercase tracking-widest">{source.description}</p>
       </div>
       {source.available === false && (
-        <Badge variant="secondary" className="absolute top-2 right-2 text-[10px]">Unavailable</Badge>
+        <Badge variant="secondary" className="absolute top-2 right-2 text-caption rounded-none uppercase tracking-widest">Unavailable</Badge>
       )}
     </button>
   )
@@ -155,17 +157,17 @@ function ExistingImageCard({
   return (
     <button
       onClick={onClick}
-      className="flex items-center justify-between w-full p-3 rounded-lg border hover:border-primary/50 hover:bg-muted/30 transition-all text-left"
+      className="flex items-center justify-between w-full p-3 border border-white/10 hover:border-white/20 hover:bg-white/5 transition-all text-left"
     >
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{image.name}</p>
-        <p className="text-xs text-muted-foreground mt-0.5">
+        <p className="text-body-sm truncate uppercase tracking-caps">{image.name}</p>
+        <p className="text-caption text-muted-foreground/50 mt-0.5 uppercase tracking-widest">
           Last scan: {new Date(image.lastScan).toLocaleDateString()}
         </p>
       </div>
       <Badge
         variant={image.riskScore > 70 ? "destructive" : image.riskScore > 40 ? "secondary" : "default"}
-        className="ml-3 shrink-0"
+        className="ml-3 shrink-0 rounded-none"
       >
         {image.riskScore}
       </Badge>
@@ -254,28 +256,28 @@ export function NewScanModal({ children }: NewScanModalProps) {
         id: "dockerhub",
         label: "Docker Hub",
         description: "Public & private images",
-        icon: <IconBrandDocker className="h-6 w-6" />,
+        icon: <Container className="h-6 w-6" />,
         category: "registry",
       },
       {
         id: "github",
         label: "GitHub (GHCR)",
         description: "GitHub Container Registry",
-        icon: <IconBrandGithub className="h-6 w-6" />,
+        icon: <Github className="h-6 w-6" />,
         category: "registry",
       },
       {
         id: "custom",
         label: "Custom Registry",
         description: "Any OCI-compatible registry",
-        icon: <IconLink className="h-6 w-6" />,
+        icon: <Link2 className="h-6 w-6" />,
         category: "registry",
       },
       {
         id: "private",
         label: "Private Registry",
         description: "Configured repositories",
-        icon: <IconGitBranch className="h-6 w-6" />,
+        icon: <GitBranch className="h-6 w-6" />,
         category: "registry",
         available: scanSources.repositories.length > 0,
       },
@@ -286,7 +288,7 @@ export function NewScanModal({ children }: NewScanModalProps) {
         id: "local",
         label: "Local Docker",
         description: "Images on this host",
-        icon: <IconDeviceDesktop className="h-6 w-6" />,
+        icon: <Monitor className="h-6 w-6" />,
         category: "infrastructure",
       })
     }
@@ -296,7 +298,7 @@ export function NewScanModal({ children }: NewScanModalProps) {
         id: "swarm",
         label: "Docker Swarm",
         description: "Swarm service images",
-        icon: <IconStack2 className="h-6 w-6" />,
+        icon: <Layers className="h-6 w-6" />,
         category: "infrastructure",
       })
     }
@@ -305,7 +307,7 @@ export function NewScanModal({ children }: NewScanModalProps) {
       id: "kubernetes",
       label: "Kubernetes",
       description: "Pod container images",
-      icon: <IconHexagonLetterK className="h-6 w-6" />,
+      icon: <Hexagon className="h-6 w-6" />,
       category: "infrastructure",
     })
 
@@ -396,40 +398,38 @@ export function NewScanModal({ children }: NewScanModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0 border-white/10 rounded-none shadow-2xl">
         {/* Header */}
-        <div className="px-6 pt-6 pb-2">
+        <div className="px-8 pt-8 pb-4 border-b border-white/10 bg-surface-1">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <IconShieldCheck className="h-5 w-5 text-primary" />
-            </div>
+            <ShieldCheck className="h-4 w-4 text-accent" />
             <div>
-              <h2 className="text-lg font-semibold">New Security Scan</h2>
-              <p className="text-sm text-muted-foreground">
+              <DialogTitle className="text-sm uppercase tracking-wide-caps text-foreground">New Security Scan</DialogTitle>
+              <DialogDescription className="text-caption text-muted-foreground/50 uppercase tracking-widest mt-0.5">
                 {step === 1 && "Choose where to scan from"}
                 {step === 2 && `Select an image from ${selectedSourceLabel}`}
                 {step === 3 && "Review and start scan"}
-              </p>
+              </DialogDescription>
             </div>
           </div>
           <StepIndicator currentStep={step} totalSteps={3} />
         </div>
 
         {/* Content area */}
-        <div className="flex-1 overflow-y-auto px-6 pb-2">
+        <div className="flex-1 overflow-y-auto px-8 pb-2">
           {/* ============ STEP 1: Choose Source ============ */}
           {step === 1 && (
             <div className="space-y-6 pb-4">
               {/* Previously scanned — quick rescan */}
               {existingImages.length > 0 && (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                    <IconHistory className="h-4 w-4" />
+                  <div className="flex items-center gap-2 text-caption text-muted-foreground/60 uppercase tracking-widest">
+                    <History className="h-3.5 w-3.5" />
                     Quick Rescan
                   </div>
 
                   <div className="relative">
-                    <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Search previously scanned images..."
                       value={searchQuery}
@@ -438,22 +438,22 @@ export function NewScanModal({ children }: NewScanModalProps) {
                     />
                   </div>
 
-                  <div className="max-h-36 overflow-y-auto space-y-1.5 rounded-lg border p-2">
+                  <div className="max-h-36 overflow-y-auto space-y-1 border border-white/10 p-2">
                     {filteredExistingImages.length > 0 ? (
                       filteredExistingImages.slice(0, 10).map((image) => (
                         <ExistingImageCard key={image.id} image={image} onClick={() => handleSelectExisting(image)} />
                       ))
                     ) : (
-                      <p className="text-center text-sm text-muted-foreground py-3">No matching images</p>
+                      <p className="text-center text-caption text-muted-foreground/40 uppercase tracking-widest py-3">No matching images</p>
                     )}
                   </div>
 
                   <div className="relative">
                     <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t" />
+                      <div className="w-full border-t border-white/10" />
                     </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-background px-2 text-muted-foreground">or scan new image</span>
+                    <div className="relative flex justify-center text-caption uppercase tracking-widest">
+                      <span className="bg-background px-2 text-muted-foreground/40">or scan new image</span>
                     </div>
                   </div>
                 </div>
@@ -535,19 +535,19 @@ export function NewScanModal({ children }: NewScanModalProps) {
           {/* ============ STEP 3: Review & Scan ============ */}
           {step === 3 && (
             <div className="space-y-6 pb-4">
-              <div className="rounded-xl border bg-muted/30 p-6">
+              <div className="border border-white/10 bg-surface-1 p-6">
                 <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center text-accent">
                     {sources.find((s) => s.id === selectedSource)?.icon || (
-                      <IconShieldCheck className="h-6 w-6 text-primary" />
+                      <ShieldCheck className="h-5 w-5" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-muted-foreground">Source</p>
-                    <p className="font-medium">{selectedSourceLabel}</p>
+                    <p className="text-caption text-muted-foreground/50 uppercase tracking-widest">Source</p>
+                    <p className="text-body-sm uppercase tracking-caps">{selectedSourceLabel}</p>
                     <div className="mt-3">
-                      <p className="text-sm text-muted-foreground">Image</p>
-                      <code className="text-sm font-semibold break-all">{getSelectedImageDisplay()}</code>
+                      <p className="text-caption text-muted-foreground/50 uppercase tracking-widest">Image</p>
+                      <code className="text-body-sm break-all text-foreground">{getSelectedImageDisplay()}</code>
                     </div>
                   </div>
                 </div>
@@ -555,9 +555,9 @@ export function NewScanModal({ children }: NewScanModalProps) {
 
               {showProgress && (
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Initializing scan...</span>
-                    <span className="font-medium">{scanProgress}%</span>
+                  <div className="flex justify-between text-caption uppercase tracking-widest">
+                    <span className="text-muted-foreground/60">Initializing scan...</span>
+                    <span className="text-foreground">{scanProgress}%</span>
                   </div>
                   <Progress value={scanProgress} className="h-2" />
                 </div>
@@ -567,18 +567,18 @@ export function NewScanModal({ children }: NewScanModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t px-6 py-4">
+        <div className="flex items-center justify-between border-t border-white/10 px-8 py-4 bg-surface-1">
           <div>
             {step > 1 && (
-              <Button variant="ghost" size="sm" onClick={() => setStep(step - 1)} disabled={isLoading}>
-                <IconArrowLeft className="h-4 w-4 mr-1" />
+              <Button variant="ghost" size="sm" onClick={() => setStep(step - 1)} disabled={isLoading} className="rounded-none hover:bg-white/5 text-muted-foreground uppercase tracking-widest text-caption">
+                <ArrowLeft className="h-4 w-4 mr-1" />
                 Back
               </Button>
             )}
           </div>
           <div className="flex gap-2">
             <DialogClose asChild>
-              <Button variant="outline" size="sm" disabled={isLoading}>
+              <Button variant="outline" size="sm" disabled={isLoading} className="rounded-none border-white/10 hover:bg-white/5 uppercase tracking-widest text-caption">
                 Cancel
               </Button>
             </DialogClose>
@@ -588,9 +588,10 @@ export function NewScanModal({ children }: NewScanModalProps) {
                 size="sm"
                 onClick={() => setStep(3)}
                 disabled={!isImageSelected}
+                className="rounded-none uppercase tracking-widest text-caption"
               >
                 Review
-                <IconArrowRight className="h-4 w-4 ml-1" />
+                <ArrowRight className="h-4 w-4 ml-1" />
               </Button>
             )}
 
@@ -599,6 +600,7 @@ export function NewScanModal({ children }: NewScanModalProps) {
                 size="sm"
                 onClick={handleStartScan}
                 disabled={!isImageSelected || isLoading}
+                className="rounded-none uppercase tracking-widest text-caption"
               >
                 {isLoading ? "Starting..." : selectedSource === "local" && scanAllLocalImages
                   ? `Scan ${scanSources.localImageCount} Images`

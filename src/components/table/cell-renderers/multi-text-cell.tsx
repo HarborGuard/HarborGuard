@@ -6,7 +6,7 @@ export function multiTextCell<T>({ value, column }: CellRendererProps<T>) {
     return (
       <div className="flex flex-col">
         {value.map((text, index) => (
-          <span key={index} className={index > 0 ? "text-xs text-muted-foreground" : ""}>
+          <span key={index} className={index > 0 ? "text-caption uppercase tracking-widest text-muted-foreground/60" : ""}>
             {text}
           </span>
         ))}
@@ -20,7 +20,7 @@ export function multiTextCell<T>({ value, column }: CellRendererProps<T>) {
       <div className="flex flex-col">
         <span>{primary}</span>
         {secondary && (
-          <span className="text-xs text-muted-foreground">{secondary}</span>
+          <span className="text-caption uppercase tracking-widest text-muted-foreground/60">{secondary}</span>
         )}
       </div>
     )

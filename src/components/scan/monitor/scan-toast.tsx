@@ -41,8 +41,8 @@ export function ScanToast({
       onClick={onClick}
       className={cn(
         "min-w-75 flex items-center gap-2 px-4 py-2",
-        "bg-background border rounded-lg shadow-lg",
-        "hover:bg-accent transition-colors",
+        "bg-surface-1 border border-white/10 shadow-2xl",
+        "hover:bg-white/5 transition-colors",
         "cursor-pointer select-none",
         "animate-in slide-in-from-bottom-5",
         className
@@ -72,12 +72,12 @@ export function ScanToast({
       </svg>
 
       {/* Message */}
-      <span className="text-sm font-medium">
+      <span className="text-body-sm uppercase tracking-caps text-foreground">
         {message}
       </span>
 
       {/* Click hint */}
-      <span className="text-xs text-muted-foreground ml-1">
+      <span className="text-caption text-muted-foreground/50 ml-1 uppercase tracking-widest">
         Click to view
       </span>
     </button>

@@ -1,11 +1,11 @@
 import {
-  IconTrendingDown,
-  IconTrendingUp,
-  IconShield,
-  IconAlertTriangle,
-  IconEye,
-  IconChecks,
-} from "@tabler/icons-react";
+  TrendingDown,
+  TrendingUp,
+  Shield,
+  AlertTriangle,
+  Eye,
+  CheckCheck,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -97,9 +97,9 @@ export function SectionCards({
   // Loading state - show skeleton cards matching the actual card design
   if (loading) {
     return (
-      <div className="*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 *:data-[slot=card]:shadow-xs @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
         {/* Total Images Scanned Skeleton */}
-        <Card className="@container/card">
+        <Card className="@container/card bg-surface-1 border-white/10 rounded-none">
           <CardHeader>
             <CardDescription>Total Images Scanned</CardDescription>
             <Skeleton className="h-8 w-16 @[250px]/card:h-10" />
@@ -114,7 +114,7 @@ export function SectionCards({
         </Card>
 
         {/* Average Risk Score Skeleton */}
-        <Card className="@container/card">
+        <Card className="@container/card bg-surface-1 border-white/10 rounded-none">
           <CardHeader>
             <CardDescription>Average Risk Score</CardDescription>
             <Skeleton className="h-8 w-12 @[250px]/card:h-10" />
@@ -129,7 +129,7 @@ export function SectionCards({
         </Card>
 
         {/* Critical Vulnerabilities Skeleton */}
-        <Card className="@container/card">
+        <Card className="@container/card bg-surface-1 border-white/10 rounded-none">
           <CardHeader>
             <CardDescription>Critical Vulnerabilities</CardDescription>
             <Skeleton className="h-8 w-12 @[250px]/card:h-10" />
@@ -144,7 +144,7 @@ export function SectionCards({
         </Card>
 
         {/* High Vulnerabilities Skeleton */}
-        <Card className="@container/card">
+        <Card className="@container/card bg-surface-1 border-white/10 rounded-none">
           <CardHeader>
             <CardDescription>High Vulnerabilities</CardDescription>
             <Skeleton className="h-8 w-12 @[250px]/card:h-10" />
@@ -162,35 +162,35 @@ export function SectionCards({
   }
 
   return (
-    <div className="*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 *:data-[slot=card]:shadow-xs @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
-      <Card className="@container/card">
+    <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+      <Card className="@container/card bg-surface-1 border-white/10 rounded-none">
         <CardHeader>
-          <CardDescription>Total Images Scanned</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+          <CardDescription className="uppercase tracking-widest text-caption text-muted-foreground/60">Total Images Scanned</CardDescription>
+          <CardTitle className="text-2xl tracking-tight tabular-nums @[250px]/card:text-3xl text-foreground">
             {totalImages}
           </CardTitle>
           <CardAction>
-            <Badge variant="outline">
-              <IconChecks />
+            <Badge variant="outline" className="rounded-none border-white/20 text-muted-foreground uppercase tracking-widest text-caption">
+              <CheckCheck className="h-3 w-3 mr-1" />
               {completedScans} Complete
             </Badge>
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
+          <div className="line-clamp-1 flex gap-2 text-body-sm uppercase tracking-caps">
             {completedScans} of {totalScans} scans completed{" "}
-            <IconChecks className="size-4" />
+            <CheckCheck className="h-4 w-4" />
           </div>
-          <div className="text-muted-foreground">
+          <div className="text-caption uppercase tracking-widest text-muted-foreground/50">
             Active security monitoring
           </div>
         </CardFooter>
       </Card>
 
-      <Card className="@container/card">
+      <Card className="@container/card bg-surface-1 border-white/10 rounded-none">
         <CardHeader>
-          <CardDescription>Average Risk Score</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+          <CardDescription className="uppercase tracking-widest text-caption text-muted-foreground/60">Average Risk Score</CardDescription>
+          <CardTitle className="text-2xl tracking-tight tabular-nums @[250px]/card:text-3xl text-foreground">
             {averageRiskScore}
           </CardTitle>
           <CardAction>
@@ -202,8 +202,9 @@ export function SectionCards({
                   ? "secondary"
                   : "default"
               }
+              className="rounded-none uppercase tracking-widest text-caption"
             >
-              <IconShield />
+              <Shield className="h-3 w-3 mr-1" />
               {riskTrend === "high"
                 ? "High Risk"
                 : riskTrend === "medium"
@@ -213,69 +214,69 @@ export function SectionCards({
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
+          <div className="line-clamp-1 flex gap-2 text-body-sm uppercase tracking-caps">
             {riskTrend === "high"
               ? "Requires attention"
               : riskTrend === "medium"
               ? "Monitor closely"
               : "Good security posture"}{" "}
-            <IconShield className="size-4" />
+            <Shield className="h-4 w-4" />
           </div>
-          <div className="text-muted-foreground">
+          <div className="text-caption uppercase tracking-widest text-muted-foreground/50">
             Overall security risk assessment
           </div>
         </CardFooter>
       </Card>
 
-      <Card className="@container/card">
+      <Card className="@container/card bg-surface-1 border-white/10 rounded-none">
         <CardHeader>
-          <CardDescription>Critical + High Vulnerabilities</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+          <CardDescription className="uppercase tracking-widest text-caption text-muted-foreground/60">Critical + High Vulnerabilities</CardDescription>
+          <CardTitle className="text-2xl tracking-tight tabular-nums @[250px]/card:text-3xl text-foreground">
             {totalCriticalVulns + totalHighVulns}
           </CardTitle>
           <CardAction>
-            <Badge variant={totalCriticalVulns > 0 ? "destructive" : "outline"}>
+            <Badge variant={totalCriticalVulns > 0 ? "destructive" : "outline"} className="rounded-none uppercase tracking-widest text-caption">
               {criticalTrend === "up" ? (
-                <IconTrendingUp />
+                <TrendingUp className="h-3 w-3 mr-1" />
               ) : (
-                <IconTrendingDown />
+                <TrendingDown className="h-3 w-3 mr-1" />
               )}
               {totalCriticalVulns} Critical
             </Badge>
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
+          <div className="line-clamp-1 flex gap-2 text-body-sm uppercase tracking-caps">
             {totalCriticalVulns > 0
               ? "Immediate action needed"
               : "No critical issues"}{" "}
-            <IconAlertTriangle className="size-4" />
+            <AlertTriangle className="h-4 w-4" />
           </div>
-          <div className="text-muted-foreground">
+          <div className="text-caption uppercase tracking-widest text-muted-foreground/50">
             View details for breakdown
           </div>
         </CardFooter>
       </Card>
 
-      <Card className="@container/card">
+      <Card className="@container/card bg-surface-1 border-white/10 rounded-none">
         <CardHeader>
-          <CardDescription>Security Issues</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+          <CardDescription className="uppercase tracking-widest text-caption text-muted-foreground/60">Security Issues</CardDescription>
+          <CardTitle className="text-2xl tracking-tight tabular-nums @[250px]/card:text-3xl text-foreground">
             {totalMisconfigs + totalSecrets}
           </CardTitle>
           <CardAction>
-            <Badge variant={totalSecrets > 0 ? "destructive" : "outline"}>
-              <IconEye />
+            <Badge variant={totalSecrets > 0 ? "destructive" : "outline"} className="rounded-none uppercase tracking-widest text-caption">
+              <Eye className="h-3 w-3 mr-1" />
               {totalSecrets} Secrets
             </Badge>
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
+          <div className="line-clamp-1 flex gap-2 text-body-sm uppercase tracking-caps">
             {totalMisconfigs} misconfigurations detected{" "}
-            <IconAlertTriangle className="size-4" />
+            <AlertTriangle className="h-4 w-4" />
           </div>
-          <div className="text-muted-foreground">
+          <div className="text-caption uppercase tracking-widest text-muted-foreground/50">
             {totalOSVPackages > 0
               ? `${totalOSVVulnerable} of ${totalOSVPackages} packages vulnerable`
               : `View details for breakdown`}

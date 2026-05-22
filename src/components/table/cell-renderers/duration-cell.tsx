@@ -1,4 +1,4 @@
-import { IconClock } from "@tabler/icons-react"
+import { Clock } from "lucide-react"
 import { CellRendererProps } from "../types"
 
 export function durationCell<T>({ value }: CellRendererProps<T>) {
@@ -22,7 +22,7 @@ export function durationCell<T>({ value }: CellRendererProps<T>) {
 
   return (
     <div className="flex items-center gap-1">
-      <IconClock className="h-3 w-3 text-muted-foreground" />
+      <Clock className="h-3 w-3 text-muted-foreground" />
       <span className="text-sm">{formattedDuration}</span>
     </div>
   )

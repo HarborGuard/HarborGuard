@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  IconBug,
-  IconPackage,
-  IconShield,
-  IconSettings,
-} from "@tabler/icons-react";
+  Bug,
+  Package,
+  Shield,
+  Settings,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -141,16 +141,16 @@ export function ScanDetailsNormalized({
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="bg-surface-1 border-white/10 rounded-none">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Vulnerabilities</CardTitle>
+            <CardTitle className="text-caption uppercase tracking-widest text-muted-foreground/60">Vulnerabilities</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{findings.vulnerabilities?.total || 0}</div>
+            <div className="text-2xl tracking-tight text-foreground">{findings.vulnerabilities?.total || 0}</div>
             <div className="flex gap-2 mt-2">
               {findings.vulnerabilities?.bySeverity && Object.entries(findings.vulnerabilities.bySeverity).map(([sev, count]) => (
                 (count as number) > 0 && (
-                  <span key={sev} className="text-xs">
+                  <span key={sev} className="text-caption uppercase tracking-widest text-muted-foreground/50">
                     {sev}: {count as number}
                   </span>
                 )
@@ -159,37 +159,37 @@ export function ScanDetailsNormalized({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-surface-1 border-white/10 rounded-none">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Packages</CardTitle>
+            <CardTitle className="text-caption uppercase tracking-widest text-muted-foreground/60">Packages</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{findings.packages?.total || 0}</div>
-            <p className="text-xs text-muted-foreground mt-2">
+            <div className="text-2xl tracking-tight text-foreground">{findings.packages?.total || 0}</div>
+            <p className="text-caption uppercase tracking-widest text-muted-foreground/50 mt-2">
               {Object.keys(findings.packages?.byType || {}).length} types
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-surface-1 border-white/10 rounded-none">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Compliance</CardTitle>
+            <CardTitle className="text-caption uppercase tracking-widest text-muted-foreground/60">Compliance</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{findings.compliance?.total || 0}</div>
-            <p className="text-xs text-muted-foreground mt-2">
+            <div className="text-2xl tracking-tight text-foreground">{findings.compliance?.total || 0}</div>
+            <p className="text-caption uppercase tracking-widest text-muted-foreground/50 mt-2">
               Grade: {findings.summary?.complianceGrade || 'N/A'}
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-surface-1 border-white/10 rounded-none">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Risk Score</CardTitle>
+            <CardTitle className="text-caption uppercase tracking-widest text-muted-foreground/60">Risk Score</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{findings.summary?.aggregatedRiskScore || scanData?.riskScore || 0}</div>
-            <p className="text-xs text-muted-foreground mt-2">
+            <div className="text-2xl tracking-tight text-foreground">{findings.summary?.aggregatedRiskScore || scanData?.riskScore || 0}</div>
+            <p className="text-caption uppercase tracking-widest text-muted-foreground/50 mt-2">
               {findings.correlations?.multiSource || 0} multi-source findings
             </p>
           </CardContent>
@@ -231,19 +231,19 @@ export function ScanDetailsNormalized({
       <Tabs defaultValue="vulnerabilities" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="vulnerabilities" className="flex items-center gap-2">
-            <IconBug className="h-4 w-4" />
+            <Bug className="h-4 w-4" />
             Vulnerabilities ({findings.vulnerabilities?.total || 0})
           </TabsTrigger>
           <TabsTrigger value="packages" className="flex items-center gap-2">
-            <IconPackage className="h-4 w-4" />
+            <Package className="h-4 w-4" />
             Packages ({findings.packages?.total || 0})
           </TabsTrigger>
           <TabsTrigger value="compliance" className="flex items-center gap-2">
-            <IconShield className="h-4 w-4" />
+            <Shield className="h-4 w-4" />
             Compliance ({findings.compliance?.total || 0})
           </TabsTrigger>
           <TabsTrigger value="efficiency" className="flex items-center gap-2">
-            <IconSettings className="h-4 w-4" />
+            <Settings className="h-4 w-4" />
             Efficiency ({findings.efficiency?.total || 0})
           </TabsTrigger>
         </TabsList>

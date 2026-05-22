@@ -95,7 +95,7 @@ export function AuditLogFilters({ filters, onFiltersChange }: AuditLogFiltersPro
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       <div className="space-y-2">
-        <Label htmlFor="search">Search</Label>
+        <Label htmlFor="search" className="text-caption uppercase tracking-widest text-muted-foreground/60">Search</Label>
         <Input
           id="search"
           placeholder="Search logs..."
@@ -105,7 +105,7 @@ export function AuditLogFilters({ filters, onFiltersChange }: AuditLogFiltersPro
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="eventType">Event Type</Label>
+        <Label htmlFor="eventType" className="text-caption uppercase tracking-widest text-muted-foreground/60">Event Type</Label>
         <Select
           value={filters.eventType || "all"}
           onValueChange={(value) => updateFilter("eventType", value)}
@@ -125,7 +125,7 @@ export function AuditLogFilters({ filters, onFiltersChange }: AuditLogFiltersPro
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="category">Category</Label>
+        <Label htmlFor="category" className="text-caption uppercase tracking-widest text-muted-foreground/60">Category</Label>
         <Select
           value={filters.category || "all"}
           onValueChange={(value) => updateFilter("category", value)}
@@ -145,7 +145,7 @@ export function AuditLogFilters({ filters, onFiltersChange }: AuditLogFiltersPro
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="userIp">User IP</Label>
+        <Label htmlFor="userIp" className="text-caption uppercase tracking-widest text-muted-foreground/60">User IP</Label>
         <Input
           id="userIp"
           placeholder="Filter by IP..."
@@ -155,7 +155,7 @@ export function AuditLogFilters({ filters, onFiltersChange }: AuditLogFiltersPro
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="resource">Resource</Label>
+        <Label htmlFor="resource" className="text-caption uppercase tracking-widest text-muted-foreground/60">Resource</Label>
         <Input
           id="resource"
           placeholder="Filter by resource..."
@@ -165,7 +165,7 @@ export function AuditLogFilters({ filters, onFiltersChange }: AuditLogFiltersPro
       </div>
 
       <div className="space-y-2">
-        <Label>Start Date</Label>
+        <Label className="text-caption uppercase tracking-widest text-muted-foreground/60">Start Date</Label>
         <Popover>
           <PopoverTrigger asChild>
             <Button
@@ -188,7 +188,7 @@ export function AuditLogFilters({ filters, onFiltersChange }: AuditLogFiltersPro
       </div>
 
       <div className="space-y-2">
-        <Label>End Date</Label>
+        <Label className="text-caption uppercase tracking-widest text-muted-foreground/60">End Date</Label>
         <Popover>
           <PopoverTrigger asChild>
             <Button

@@ -3,10 +3,11 @@
 import * as React from "react";
 import { useParams } from "next/navigation";
 import {
-  IconBug,
-  IconShield,
-  IconInfoCircle,
-} from "@tabler/icons-react";
+  Bug,
+  Shield,
+  Info,
+  ChevronRight,
+} from "lucide-react";
 
 import { ScanDetailsNormalized } from "@/components/scan/ScanDetailsNormalized";
 import { Button } from "@/components/ui/button";
@@ -204,22 +205,22 @@ export default function ScanResultsPage() {
     return (
       <div className="flex-1 overflow-auto">
         <div className="@container/main flex flex-col gap-4 p-4 lg:p-6">
-          <Card>
+          <Card className="bg-surface-1 border-white/10 rounded-none">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-red-500">
-                <IconInfoCircle className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-red-400 text-body-sm uppercase tracking-caps">
+                <Info className="h-4 w-4" />
                 Scan Not Found
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-caption uppercase tracking-widest text-muted-foreground/50">
                 {error || "The requested scan could not be found"}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col items-center gap-4 py-8">
-              <p className="text-muted-foreground text-center">
+              <p className="text-caption uppercase tracking-widest text-muted-foreground/40 text-center">
                 Scan &quot;{scanId}&quot; for image &quot;{decodedImageName}
                 &quot; does not exist or may have been removed.
               </p>
-              <Button asChild>
+              <Button asChild className="rounded-none uppercase tracking-widest text-caption">
                 <a href={`/images/${encodeURIComponent(decodedImageName)}`}>
                   Go Back to Image
                 </a>
@@ -233,6 +234,21 @@ export default function ScanResultsPage() {
 
   return (
     <div className="flex-1 overflow-auto">
+      {/* Page eyebrow + h1 */}
+      <div className="px-6 pt-8 pb-6 space-y-1">
+        <p className="text-caption uppercase tracking-caps text-muted-foreground/50 flex items-center gap-1">
+          <a href="/images" className="hover:text-foreground transition-colors">Images</a>
+          <ChevronRight className="h-3 w-3" />
+          <a href={`/images/${imageName}`} className="hover:text-foreground transition-colors">{decodedImageName}</a>
+          <ChevronRight className="h-3 w-3" />
+          Scan Results
+        </p>
+        <h1 className="text-2xl tracking-tight text-foreground">Scan Results</h1>
+        <p className="text-muted-foreground text-body-sm uppercase tracking-wide-caps">
+          {decodedImageName} — {scanId.slice(0, 8)}
+        </p>
+      </div>
+
       <div className="@container/main flex flex-col gap-4 p-4 lg:p-6">
         {/* Scan Summary */}
         <ScanSummaryCard
@@ -252,25 +268,27 @@ export default function ScanResultsPage() {
 
         {/* View Mode Toggle - Only show if raw output is enabled */}
         {showRawOutput ? (
-          <Card>
+          <Card className="bg-surface-1 border-white/10 rounded-none">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Scan Results View</CardTitle>
+                <CardTitle className="text-body-sm uppercase tracking-caps text-foreground">Scan Results View</CardTitle>
                 <div className="flex items-center gap-2">
                   <Button
                     variant={viewMode === "normalized" ? "default" : "outline"}
                     size="sm"
                     onClick={() => setViewMode("normalized")}
+                    className="rounded-none uppercase tracking-widest text-caption border-white/10 hover:bg-white/5"
                   >
-                    <IconShield className="h-4 w-4 mr-2" />
+                    <Shield className="h-4 w-4 mr-2" />
                     Normalized View
                   </Button>
                   <Button
                     variant={viewMode === "raw" ? "default" : "outline"}
                     size="sm"
                     onClick={() => setViewMode("raw")}
+                    className="rounded-none uppercase tracking-widest text-caption border-white/10 hover:bg-white/5"
                   >
-                    <IconBug className="h-4 w-4 mr-2" />
+                    <Bug className="h-4 w-4 mr-2" />
                     Raw Scanner Output
                   </Button>
                 </div>

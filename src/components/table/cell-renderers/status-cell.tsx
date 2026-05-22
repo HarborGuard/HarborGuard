@@ -2,7 +2,7 @@
 
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { IconCircleCheckFilled, IconLoader } from "@tabler/icons-react"
+import { CheckCircle2, Loader } from "lucide-react"
 import { CellRendererProps } from "../types"
 import { useScanning } from "@/contexts/ScanningContext"
 
@@ -32,8 +32,8 @@ export function statusCell<T>({ value, row, column }: CellRendererProps<T>) {
   if (runningJob) {
     return (
       <div className="w-32 space-y-1">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">Scanning</span>
+        <div className="flex items-center justify-between text-caption uppercase tracking-widest">
+          <span className="text-muted-foreground/60">Scanning</span>
           <span className="font-mono">{runningJob.progress}%</span>
         </div>
         <Progress
@@ -41,7 +41,7 @@ export function statusCell<T>({ value, row, column }: CellRendererProps<T>) {
           className="h-2"
         />
         {runningJob.step && (
-          <div className="text-xs text-muted-foreground truncate">
+          <div className="text-caption uppercase tracking-widest text-muted-foreground/60 truncate">
             {runningJob.step}
           </div>
         )}
@@ -51,11 +51,11 @@ export function statusCell<T>({ value, row, column }: CellRendererProps<T>) {
 
   // Otherwise show the regular status badge
   return (
-    <Badge variant="outline" className="text-muted-foreground px-1.5">
+    <Badge variant="outline" className="rounded-none uppercase tracking-widest text-caption border-white/10 text-muted-foreground">
       {value === "Complete" ? (
-        <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
+        <CheckCircle2 className="fill-green-500 dark:fill-green-400" />
       ) : (
-        <IconLoader />
+        <Loader />
       )}
       {value}
     </Badge>

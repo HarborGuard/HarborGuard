@@ -2,11 +2,11 @@
 
 import React from "react"
 import {
-  IconBrandDocker,
-  IconBrandGithub,
-  IconServer,
-  IconGitBranch,
-} from "@tabler/icons-react"
+  Container,
+  Github,
+  Server,
+  GitBranch,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -276,13 +276,13 @@ export function PrivateRepositoriesTab({
     <div className="space-y-3">
       {repositories.length === 0 ? (
         <div className="text-center py-8">
-          <IconServer className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Private Repositories</h3>
+          <Server className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-sm uppercase tracking-wide-caps text-foreground mb-2">No Private Repositories</h3>
           <p className="text-muted-foreground mb-4">
             Add private repositories in the Repositories page to scan private images.
           </p>
           <Button variant="outline" onClick={() => window.open('/repositories', '_blank')}>
-            <IconGitBranch className="mr-2 h-4 w-4" />
+            <GitBranch className="mr-2 h-4 w-4" />
             Manage Repositories
           </Button>
         </div>
@@ -297,11 +297,11 @@ export function PrivateRepositoriesTab({
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3">
-                    {repo.type === 'DOCKERHUB' && <IconBrandDocker className="h-5 w-5 mt-0.5" />}
-                    {repo.type === 'GHCR' && <IconBrandGithub className="h-5 w-5 mt-0.5" />}
-                    {repo.type === 'GENERIC' && <IconServer className="h-5 w-5 mt-0.5" />}
+                    {repo.type === 'DOCKERHUB' && <Container className="h-5 w-5 mt-0.5" />}
+                    {repo.type === 'GHCR' && <Github className="h-5 w-5 mt-0.5" />}
+                    {repo.type === 'GENERIC' && <Server className="h-5 w-5 mt-0.5" />}
                     <div className="space-y-1">
-                      <div className="font-medium">{repo.name}</div>
+                      <div className="text-body-sm text-foreground">{repo.name}</div>
                       <div className="text-sm text-muted-foreground">
                         {repo.type === 'GENERIC' && repo.protocol ? `${repo.protocol}://${repo.registryUrl}` : repo.registryUrl}
                       </div>

@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import {
-  IconServer,
-  IconRefresh,
-  IconStack2,
-  IconWorld,
-  IconCopy,
-  IconCheck,
-} from '@tabler/icons-react';
+  Server,
+  RefreshCw,
+  Layers,
+  Globe,
+  Copy,
+  Check,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -44,7 +44,7 @@ export function SwarmServicesList({
   if (!isSwarmMode) {
     return (
       <div className="text-center py-8">
-        <IconStack2 className="mx-auto h-12 w-12 text-muted-foreground" />
+        <Layers className="mx-auto h-12 w-12 text-muted-foreground" />
         <h3 className="mt-2 text-sm font-medium">Not in Swarm Mode</h3>
         <p className="mt-1 text-sm text-muted-foreground">
           Docker is not running in Swarm mode. Deploy HarborGuard in a Swarm cluster to use this feature.
@@ -57,7 +57,7 @@ export function SwarmServicesList({
   if (!isManager) {
     return (
       <div className="text-center py-8">
-        <IconWorld className="mx-auto h-12 w-12 text-muted-foreground" />
+        <Globe className="mx-auto h-12 w-12 text-muted-foreground" />
         <h3 className="mt-2 text-sm font-medium">Manager Node Required</h3>
         <p className="mt-1 text-sm text-muted-foreground">
           This node is a worker. Deploy HarborGuard on a manager node to list Swarm services.
@@ -93,13 +93,13 @@ export function SwarmServicesList({
   if (services.length === 0) {
     return (
       <div className="text-center py-8">
-        <IconServer className="mx-auto h-12 w-12 text-muted-foreground" />
+        <Server className="mx-auto h-12 w-12 text-muted-foreground" />
         <h3 className="mt-2 text-sm font-medium">No Services Found</h3>
         <p className="mt-1 text-sm text-muted-foreground">
           No services are currently running in this Swarm cluster.
         </p>
         <Button onClick={refetch} variant="outline" size="sm" className="mt-4">
-          <IconRefresh className="h-4 w-4 mr-2" />
+          <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
       </div>
@@ -111,14 +111,14 @@ export function SwarmServicesList({
       {/* Swarm Info Header */}
       <div className="flex items-center justify-between mb-4 p-2 bg-muted/50 rounded-md">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <IconStack2 className="h-4 w-4" />
+          <Layers className="h-4 w-4" />
           <span>
             Swarm: {swarmInfo?.nodes} node{swarmInfo?.nodes !== 1 ? 's' : ''},
             {' '}{services.length} service{services.length !== 1 ? 's' : ''}
           </span>
         </div>
         <Button variant="ghost" size="sm" onClick={refetch} disabled={loading}>
-          <IconRefresh className={cn("h-4 w-4", loading && "animate-spin")} />
+          <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
         </Button>
       </div>
 
@@ -156,9 +156,9 @@ export function SwarmServicesList({
                     onClick={(e) => copyImageName(service, e)}
                   >
                     {copiedId === service.id ? (
-                      <IconCheck className="h-3 w-3 text-green-500" />
+                      <Check className="h-3 w-3 text-green-500" />
                     ) : (
-                      <IconCopy className="h-3 w-3" />
+                      <Copy className="h-3 w-3" />
                     )}
                   </Button>
                 </div>

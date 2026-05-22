@@ -5,7 +5,7 @@ import { ScanProgressBarDetailed } from "@/components/scan/monitor/scan-progress
 import { ScanToast } from "@/components/scan/monitor/scan-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { IconEye, IconX } from "@tabler/icons-react";
+import { Eye, X } from "lucide-react";
 import { useScanning } from "@/contexts/ScanningContext";
 import {
   Dialog,
@@ -81,30 +81,32 @@ export function GlobalScanMonitor() {
 
       {/* Dialog with scan details */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Scan Activity</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto border-white/10 rounded-none shadow-2xl p-0">
+          <div className="p-8 border-b border-white/10 bg-surface-1">
+            <DialogHeader>
+              <DialogTitle className="text-sm uppercase tracking-wide-caps text-foreground">Scan Activity</DialogTitle>
+            </DialogHeader>
+          </div>
 
-          <div className="space-y-6 mt-4">
+          <div className="space-y-6 p-8">
             {/* Summary Stats */}
-            <div className="flex gap-4 text-sm">
+            <div className="flex gap-4 text-caption uppercase tracking-widest">
               {totalActiveJobs > 0 && (
                 <div className="flex items-center gap-2">
                   <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse" />
-                  <span>Running: {totalActiveJobs}</span>
+                  <span className="text-muted-foreground/60">Running: {totalActiveJobs}</span>
                 </div>
               )}
               {totalQueuedJobs > 0 && (
                 <div className="flex items-center gap-2">
                   <div className="h-2 w-2 bg-yellow-500 rounded-full" />
-                  <span>Queued: {totalQueuedJobs}</span>
+                  <span className="text-muted-foreground/60">Queued: {totalQueuedJobs}</span>
                 </div>
               )}
               {recentJobs.length > 0 && (
                 <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 bg-gray-400 rounded-full" />
-                  <span>Recent: {recentJobs.length}</span>
+                  <div className="h-2 w-2 bg-muted-foreground/40 rounded-full" />
+                  <span className="text-muted-foreground/60">Recent: {recentJobs.length}</span>
                 </div>
               )}
             </div>
@@ -112,25 +114,13 @@ export function GlobalScanMonitor() {
             {/* Running Scans */}
             {runningJobs.length > 0 && (
               <div className="space-y-3">
-                <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
+                <div className="flex items-center gap-3">
+                  <svg className="animate-spin h-4 w-4 text-accent" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  Running Scans
-                </h4>
+                  <h4 className="text-sm uppercase tracking-wide-caps text-foreground">Running Scans</h4>
+                </div>
                 {runningJobs.map((job) => (
                   <ScanJobCard
                     key={job.requestId}
@@ -145,21 +135,13 @@ export function GlobalScanMonitor() {
             {/* Queued Scans */}
             {queuedScans && queuedScans.length > 0 && (
               <div className="space-y-3">
-                <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <svg className="h-4 w-4" viewBox="0 0 24 24">
-                    <circle
-                      className="opacity-50"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      fill="none"
-                    />
+                <div className="flex items-center gap-3">
+                  <svg className="h-4 w-4 text-accent" viewBox="0 0 24 24">
+                    <circle className="opacity-50" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" />
                     <path className="opacity-75" fill="currentColor" d="M12 6v6l4 2" />
                   </svg>
-                  Queued Scans
-                </h4>
+                  <h4 className="text-sm uppercase tracking-wide-caps text-foreground">Queued Scans</h4>
+                </div>
                 {queuedScans.map((scan) => (
                   <QueuedScanCard
                     key={scan.requestId}
@@ -172,9 +154,7 @@ export function GlobalScanMonitor() {
             {/* Recent Completed/Failed Scans */}
             {recentJobs.length > 0 && (
               <div className="space-y-3">
-                <h4 className="text-sm font-medium text-muted-foreground">
-                  Recent Activity
-                </h4>
+                <h4 className="text-sm uppercase tracking-wide-caps text-foreground">Recent Activity</h4>
                 {recentJobs.map((job) => (
                   <ScanJobCard
                     key={job.requestId}
@@ -187,8 +167,8 @@ export function GlobalScanMonitor() {
 
             {/* Empty state */}
             {totalActiveJobs === 0 && totalQueuedJobs === 0 && recentJobs.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <p>No active scans at the moment</p>
+              <div className="text-center py-16 text-caption uppercase tracking-widest text-muted-foreground/40">
+                No active scans at the moment
               </div>
             )}
           </div>
@@ -213,7 +193,7 @@ function ScanJobCard({ job, onCancel, variant = "running" }: ScanJobCardProps) {
   return (
     <div
       className={cn(
-        "p-3 border rounded-lg space-y-2 bg-card",
+        "p-3 border border-white/10 space-y-2 bg-surface-1",
         !isRunning && "opacity-75"
       )}
     >
@@ -227,10 +207,11 @@ function ScanJobCard({ job, onCancel, variant = "running" }: ScanJobCardProps) {
                 ? "destructive"
                 : "secondary"
             }
+            className="rounded-none uppercase tracking-widest text-caption font-mono"
           >
             {job.requestId.slice(-8)}
           </Badge>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-body-sm text-muted-foreground/60">
             {job.imageName || job.imageId}
           </span>
         </div>
@@ -243,7 +224,7 @@ function ScanJobCard({ job, onCancel, variant = "running" }: ScanJobCardProps) {
               onClick={() => window.open(`/scans/${job.scanId}`, "_blank")}
               title="View scan details"
             >
-              <IconEye className="h-3 w-3" />
+              <Eye className="h-3 w-3" />
             </Button>
           )}
           {isRunning && onCancel && (
@@ -253,7 +234,7 @@ function ScanJobCard({ job, onCancel, variant = "running" }: ScanJobCardProps) {
               onClick={() => onCancel(job.requestId)}
               title="Cancel scan"
             >
-              <IconX className="h-3 w-3" />
+              <X className="h-3 w-3" />
             </Button>
           )}
         </div>
@@ -267,7 +248,7 @@ function ScanJobCard({ job, onCancel, variant = "running" }: ScanJobCardProps) {
       )}
 
       {!isRunning && (
-        <div className="text-xs text-muted-foreground">
+        <div className="text-caption uppercase tracking-widest text-muted-foreground/50">
           Status: {job.status}
         </div>
       )}
@@ -284,18 +265,18 @@ interface QueuedScanCardProps {
 
 function QueuedScanCard({ scan }: QueuedScanCardProps) {
   return (
-    <div className="p-3 border rounded-lg space-y-2 bg-card opacity-60">
+    <div className="p-3 border border-white/10 space-y-2 bg-surface-1 opacity-60">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Badge variant="outline">
+          <Badge variant="outline" className="rounded-none uppercase tracking-widest text-caption font-mono border-white/10">
             {scan.requestId.slice(-8)}
           </Badge>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-body-sm text-muted-foreground/60">
             {scan.imageName || scan.imageId}
           </span>
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 text-caption uppercase tracking-widest text-muted-foreground/50">
           {scan.queuePosition && (
             <span>Position: #{scan.queuePosition}</span>
           )}
@@ -305,8 +286,8 @@ function QueuedScanCard({ scan }: QueuedScanCardProps) {
         </div>
       </div>
 
-      <div className="w-full bg-secondary rounded-full h-1.5">
-        <div className="bg-yellow-500/50 h-1.5 rounded-full animate-pulse" style={{ width: '25%' }} />
+      <div className="w-full bg-white/5 h-1.5">
+        <div className="bg-yellow-500/50 h-1.5 animate-pulse" style={{ width: '25%' }} />
       </div>
     </div>
   );

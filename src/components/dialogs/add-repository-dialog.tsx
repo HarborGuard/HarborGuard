@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { IconCheck, IconX, IconLoader } from "@tabler/icons-react"
+import { Check, X, Loader } from "lucide-react"
 import { toast } from "sonner"
 import { RegistryTypeSelector, repositoryTypes } from "@/components/repository-config/RegistryTypeSelector"
 import { RegistryConfigForm } from "@/components/repository-config/RegistryConfigForm"
@@ -169,16 +169,19 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Add Repository</DialogTitle>
-          <DialogDescription>
-            {step === 'select' && 'Choose a repository type to get started'}
-            {step === 'configure' && 'Configure your repository credentials'}
-            {step === 'test' && 'Test connection and add repository'}
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-w-2xl border-white/10 rounded-none shadow-2xl p-0 overflow-hidden">
+        <div className="p-8 border-b border-white/10 bg-surface-1">
+          <DialogHeader className="space-y-3">
+            <DialogTitle className="text-sm uppercase tracking-wide-caps text-foreground">Add Repository</DialogTitle>
+            <DialogDescription className="text-body-sm text-muted-foreground uppercase tracking-widest">
+              {step === 'select' && 'Choose a repository type to get started'}
+              {step === 'configure' && 'Configure your repository credentials'}
+              {step === 'test' && 'Test connection and add repository'}
+            </DialogDescription>
+          </DialogHeader>
+        </div>
 
+        <div className="p-8">
         {step === 'select' && (
           <RegistryTypeSelector onTypeSelect={handleTypeSelect} />
         )}
@@ -194,77 +197,78 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
 
         {step === 'test' && (
           <div className="space-y-4 py-4">
-            <div className="border rounded-lg p-4">
-              <h3 className="font-medium mb-2">Repository Configuration</h3>
-              <div className="space-y-2 text-sm">
-                <div><strong>Name:</strong> {config.name}</div>
-                <div><strong>Type:</strong> {repositoryTypes.find(t => t.type === config.type)?.title}</div>
+            <div className="border border-white/10 bg-surface-1 p-4">
+              <h3 className="text-sm uppercase tracking-wide-caps text-foreground mb-3">Repository Configuration</h3>
+              <div className="space-y-2">
+                <div className="flex gap-2"><span className="text-caption uppercase tracking-widest text-muted-foreground/50 w-24 shrink-0">Name</span><span className="text-body-sm text-foreground">{config.name}</span></div>
+                <div className="flex gap-2"><span className="text-caption uppercase tracking-widest text-muted-foreground/50 w-24 shrink-0">Type</span><span className="text-body-sm text-foreground">{repositoryTypes.find(t => t.type === config.type)?.title}</span></div>
                 {config.type === 'gcr' ? (
                   <>
-                    <div><strong>Project:</strong> {config.garProjectId}</div>
-                    <div><strong>Location:</strong> {config.garLocation || 'us'}</div>
-                    <div><strong>Repository:</strong> {config.garRepositoryName}</div>
-                    <div><strong>Registry:</strong> {(config.garLocation || 'us')}-docker.pkg.dev</div>
+                    <div className="flex gap-2"><span className="text-caption uppercase tracking-widest text-muted-foreground/50 w-24 shrink-0">Project</span><span className="text-body-sm text-foreground">{config.garProjectId}</span></div>
+                    <div className="flex gap-2"><span className="text-caption uppercase tracking-widest text-muted-foreground/50 w-24 shrink-0">Location</span><span className="text-body-sm text-foreground">{config.garLocation || 'us'}</span></div>
+                    <div className="flex gap-2"><span className="text-caption uppercase tracking-widest text-muted-foreground/50 w-24 shrink-0">Repository</span><span className="text-body-sm text-foreground">{config.garRepositoryName}</span></div>
+                    <div className="flex gap-2"><span className="text-caption uppercase tracking-widest text-muted-foreground/50 w-24 shrink-0">Registry</span><span className="text-body-sm text-foreground">{(config.garLocation || 'us')}-docker.pkg.dev</span></div>
                   </>
                 ) : (
                   <>
-                    <div><strong>Registry:</strong> {(config.type === 'generic' || config.type === 'gitlab' || config.type === 'nexus') && config.registryUrl ? `${protocol}://${config.registryUrl}` : config.registryUrl}</div>
-                    <div><strong>Username:</strong> {config.username}</div>
+                    <div className="flex gap-2"><span className="text-caption uppercase tracking-widest text-muted-foreground/50 w-24 shrink-0">Registry</span><span className="text-body-sm text-foreground">{(config.type === 'generic' || config.type === 'gitlab' || config.type === 'nexus') && config.registryUrl ? `${protocol}://${config.registryUrl}` : config.registryUrl}</span></div>
+                    <div className="flex gap-2"><span className="text-caption uppercase tracking-widest text-muted-foreground/50 w-24 shrink-0">Username</span><span className="text-body-sm text-foreground">{config.username}</span></div>
                   </>
                 )}
               </div>
             </div>
 
-            <div className="border rounded-lg p-4">
-              <h3 className="font-medium mb-2">Connection Test</h3>
+            <div className="border border-white/10 bg-surface-1 p-4">
+              <h3 className="text-sm uppercase tracking-wide-caps text-foreground mb-3">Connection Test</h3>
               <div className="flex items-center gap-2 mb-3">
-                {testStatus === 'idle' && <Badge variant="secondary">Not tested</Badge>}
+                {testStatus === 'idle' && <Badge variant="secondary" className="rounded-none uppercase tracking-widest text-caption">Not tested</Badge>}
                 {testStatus === 'testing' && (
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                    <IconLoader className="mr-1 h-3 w-3 animate-spin" />
+                  <Badge variant="secondary" className="bg-accent/20 text-accent border-accent/30 rounded-none uppercase tracking-widest text-caption">
+                    <Loader className="mr-1 h-3 w-3 animate-spin" />
                     Testing...
                   </Badge>
                 )}
                 {testStatus === 'success' && (
-                  <Badge variant="default" className="bg-green-100 text-green-800">
-                    <IconCheck className="mr-1 h-3 w-3" />
+                  <Badge variant="default" className="bg-green-900/30 text-green-400 border-green-500/30 rounded-none uppercase tracking-widest text-caption">
+                    <Check className="mr-1 h-3 w-3" />
                     Success
                   </Badge>
                 )}
                 {testStatus === 'error' && (
-                  <Badge variant="destructive">
-                    <IconX className="mr-1 h-3 w-3" />
+                  <Badge variant="destructive" className="rounded-none uppercase tracking-widest text-caption">
+                    <X className="mr-1 h-3 w-3" />
                     Failed
                   </Badge>
                 )}
               </div>
 
               {testResult?.repositoryCount !== undefined && (
-                <div className="text-sm text-green-700">
+                <div className="text-body-sm text-green-400 uppercase tracking-widest text-caption">
                   Found {testResult.repositoryCount} repositories
                 </div>
               )}
 
               {testResult?.error && (
-                <div className="text-sm text-red-600">
+                <div className="text-body-sm text-red-400">
                   {testResult.error}
                 </div>
               )}
             </div>
           </div>
         )}
+        </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
+        <div className="p-8 pt-0 flex justify-end gap-2 border-t border-white/10 py-4 px-8">
+          <Button variant="outline" onClick={handleClose} className="rounded-none border-white/10 hover:bg-white/5 uppercase tracking-widest text-caption">
             Cancel
           </Button>
 
           {step === 'configure' && (
             <>
-              <Button variant="outline" onClick={() => setStep('select')}>
+              <Button variant="outline" onClick={() => setStep('select')} className="rounded-none border-white/10 hover:bg-white/5 uppercase tracking-widest text-caption">
                 Back
               </Button>
-              <Button onClick={() => setStep('test')}>
+              <Button onClick={() => setStep('test')} className="rounded-none uppercase tracking-widest text-caption">
                 Next
               </Button>
             </>
@@ -272,17 +276,18 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
 
           {step === 'test' && (
             <>
-              <Button variant="outline" onClick={() => setStep('configure')}>
+              <Button variant="outline" onClick={() => setStep('configure')} className="rounded-none border-white/10 hover:bg-white/5 uppercase tracking-widest text-caption">
                 Back
               </Button>
               <Button
                 variant="outline"
                 onClick={handleTestConnection}
                 disabled={!canTestConnection || testStatus === 'testing'}
+                className="rounded-none border-white/10 hover:bg-white/5 uppercase tracking-widest text-caption"
               >
                 {testStatus === 'testing' ? (
                   <>
-                    <IconLoader className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader className="mr-2 h-4 w-4 animate-spin" />
                     Testing...
                   </>
                 ) : (
@@ -292,12 +297,13 @@ export function AddRepositoryDialog({ open, onOpenChange, onRepositoryAdded }: A
               <Button
                 onClick={handleAddRepository}
                 disabled={!canAddRepository}
+                className="rounded-none uppercase tracking-widest text-caption"
               >
                 Add Repository
               </Button>
             </>
           )}
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )

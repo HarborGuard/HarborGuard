@@ -2,11 +2,11 @@
 
 import * as React from "react";
 import {
-  IconSettings,
-  IconSearch,
-  IconSortAscending,
-  IconSortDescending,
-} from "@tabler/icons-react";
+  Settings,
+  Search,
+  ArrowUpAZ,
+  ArrowDownAZ,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -101,13 +101,13 @@ export function DockleResultsTab({ dockleResults }: DockleResultsTabProps) {
   };
 
   return (
-    <Card>
+    <Card className="bg-surface-1 border-white/10 rounded-none">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <IconSettings className="h-5 w-5" />
+        <CardTitle className="flex items-center gap-2 text-body-sm uppercase tracking-caps text-foreground">
+          <Settings className="h-4 w-4 text-accent" />
           Dockle Configuration Linter
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-caption uppercase tracking-widest text-muted-foreground/50">
           Container image linter for security and best practices
         </CardDescription>
       </CardHeader>
@@ -115,107 +115,107 @@ export function DockleResultsTab({ dockleResults }: DockleResultsTabProps) {
         <div className="space-y-4">
           {/* Summary Statistics */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 border rounded-lg">
-              <p className="text-2xl font-bold text-red-600">
+            <div className="text-center p-4 border border-white/10">
+              <p className="text-2xl tracking-tight text-red-400">
                 {dockleResults?.summary?.fatal || 0}
               </p>
-              <p className="text-sm text-muted-foreground">Fatal</p>
+              <p className="text-caption uppercase tracking-widest text-muted-foreground/50">Fatal</p>
             </div>
-            <div className="text-center p-4 border rounded-lg">
-              <p className="text-2xl font-bold text-orange-600">
+            <div className="text-center p-4 border border-white/10">
+              <p className="text-2xl tracking-tight text-orange-400">
                 {dockleResults?.summary?.warn || 0}
               </p>
-              <p className="text-sm text-muted-foreground">Warnings</p>
+              <p className="text-caption uppercase tracking-widest text-muted-foreground/50">Warnings</p>
             </div>
-            <div className="text-center p-4 border rounded-lg">
-              <p className="text-2xl font-bold text-blue-600">
+            <div className="text-center p-4 border border-white/10">
+              <p className="text-2xl tracking-tight text-blue-400">
                 {dockleResults?.summary?.info || 0}
               </p>
-              <p className="text-sm text-muted-foreground">Info</p>
+              <p className="text-caption uppercase tracking-widest text-muted-foreground/50">Info</p>
             </div>
-            <div className="text-center p-4 border rounded-lg">
-              <p className="text-2xl font-bold">
+            <div className="text-center p-4 border border-white/10">
+              <p className="text-2xl tracking-tight text-foreground">
                 {dockleResults?.summary?.pass || 0}
               </p>
-              <p className="text-sm text-muted-foreground">Passed</p>
+              <p className="text-caption uppercase tracking-widest text-muted-foreground/50">Passed</p>
             </div>
           </div>
 
-          <Separator />
+          <Separator className="border-white/10" />
 
           {/* Search and Filter Bar */}
           <div className="flex items-center gap-4">
             <div className="relative flex-1">
-              <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground/40 h-4 w-4" />
               <Input
                 placeholder="Search rules, codes, or descriptions..."
                 value={dockleSearch}
                 onChange={(e) => setDockleSearch(e.target.value)}
-                className="pl-10"
+                className="pl-10 rounded-none border-white/10 bg-transparent text-body-sm placeholder:text-muted-foreground/30 placeholder:uppercase placeholder:tracking-caps"
               />
             </div>
-            <div className="text-sm text-muted-foreground">
+            <div className="text-caption uppercase tracking-widest text-muted-foreground/50">
               {filteredDockleFindings.length} of{" "}
               {dockleResults?.details?.length || 0} findings
             </div>
           </div>
 
           {/* Findings Table */}
-          <div className="border rounded-lg">
+          <div className="border border-white/10 overflow-hidden rounded-none">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>
+                <TableRow className="border-white/10 hover:bg-transparent">
+                  <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">
                     <Button
                       variant="ghost"
-                      className="h-auto p-0 font-medium"
+                      className="h-auto p-0 text-caption uppercase tracking-widest hover:bg-transparent hover:text-foreground"
                       onClick={() => handleDockleSort("level")}
                     >
                       Level
                       {dockleSortField === "level" &&
                         (dockleSortOrder === "asc" ? (
-                          <IconSortAscending className="ml-1 h-4 w-4" />
+                          <ArrowUpAZ className="ml-1 h-4 w-4" />
                         ) : (
-                          <IconSortDescending className="ml-1 h-4 w-4" />
+                          <ArrowDownAZ className="ml-1 h-4 w-4" />
                         ))}
                     </Button>
                   </TableHead>
-                  <TableHead>
+                  <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">
                     <Button
                       variant="ghost"
-                      className="h-auto p-0 font-medium"
+                      className="h-auto p-0 text-caption uppercase tracking-widest hover:bg-transparent hover:text-foreground"
                       onClick={() => handleDockleSort("code")}
                     >
                       Rule Code
                       {dockleSortField === "code" &&
                         (dockleSortOrder === "asc" ? (
-                          <IconSortAscending className="ml-1 h-4 w-4" />
+                          <ArrowUpAZ className="ml-1 h-4 w-4" />
                         ) : (
-                          <IconSortDescending className="ml-1 h-4 w-4" />
+                          <ArrowDownAZ className="ml-1 h-4 w-4" />
                         ))}
                     </Button>
                   </TableHead>
-                  <TableHead>
+                  <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">
                     <Button
                       variant="ghost"
-                      className="h-auto p-0 font-medium"
+                      className="h-auto p-0 text-caption uppercase tracking-widest hover:bg-transparent hover:text-foreground"
                       onClick={() => handleDockleSort("title")}
                     >
                       Title
                       {dockleSortField === "title" &&
                         (dockleSortOrder === "asc" ? (
-                          <IconSortAscending className="ml-1 h-4 w-4" />
+                          <ArrowUpAZ className="ml-1 h-4 w-4" />
                         ) : (
-                          <IconSortDescending className="ml-1 h-4 w-4" />
+                          <ArrowDownAZ className="ml-1 h-4 w-4" />
                         ))}
                     </Button>
                   </TableHead>
-                  <TableHead>Details</TableHead>
+                  <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">Details</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredDockleFindings.map((detail, index) => (
-                  <TableRow key={index}>
+                  <TableRow key={index} className="border-white/10 hover:bg-white/5">
                     <TableCell>
                       <Badge
                         variant={
@@ -225,20 +225,21 @@ export function DockleResultsTab({ dockleResults }: DockleResultsTabProps) {
                             ? "secondary"
                             : "outline"
                         }
+                        className="rounded-none uppercase tracking-widest text-caption"
                       >
                         {detail.level}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <code className="text-sm bg-muted px-2 py-1 rounded">
+                      <code className="text-caption bg-surface-1 border border-white/10 px-2 py-1">
                         {detail.code}
                       </code>
                     </TableCell>
                     <TableCell>
-                      <p className="font-medium">{detail.title}</p>
+                      <p className="text-body-sm text-foreground">{detail.title}</p>
                     </TableCell>
                     <TableCell>
-                      <p className="text-sm text-muted-foreground max-w-md">
+                      <p className="text-caption text-muted-foreground/60 max-w-md">
                         {detail.details}
                       </p>
                     </TableCell>

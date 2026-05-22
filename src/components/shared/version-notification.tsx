@@ -101,7 +101,7 @@ export function VersionNotification() {
           <div className="space-y-4 py-4">
             <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
               <div>
-                <p className="text-sm font-medium">Current Version</p>
+                <p className="text-caption uppercase tracking-widest text-muted-foreground/50">Current Version</p>
                 <p className="text-sm text-muted-foreground">
                   {currentVersion}
                 </p>
@@ -111,7 +111,7 @@ export function VersionNotification() {
 
             <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-950 dark:border-blue-800">
               <div>
-                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                <p className="text-body-sm text-foreground">
                   Latest Version
                 </p>
                 <p className="text-sm text-blue-700 dark:text-blue-300">
@@ -125,7 +125,7 @@ export function VersionNotification() {
               <div className="flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
                 <div className="text-sm">
-                  <p className="font-medium text-amber-900 dark:text-amber-100">
+                  <p className="text-body-sm text-foreground">
                     Update Instructions
                   </p>
                   <p className="text-amber-700 dark:text-amber-300 mt-1">

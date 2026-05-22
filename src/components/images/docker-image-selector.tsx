@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { IconServer, IconClock, IconSearch } from '@tabler/icons-react'
+import { Server, Clock, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -143,7 +143,7 @@ export function DockerImageSelector({ onImageSelect, disabled, className }: Dock
   if (allImages.length === 0 && !loading) {
     return (
       <div className="text-center py-8">
-        <IconServer className="mx-auto h-12 w-12 text-muted-foreground" />
+        <Server className="mx-auto h-12 w-12 text-muted-foreground" />
         <h3 className="mt-2 text-sm font-medium">No Docker images found</h3>
         <p className="mt-1 text-sm text-muted-foreground">
           No local Docker images are available for scanning.
@@ -155,7 +155,7 @@ export function DockerImageSelector({ onImageSelect, disabled, className }: Dock
   return (
     <div className={cn("relative docker-image-selector-container", className)}>
       <div className="relative">
-        <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
         <Input
           ref={inputRef}
           value={searchValue}
@@ -183,7 +183,7 @@ export function DockerImageSelector({ onImageSelect, disabled, className }: Dock
             >
               <div className="flex items-center gap-3 w-full min-w-0">
                 <div className="flex-shrink-0">
-                  <IconServer className="h-8 w-8 text-muted-foreground" />
+                  <Server className="h-8 w-8 text-muted-foreground" />
                 </div>
                 
                 <div className="flex-1 min-w-0">
@@ -197,7 +197,7 @@ export function DockerImageSelector({ onImageSelect, disabled, className }: Dock
                     <span>ID: {image.id.slice(0, 12)}</span>
                     <span>{formatSize(image.size)}</span>
                     <div className="flex items-center gap-1">
-                      <IconClock className="h-3 w-3" />
+                      <Clock className="h-3 w-3" />
                       {formatDate(image.created)}
                     </div>
                   </div>

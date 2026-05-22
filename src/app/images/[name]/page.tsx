@@ -7,10 +7,11 @@ import { useCveClassifications } from "@/hooks/useCveClassifications";
 import type { ScanWithImage } from "@/types";
 import { aggregateVulnerabilitiesWithClassifications } from "@/lib/scan-aggregations";
 import {
-  IconCalendarClock,
-  IconShield,
-  IconTag,
-} from "@tabler/icons-react";
+  CalendarClock,
+  Shield,
+  Tag,
+  ChevronRight,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +27,7 @@ import { UnifiedTable } from "@/components/table/unified-table";
 import { ColumnDefinition, ContextMenuItem } from "@/components/table/types";
 import { ImagePageSkeleton } from "@/components/images/image-loading";
 import { toast } from "sonner";
-import { IconDownload, IconUpload, IconTrash } from "@tabler/icons-react";
+import { Download, Upload, Trash2 } from "lucide-react";
 import { ExportImageDialogEnhanced } from "@/components/dialogs/export-image-dialog-enhanced";
 import { getImageName } from "@/lib/utils/image-utils";
 import { resolveRegistryDisplay } from "@/lib/registry/registry-utils";
@@ -161,21 +162,21 @@ export default function ImageDetailsPage() {
     return (
       <div className="flex-1 overflow-auto">
         <div className="@container/main flex flex-col gap-4 p-4 lg:p-6">
-          <Card>
+          <Card className="bg-surface-1 border-white/10 rounded-none">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-red-500">
-                <IconShield className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-red-400 text-body-sm uppercase tracking-caps">
+                <Shield className="h-4 w-4" />
                 Image Not Found
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-caption uppercase tracking-widest text-muted-foreground/50">
                 {error || "The requested image could not be found"}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col items-center gap-4 py-8">
-              <p className="text-muted-foreground text-center">
-                The image "{imageName}" does not exist or may have been removed.
+              <p className="text-caption uppercase tracking-widest text-muted-foreground/40 text-center">
+                The image &quot;{imageName}&quot; does not exist or may have been removed.
               </p>
-              <Button asChild>
+              <Button asChild className="rounded-none uppercase tracking-widest text-caption">
                 <a href="/">Go Back to Dashboard</a>
               </Button>
             </CardContent>
@@ -323,59 +324,72 @@ export default function ImageDetailsPage() {
 
   return (
     <div className="flex-1 overflow-auto">
+      {/* Page eyebrow + h1 */}
+      <div className="px-6 pt-8 pb-6 space-y-1">
+        <p className="text-caption uppercase tracking-caps text-muted-foreground/50 flex items-center gap-1">
+          <a href="/images" className="hover:text-foreground transition-colors">Images</a>
+          <ChevronRight className="h-3 w-3" />
+          {imageData.name}
+        </p>
+        <h1 className="text-2xl tracking-tight text-foreground">{imageData.name}</h1>
+        <p className="text-muted-foreground text-body-sm uppercase tracking-wide-caps">
+          {imageData.totalScans} scan{imageData.totalScans !== 1 ? "s" : ""} across {imageData.tags?.length || 0} tag{(imageData.tags?.length || 0) !== 1 ? "s" : ""}
+        </p>
+      </div>
+
       <div className="@container/main flex flex-col gap-4 p-4 lg:p-6">
         {/* Image Metadata Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Basic Information */}
-          <Card>
+          <Card className="bg-surface-1 border-white/10 rounded-none">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <IconTag className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-body-sm uppercase tracking-caps text-foreground">
+                <Tag className="h-4 w-4 text-accent" />
                 Image Information
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-caption uppercase tracking-widest text-muted-foreground/50">
                 Container image details and metadata
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">
                     Image Name
                   </p>
-                  <p className="font-mono text-sm">{imageData.name}</p>
+                  <p className="font-mono text-body-sm mt-1">{imageData.name}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">
                     Available Tags
                   </p>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {imageData.tags?.map((tag: string, index: number) => (
-                      <Badge key={`${tag}-${index}`} variant="outline" className="text-xs">
+                      <Badge key={`${tag}-${index}`} variant="outline" className="rounded-none uppercase tracking-widest text-caption border-white/10">
                         {tag}
                       </Badge>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">
                     Latest Tag
                   </p>
-                  <Badge variant="outline">{imageData.latestImage?.tag}</Badge>
+                  <Badge variant="outline" className="mt-1 rounded-none uppercase tracking-widest text-caption border-white/10">{imageData.latestImage?.tag}</Badge>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">
                     Platform
                   </p>
-                  <Badge variant="outline">
+                  <Badge variant="outline" className="mt-1 rounded-none uppercase tracking-widest text-caption border-white/10">
                     {imageData.latestImage?.platform || "Unknown"}
                   </Badge>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">
                     Size (Latest)
                   </p>
-                  <p className="text-sm">
+                  <p className="text-body-sm mt-1">
                     {imageData.latestImage?.sizeBytes
                       ? Math.round(
                           Number(imageData.latestImage.sizeBytes || 0) / 1024 / 1024
@@ -385,26 +399,26 @@ export default function ImageDetailsPage() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">
                     Registry
                   </p>
-                  <p className="text-sm">
+                  <p className="text-body-sm mt-1 text-muted-foreground/80">
                     {imageData.registries?.length > 0
                       ? imageData.registries.join(", ")
                       : resolveRegistryDisplay(imageData.latestImage?.source)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">
                     Total Scans
                   </p>
-                  <p className="text-sm">{imageData.totalScans}</p>
+                  <p className="text-body-sm mt-1">{imageData.totalScans}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">
+                  <p className="text-caption uppercase tracking-widest text-muted-foreground/50">
                     Latest Digest
                   </p>
-                  <p className="font-mono text-sm text-xs">
+                  <p className="font-mono text-caption text-muted-foreground/60 mt-1">
                     {imageData.latestImage?.digest?.slice(7, 19) || "N/A"}
                   </p>
                 </div>
@@ -413,19 +427,19 @@ export default function ImageDetailsPage() {
           </Card>
 
           {/* Summary Statistics */}
-          <Card>
+          <Card className="bg-surface-1 border-white/10 rounded-none">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <IconShield className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-body-sm uppercase tracking-caps text-foreground">
+                <Shield className="h-4 w-4 text-accent" />
                 Security Summary
               </CardTitle>
-              <CardDescription>Across all tags and scans</CardDescription>
+              <CardDescription className="text-caption uppercase tracking-widest text-muted-foreground/50">Across all tags and scans</CardDescription>
             </CardHeader>
             <CardContent>
               {historicalScans.length > 0 ? (
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-sm">Latest Risk Score</span>
+                    <span className="text-caption uppercase tracking-widest text-muted-foreground/60">Latest Risk Score</span>
                     <Badge
                       variant={
                         historicalScans[0]?.riskScore > 75
@@ -434,25 +448,26 @@ export default function ImageDetailsPage() {
                           ? "default"
                           : "secondary"
                       }
+                      className="rounded-none uppercase tracking-widest text-caption"
                     >
                       {historicalScans[0]?.riskScore}/100
                     </Badge>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm">Critical Vulns</span>
-                    <span className="text-sm font-medium text-red-600">
+                    <span className="text-caption uppercase tracking-widest text-muted-foreground/60">Critical Vulns</span>
+                    <span className="text-body-sm text-red-400">
                       {historicalScans[0]?.severities?.crit || 0}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm">High Vulns</span>
-                    <span className="text-sm font-medium text-orange-600">
+                    <span className="text-caption uppercase tracking-widest text-muted-foreground/60">High Vulns</span>
+                    <span className="text-body-sm text-orange-400">
                       {historicalScans[0]?.severities?.high || 0}
                     </span>
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-caption uppercase tracking-widest text-muted-foreground/40">
                   No scan data available
                 </p>
               )}
@@ -461,13 +476,13 @@ export default function ImageDetailsPage() {
         </div>
 
         {/* Historical Scans */}
-        <Card>
+        <Card className="bg-surface-1 border-white/10 rounded-none">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <IconCalendarClock className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-body-sm uppercase tracking-caps text-foreground">
+              <CalendarClock className="h-4 w-4 text-accent" />
               All Scans Across Tags
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-caption uppercase tracking-widest text-muted-foreground/50">
               Security scans for all versions of {imageData.name}
             </CardDescription>
           </CardHeader>
@@ -563,7 +578,7 @@ export default function ImageDetailsPage() {
     return [
       {
         label: 'Download Reports',
-        icon: <IconDownload className="mr-2 h-4 w-4" />,
+        icon: <Download className="mr-2 h-4 w-4" />,
         action: async () => {
           if (!imageData?.name || !row.scanId) return;
 
@@ -587,7 +602,7 @@ export default function ImageDetailsPage() {
       },
       {
         label: 'Export Image',
-        icon: <IconUpload className="mr-2 h-4 w-4" />,
+        icon: <Upload className="mr-2 h-4 w-4" />,
         action: modalAction(() => {
           // row.version contains "imageName:tag", need to extract just the tag
           const versionParts = (row.version || 'latest').split(':');
@@ -612,7 +627,7 @@ export default function ImageDetailsPage() {
       {
         label: 'Delete Scan',
         separator: true,
-        icon: <IconTrash className="mr-2 h-4 w-4" />,
+        icon: <Trash2 className="mr-2 h-4 w-4" />,
         action: async () => {
           if (!row.scanId) return;
 

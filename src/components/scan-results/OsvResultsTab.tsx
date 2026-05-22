@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { IconPackage, IconInfoCircle } from "@tabler/icons-react";
+import { Package, Info } from "lucide-react";
 
 import {
   Card,
@@ -27,13 +27,13 @@ interface OsvResultsTabProps {
 
 export function OsvResultsTab({ osvResults }: OsvResultsTabProps) {
   return (
-    <Card>
+    <Card className="bg-surface-1 border-white/10 rounded-none">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <IconPackage className="h-5 w-5" />
+        <CardTitle className="flex items-center gap-2 text-body-sm uppercase tracking-caps text-foreground">
+          <Package className="h-4 w-4 text-accent" />
           OSV Vulnerability Database
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-caption uppercase tracking-widest text-muted-foreground/50">
           Open Source Vulnerability database analysis of container
           packages
         </CardDescription>
@@ -42,20 +42,20 @@ export function OsvResultsTab({ osvResults }: OsvResultsTabProps) {
         <div className="space-y-4">
           {/* Summary Statistics */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="text-center p-4 border rounded-lg">
-              <p className="text-2xl font-bold">
+            <div className="text-center p-4 border border-white/10">
+              <p className="text-2xl tracking-tight text-foreground">
                 {osvResults.results?.reduce(
                   (total, result) =>
                     total + (result.packages?.length || 0),
                   0
                 ) || 0}
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-caption uppercase tracking-widest text-muted-foreground/50">
                 Total Packages
               </p>
             </div>
-            <div className="text-center p-4 border rounded-lg">
-              <p className="text-2xl font-bold text-red-600">
+            <div className="text-center p-4 border border-white/10">
+              <p className="text-2xl tracking-tight text-red-400">
                 {osvResults.results?.reduce(
                   (total, result) =>
                     total +
@@ -65,12 +65,12 @@ export function OsvResultsTab({ osvResults }: OsvResultsTabProps) {
                   0
                 ) || 0}
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-caption uppercase tracking-widest text-muted-foreground/50">
                 Vulnerable
               </p>
             </div>
-            <div className="text-center p-4 border rounded-lg">
-              <p className="text-2xl font-bold">
+            <div className="text-center p-4 border border-white/10">
+              <p className="text-2xl tracking-tight text-foreground">
                 {new Set(
                   osvResults.results?.flatMap(
                     (result) =>
@@ -80,7 +80,7 @@ export function OsvResultsTab({ osvResults }: OsvResultsTabProps) {
                   )
                 ).size || 0}
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-caption uppercase tracking-widest text-muted-foreground/50">
                 Ecosystems
               </p>
             </div>
@@ -88,7 +88,7 @@ export function OsvResultsTab({ osvResults }: OsvResultsTabProps) {
 
           {/* Ecosystem Distribution */}
           <div className="mb-6">
-            <h4 className="font-semibold mb-2">
+            <h4 className="text-caption uppercase tracking-widest text-muted-foreground/60 mb-2">
               Package Distribution by Ecosystem
             </h4>
             <div className="flex flex-wrap gap-2">
@@ -112,7 +112,7 @@ export function OsvResultsTab({ osvResults }: OsvResultsTabProps) {
                     0
                   ) || 0;
                 return (
-                  <Badge key={ecosystem} variant="outline">
+                  <Badge key={ecosystem} variant="outline" className="rounded-none uppercase tracking-widest text-caption border-white/10">
                     {ecosystem}: {count}
                   </Badge>
                 );
@@ -122,18 +122,18 @@ export function OsvResultsTab({ osvResults }: OsvResultsTabProps) {
 
           {/* Vulnerable Packages Table */}
           <div>
-            <h4 className="font-semibold mb-4">
+            <h4 className="text-caption uppercase tracking-widest text-muted-foreground/60 mb-4">
               Vulnerable Packages
             </h4>
-            <div className="border rounded-lg">
+            <div className="border border-white/10 overflow-hidden rounded-none">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Package</TableHead>
-                    <TableHead>Version</TableHead>
-                    <TableHead>Ecosystem</TableHead>
-                    <TableHead>Vulnerabilities</TableHead>
-                    <TableHead>Severity</TableHead>
+                  <TableRow className="border-white/10 hover:bg-transparent">
+                    <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">Package</TableHead>
+                    <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">Version</TableHead>
+                    <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">Ecosystem</TableHead>
+                    <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">Vulnerabilities</TableHead>
+                    <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">Severity</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -145,40 +145,40 @@ export function OsvResultsTab({ osvResults }: OsvResultsTabProps) {
                         pkg.groups?.[0]?.max_severity || "0";
                       const severityNum = parseFloat(maxSeverity);
                       return (
-                        <TableRow key={index}>
-                          <TableCell className="font-medium">
+                        <TableRow key={index} className="border-white/10 hover:bg-white/5">
+                          <TableCell className="text-body-sm text-foreground">
                             {pkg.package.name}
                           </TableCell>
-                          <TableCell>{pkg.package.version}</TableCell>
+                          <TableCell className="text-body-sm text-muted-foreground/60">{pkg.package.version}</TableCell>
                           <TableCell>
-                            <Badge variant="outline">
+                            <Badge variant="outline" className="rounded-none uppercase tracking-widest text-caption border-white/10">
                               {pkg.package.ecosystem}
                             </Badge>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="text-body-sm text-muted-foreground/60">
                             {pkg.vulnerabilities.length}
                           </TableCell>
                           <TableCell>
                             {severityNum >= 9 && (
-                              <Badge variant="destructive">
+                              <Badge variant="destructive" className="rounded-none uppercase tracking-widest text-caption">
                                 Critical
                               </Badge>
                             )}
                             {severityNum >= 7 && severityNum < 9 && (
-                              <Badge variant="destructive">
+                              <Badge className="rounded-none uppercase tracking-widest text-caption bg-orange-900/30 text-orange-400 border-orange-500/30">
                                 High
                               </Badge>
                             )}
                             {severityNum >= 4 && severityNum < 7 && (
-                              <Badge variant="secondary">
+                              <Badge variant="secondary" className="rounded-none uppercase tracking-widest text-caption">
                                 Medium
                               </Badge>
                             )}
                             {severityNum > 0 && severityNum < 4 && (
-                              <Badge variant="outline">Low</Badge>
+                              <Badge variant="outline" className="rounded-none uppercase tracking-widest text-caption border-white/10">Low</Badge>
                             )}
                             {severityNum === 0 && (
-                              <Badge variant="outline">Info</Badge>
+                              <Badge variant="outline" className="rounded-none uppercase tracking-widest text-caption border-white/10">Info</Badge>
                             )}
                           </TableCell>
                         </TableRow>
@@ -195,8 +195,8 @@ export function OsvResultsTab({ osvResults }: OsvResultsTabProps) {
             .filter((pkg) => pkg.vulnerabilities.length > 0).length ||
             0) === 0 && (
             <div className="text-center py-8">
-              <IconInfoCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
+              <Info className="h-12 w-12 mx-auto text-muted-foreground/20 mb-4" />
+              <p className="text-caption uppercase tracking-widest text-muted-foreground/40">
                 No vulnerable packages found
               </p>
             </div>

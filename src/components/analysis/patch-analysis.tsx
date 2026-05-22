@@ -231,10 +231,10 @@ export function PatchAnalysis({ scanId, imageId, imageName = 'image', imageTag =
 
   if (loading) {
     return (
-      <Card>
+      <Card className="bg-surface-1 border-white/10 rounded-none">
         <CardContent className="flex items-center justify-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <span className="ml-2">Analyzing vulnerabilities for patching...</span>
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/40" />
+          <span className="ml-2 text-caption uppercase tracking-widest text-muted-foreground/40">Analyzing vulnerabilities for patching...</span>
         </CardContent>
       </Card>
     );
@@ -260,15 +260,15 @@ export function PatchAnalysis({ scanId, imageId, imageName = 'image', imageTag =
 
   return (
     <>
-    <Card>
+    <Card className="bg-surface-1 border-white/10 rounded-none">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-body-sm uppercase tracking-caps text-foreground">
+              <Shield className="h-4 w-4 text-accent" />
               Patch Analysis
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-caption uppercase tracking-widest text-muted-foreground/50 mt-1">
               Automated vulnerability remediation with Buildah
             </CardDescription>
           </div>
@@ -277,6 +277,7 @@ export function PatchAnalysis({ scanId, imageId, imageName = 'image', imageTag =
               size="sm"
               onClick={() => setShowVulnModal(true)}
               disabled={patching || analysis.patchableVulnerabilities === 0}
+              className="rounded-none uppercase tracking-widest text-caption"
             >
               {patching ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -292,20 +293,20 @@ export function PatchAnalysis({ scanId, imageId, imageName = 'image', imageTag =
         {/* Overview Stats */}
         <div className="grid grid-cols-3 gap-4">
           <div className="text-center">
-            <div className="text-2xl font-bold">{analysis.totalVulnerabilities}</div>
-            <div className="text-sm text-muted-foreground">Total CVEs</div>
+            <div className="text-2xl tracking-tight text-foreground">{analysis.totalVulnerabilities}</div>
+            <div className="text-caption uppercase tracking-widest text-muted-foreground/50">Total CVEs</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl tracking-tight text-green-400">
               {analysis.patchableVulnerabilities}
             </div>
-            <div className="text-sm text-muted-foreground">Patchable</div>
+            <div className="text-caption uppercase tracking-widest text-muted-foreground/50">Patchable</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-red-600">
+            <div className="text-2xl tracking-tight text-red-400">
               {analysis.notPatchableVulnerabilities}
             </div>
-            <div className="text-sm text-muted-foreground">Not Patchable</div>
+            <div className="text-caption uppercase tracking-widest text-muted-foreground/50">Not Patchable</div>
           </div>
         </div>
 
@@ -313,32 +314,32 @@ export function PatchAnalysis({ scanId, imageId, imageName = 'image', imageTag =
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span>Patch Coverage</span>
-            <span className="font-medium">{patchRate}%</span>
+            <span className="text-foreground">{patchRate}%</span>
           </div>
           <Progress value={Number(patchRate)} className="h-2" />
         </div>
 
         {/* Severity Breakdown */}
         <div className="space-y-2">
-          <h4 className="text-sm font-medium">Patchable by Severity</h4>
-          <div className="grid grid-cols-4 gap-2">
+          <h4 className="text-caption uppercase tracking-widest text-muted-foreground/60">Patchable by Severity</h4>
+          <div className="flex flex-wrap gap-2">
             {analysis.criticalPatchable > 0 && (
-              <Badge variant="destructive">
+              <Badge variant="destructive" className="rounded-none uppercase tracking-widest text-caption">
                 Critical: {analysis.criticalPatchable}
               </Badge>
             )}
             {analysis.highPatchable > 0 && (
-              <Badge className="bg-orange-500">
+              <Badge className="bg-orange-600 rounded-none uppercase tracking-widest text-caption">
                 High: {analysis.highPatchable}
               </Badge>
             )}
             {analysis.mediumPatchable > 0 && (
-              <Badge className="bg-yellow-500">
+              <Badge className="bg-yellow-600 rounded-none uppercase tracking-widest text-caption">
                 Medium: {analysis.mediumPatchable}
               </Badge>
             )}
             {analysis.lowPatchable > 0 && (
-              <Badge variant="secondary">
+              <Badge variant="secondary" className="rounded-none uppercase tracking-widest text-caption">
                 Low: {analysis.lowPatchable}
               </Badge>
             )}
@@ -348,12 +349,12 @@ export function PatchAnalysis({ scanId, imageId, imageName = 'image', imageTag =
         {/* Package Manager Breakdown */}
         {Object.keys(analysis.patchableByManager).length > 0 && (
           <div className="space-y-2">
-            <h4 className="text-sm font-medium">Patches by Package Manager</h4>
+            <h4 className="text-caption uppercase tracking-widest text-muted-foreground/60">Patches by Package Manager</h4>
             <div className="flex flex-wrap gap-2">
               {Object.entries(analysis.patchableByManager).map(([manager, count]) => (
                 <div key={manager} className="flex items-center gap-1">
-                  <Package className="h-4 w-4" />
-                  <span className="text-sm">
+                  <Package className="h-3.5 w-3.5 text-muted-foreground/40" />
+                  <span className="text-body-sm uppercase tracking-caps">
                     {manager}: <strong>{count as number}</strong>
                   </span>
                 </div>
@@ -395,35 +396,39 @@ export function PatchAnalysis({ scanId, imageId, imageName = 'image', imageTag =
     
     {/* Patch Progress Dialog */}
     <Dialog open={!!patchProgress} onOpenChange={() => {}}>
-      <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {patchProgress?.stage === 'failed' ? (
-              <XCircle className="h-5 w-5 text-red-500" />
-            ) : patchProgress?.stage === 'completed' ? (
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
-            ) : (
-              <Shield className="h-5 w-5 text-blue-500" />
-            )}
-            Patching {imageName}:{imageTag}
-          </DialogTitle>
-          <DialogDescription>
-            {patchProgress?.message}
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-md border-white/10 rounded-none shadow-2xl p-0 overflow-hidden" onPointerDownOutside={(e) => e.preventDefault()}>
+        <div className="p-8 border-b border-white/10 bg-surface-1">
+          <DialogHeader className="space-y-3">
+            <div className="flex items-center gap-3">
+              {patchProgress?.stage === 'failed' ? (
+                <XCircle className="h-4 w-4 text-red-400" />
+              ) : patchProgress?.stage === 'completed' ? (
+                <CheckCircle2 className="h-4 w-4 text-green-400" />
+              ) : (
+                <Shield className="h-4 w-4 text-accent" />
+              )}
+              <DialogTitle className="text-sm uppercase tracking-wide-caps text-foreground">
+                Patching {imageName}:{imageTag}
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-body-sm text-muted-foreground uppercase tracking-widest">
+              {patchProgress?.message}
+            </DialogDescription>
+          </DialogHeader>
+        </div>
         
-        <div className="space-y-4 py-4">
+        <div className="p-8 space-y-4">
           {/* Progress Bar */}
           <div className="space-y-2">
-            <Progress value={patchProgress?.progress || 0} className="h-3" />
-            <div className="flex justify-between text-sm text-muted-foreground">
+            <Progress value={patchProgress?.progress || 0} className="h-2" />
+            <div className="flex justify-between text-caption text-muted-foreground/50 uppercase tracking-widest">
               <span>{patchProgress?.progress}%</span>
               {patchProgress?.patchedCount !== undefined && patchProgress?.totalCount && (
                 <span>{patchProgress.patchedCount} / {patchProgress.totalCount} patches</span>
               )}
             </div>
           </div>
-          
+
           {/* Stage indicators */}
           <div className="space-y-2">
             {['initializing', 'analyzing', 'pulling', 'patching', 'pushing', 'verifying', 'completed'].map((stage) => {
@@ -433,40 +438,40 @@ export function PatchAnalysis({ scanId, imageId, imageName = 'image', imageTag =
               const isActive = stage === currentStage;
               const isDone = currentIndex > stageIndex;
               const isFailed = currentStage === 'failed';
-              
+
               return (
                 <div key={stage} className="flex items-center gap-2">
                   {isDone ? (
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />
                   ) : isActive && !isFailed ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
                   ) : isFailed && isActive ? (
-                    <XCircle className="h-4 w-4 text-red-500" />
+                    <XCircle className="h-3.5 w-3.5 text-red-400" />
                   ) : (
-                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <Clock className="h-3.5 w-3.5 text-muted-foreground/30" />
                   )}
-                  <span className={`text-sm capitalize ${isActive ? 'font-medium' : 'text-muted-foreground'}`}>
+                  <span className={`text-caption uppercase tracking-widest capitalize ${isActive ? 'text-foreground' : 'text-muted-foreground/40'}`}>
                     {stage.replace('_', ' ')}
                   </span>
                 </div>
               );
             })}
           </div>
-          
+
           {/* Error or success message */}
           {patchProgress?.stage === 'failed' && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="rounded-none border-red-500/30 bg-red-950/20">
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Patch Failed</AlertTitle>
-              <AlertDescription>{patchProgress.message}</AlertDescription>
+              <AlertTitle className="uppercase tracking-widest text-caption">Patch Failed</AlertTitle>
+              <AlertDescription className="text-body-sm">{patchProgress.message}</AlertDescription>
             </Alert>
           )}
-          
+
           {patchProgress?.stage === 'completed' && (
-            <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <AlertTitle>Patch Successful</AlertTitle>
-              <AlertDescription>
+            <Alert className="border-green-500/30 bg-green-950/20 rounded-none">
+              <CheckCircle className="h-4 w-4 text-green-400" />
+              <AlertTitle className="uppercase tracking-widest text-caption text-green-400">Patch Successful</AlertTitle>
+              <AlertDescription className="text-body-sm">
                 Successfully patched {patchProgress.patchedCount} out of {patchProgress.totalCount} vulnerabilities.
               </AlertDescription>
             </Alert>

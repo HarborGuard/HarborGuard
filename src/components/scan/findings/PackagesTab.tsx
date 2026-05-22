@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { IconSearch } from "@tabler/icons-react";
+import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Card,
@@ -62,7 +62,7 @@ export function PackagesTab({
             </CardDescription>
           </div>
           <div className="relative w-64">
-            <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search packages..."
               value={packageSearch}
@@ -88,7 +88,7 @@ export function PackagesTab({
             {filterPackages(packages, packageSearch).map((pkg: any) => (
               <TableRow
                 key={`${pkg.id}-${pkg.source}`}
-                className="cursor-pointer hover:bg-muted/50"
+                className="cursor-pointer hover:bg-white/5"
                 onClick={() => onPackageClick(pkg)}
               >
                 <TableCell className="font-mono text-sm">{pkg.packageName}</TableCell>

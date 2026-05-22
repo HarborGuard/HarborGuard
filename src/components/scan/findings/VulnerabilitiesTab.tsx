@@ -2,12 +2,12 @@
 
 import React from 'react';
 import {
-  IconSearch,
-  IconSortAscending,
-  IconSortDescending,
-  IconInfoCircle,
-  IconMessage,
-} from "@tabler/icons-react";
+  Search,
+  ArrowUpAZ,
+  ArrowDownAZ,
+  Info,
+  MessageSquare,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -127,7 +127,7 @@ export function VulnerabilitiesTab({
             </CardDescription>
           </div>
           <div className="relative w-64">
-            <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search vulnerabilities..."
               value={vulnerabilitySearch}
@@ -147,7 +147,7 @@ export function VulnerabilitiesTab({
               >
                 CVE ID
                 {sortField === 'cveId' && (
-                  sortOrder === 'asc' ? <IconSortAscending className="inline h-4 w-4 ml-1" /> : <IconSortDescending className="inline h-4 w-4 ml-1" />
+                  sortOrder === 'asc' ? <ArrowUpAZ className="inline h-4 w-4 ml-1" /> : <ArrowDownAZ className="inline h-4 w-4 ml-1" />
                 )}
               </TableHead>
               <TableHead>Package</TableHead>
@@ -157,7 +157,7 @@ export function VulnerabilitiesTab({
               >
                 Severity
                 {sortField === 'severity' && (
-                  sortOrder === 'asc' ? <IconSortAscending className="inline h-4 w-4 ml-1" /> : <IconSortDescending className="inline h-4 w-4 ml-1" />
+                  sortOrder === 'asc' ? <ArrowUpAZ className="inline h-4 w-4 ml-1" /> : <ArrowDownAZ className="inline h-4 w-4 ml-1" />
                 )}
               </TableHead>
               <TableHead>Source</TableHead>
@@ -167,7 +167,7 @@ export function VulnerabilitiesTab({
               >
                 CVSS
                 {sortField === 'cvssScore' && (
-                  sortOrder === 'asc' ? <IconSortAscending className="inline h-4 w-4 ml-1" /> : <IconSortDescending className="inline h-4 w-4 ml-1" />
+                  sortOrder === 'asc' ? <ArrowUpAZ className="inline h-4 w-4 ml-1" /> : <ArrowDownAZ className="inline h-4 w-4 ml-1" />
                 )}
               </TableHead>
               <TableHead>Fixed Version</TableHead>
@@ -180,7 +180,7 @@ export function VulnerabilitiesTab({
               return (
                 <TableRow
                   key={`${vuln.id}-${vuln.source}`}
-                  className={`${isFalsePositive(vuln.cveId) ? 'opacity-50' : ''} cursor-pointer hover:bg-muted/50`}
+                  className={`${isFalsePositive(vuln.cveId) ? 'opacity-50' : ''} cursor-pointer hover:bg-white/5`}
                   onClick={() => onVulnerabilityClick(vuln)}
                 >
                   <TableCell>
@@ -193,7 +193,7 @@ export function VulnerabilitiesTab({
                       </div>
                       {comment && (
                         <div className="flex items-start gap-1 mt-1">
-                          <IconMessage className="h-3 w-3 text-muted-foreground mt-0.5 flex-shrink-0" />
+                          <MessageSquare className="h-3 w-3 text-muted-foreground mt-0.5 flex-shrink-0" />
                           <span className="text-xs text-muted-foreground italic">{comment}</span>
                         </div>
                       )}
@@ -225,7 +225,7 @@ export function VulnerabilitiesTab({
                           onClassifyClick(vuln.cveId, vuln.packageName);
                         }}
                       >
-                        <IconInfoCircle className="h-4 w-4" />
+                        <Info className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>

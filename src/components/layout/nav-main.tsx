@@ -1,76 +1,80 @@
-"use client"
+"use client";
 
-import { IconCirclePlusFilled, type Icon } from "@tabler/icons-react"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { Layers2Icon } from "lucide-react"
-import {
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import { NewScanModal } from "@/components/dialogs/new-scan-modal"
-import { BulkScanModal } from "@/components/dialogs/bulk-scan-modal"
-import { Separator } from "../ui/separator"
+import { CirclePlus, Layers, type LucideIcon } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { NewScanModal } from "@/components/dialogs/new-scan-modal";
+import { BulkScanModal } from "@/components/dialogs/bulk-scan-modal";
 
 export function NavMain({
   items,
 }: {
   items: {
-    title: string
-    url: string
-    icon?: Icon
-  }[]
+    title: string;
+    url: string;
+    icon?: LucideIcon;
+  }[];
 }) {
-  const pathname = usePathname()
-  return (
-    <SidebarGroup>
-      <SidebarGroupContent className="flex flex-col gap-2">
+  const pathname = usePathname();
 
-        <Separator className="mb-2" />
-        <SidebarMenu>
-          <SidebarMenuItem className="flex items-center gap-1">
-            <NewScanModal>
-              <SidebarMenuButton
-                tooltip="New Scan"
-                className="bg-blue-500 text-primary-foreground hover:bg-blue-500/70 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear cursor-pointer flex-1"
+  return (
+    <nav className="flex-1 pb-6 overflow-y-auto">
+      {/* Action row — New Scan + Bulk */}
+      <div className="pb-6 flex items-center">
+        <NewScanModal>
+          <button
+            type="button"
+            className="flex-1 flex items-center justify-center gap-2 h-10 px-4 bg-primary text-primary-foreground text-body-sm uppercase tracking-caps hover:bg-primary/90 transition-colors"
+          >
+            <CirclePlus className="w-4 h-4" />
+            New Scan
+          </button>
+        </NewScanModal>
+        <BulkScanModal>
+          <button
+            type="button"
+            title="Bulk Scan"
+            className="h-10 w-10 flex items-center justify-center border border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+          >
+            <Layers className="w-4 h-4" />
+          </button>
+        </BulkScanModal>
+      </div>
+
+      {/* Nav items */}
+      <div className="space-y-0">
+        {items.map((item) => {
+          const isActive =
+            pathname === item.url ||
+            (item.url !== "/" && pathname.startsWith(item.url));
+          const Icon = item.icon;
+          return (
+            <Link key={item.title} href={item.url}>
+              <span
+                className={cn(
+                  "flex items-center gap-4 px-8 py-3.5 text-body-sm tracking-caps uppercase transition-all relative group cursor-pointer",
+                  isActive
+                    ? "text-foreground bg-white/5 border-r-2 border-white"
+                    : "text-muted-foreground hover:text-foreground hover:bg-surface-2"
+                )}
               >
-                <IconCirclePlusFilled />
-                <span>New Scan</span>
-              </SidebarMenuButton>
-            </NewScanModal>
-            <BulkScanModal>
-              <SidebarMenuButton
-                tooltip="Bulk Scan"
-                className="bg-blue-500 text-primary-foreground hover:bg-blue-500/70 hover:text-primary-foreground active:bg-blue-600/90 active:text-primary-foreground min-w-8 w-8 h-8 duration-200 ease-linear cursor-pointer p-0 flex items-center justify-center"
-              >
-                <Layers2Icon />
-              </SidebarMenuButton>
-            </BulkScanModal>
-          </SidebarMenuItem>
-        </SidebarMenu>
-        <Separator className="mt-2" />
-        <SidebarMenu>
-          {items.map((item) => {
-            const isActive = pathname === item.url
-            return (
-              <Link href={item.url} key={item.title} className="!cursor-pointer">
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    tooltip={item.title}
-                    className={`hover:bg-blue-300 cursor-pointer ${isActive ? "bg-blue-100" : ""}`}
-                  >
-                    {item.icon && <item.icon />}
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </Link>
-            )
-          })}
-        </SidebarMenu>
-      </SidebarGroupContent>
-    </SidebarGroup>
-  )
+                {Icon && (
+                  <Icon
+                    className={cn(
+                      "w-4 h-4 transition-colors",
+                      isActive
+                        ? "text-foreground"
+                        : "text-muted-foreground/40 group-hover:text-foreground/60"
+                    )}
+                  />
+                )}
+                {item.title}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
 }

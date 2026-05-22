@@ -42,18 +42,19 @@ export function RegistryConfigForm({
   return (
     <div className="space-y-4 py-4">
       <div className="space-y-2">
-        <Label htmlFor="name">Repository Name</Label>
+        <Label htmlFor="name" className="text-caption uppercase tracking-widest text-muted-foreground/60">Repository Name</Label>
         <Input
           id="name"
           value={config.name}
           onChange={(e) => onConfigChange(prev => ({ ...prev, name: e.target.value }))}
           placeholder="Enter a name for this repository"
+          className="rounded-none border-white/10 bg-transparent text-body-sm"
         />
       </div>
 
       {config.type === 'acr' && (
         <div className="space-y-2">
-          <Label htmlFor="registryUrl">Registry Name</Label>
+          <Label htmlFor="registryUrl" className="text-caption uppercase tracking-widest text-muted-foreground/60">Registry Name</Label>
           <div className="flex items-center gap-2">
             <Input
               id="registryUrl"
@@ -63,11 +64,11 @@ export function RegistryConfigForm({
                 onConfigChange(prev => ({ ...prev, registryUrl: name ? `${name}.azurecr.io` : '' }))
               }}
               placeholder="myregistry"
-              className="flex-1"
+              className="flex-1 rounded-none border-white/10 bg-transparent text-body-sm"
             />
-            <span className="text-sm text-muted-foreground whitespace-nowrap">.azurecr.io</span>
+            <span className="text-caption uppercase tracking-widest text-muted-foreground/50 whitespace-nowrap">.azurecr.io</span>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-caption uppercase tracking-widest text-muted-foreground/40">
             Enter just the registry name. The full URL will be {config.registryUrl || '{name}.azurecr.io'}.
           </p>
         </div>
@@ -76,13 +77,13 @@ export function RegistryConfigForm({
       {(config.type === 'generic' || config.type === 'gitlab' || config.type === 'nexus' || config.type === 'gitea') && (
         <>
           <div className="space-y-2">
-            <Label htmlFor="registryUrl">Registry URL</Label>
+            <Label htmlFor="registryUrl" className="text-caption uppercase tracking-widest text-muted-foreground/60">Registry URL</Label>
             <div className="flex gap-2">
               <Select value={protocol} onValueChange={(value: 'https' | 'http') => onProtocolChange(value)}>
-                <SelectTrigger className="w-[100px]">
+                <SelectTrigger className="w-[100px] rounded-none border-white/10 text-caption uppercase tracking-widest">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-overlay border-white/10 rounded-none">
                   <SelectItem value="https">HTTPS</SelectItem>
                   <SelectItem value="http">HTTP</SelectItem>
                 </SelectContent>
@@ -103,10 +104,10 @@ export function RegistryConfigForm({
                   onConfigChange(prev => ({ ...prev, registryUrl: value }))
                 }}
                 placeholder="registry.company.com:5050"
-                className="flex-1"
+                className="flex-1 rounded-none border-white/10 bg-transparent text-body-sm"
               />
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption uppercase tracking-widest text-muted-foreground/40">
               Include port if non-standard (e.g., :5050, :5000). Use HTTP for insecure registries.
             </p>
           </div>
@@ -123,13 +124,13 @@ export function RegistryConfigForm({
               <div className="space-y-1">
                 <Label
                   htmlFor="skipTlsVerify"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  className="text-body-sm uppercase tracking-caps peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
                   Skip TLS Verification
                 </Label>
-                <p className="text-xs text-muted-foreground">
-                  Enable this for registries with self-signed SSL certificates.
-                  <span className="text-orange-600">⚠️ Warning: This reduces security.</span>
+                <p className="text-caption uppercase tracking-widest text-muted-foreground/40">
+                  Enable this for registries with self-signed SSL certificates.{" "}
+                  <span className="text-amber-400">Warning: This reduces security.</span>
                 </p>
               </div>
             </div>
@@ -140,28 +141,29 @@ export function RegistryConfigForm({
       {config.type === 'gcr' && (
         <>
           <div className="space-y-2">
-            <Label htmlFor="garProjectId">Project ID <span className="text-red-500">*</span></Label>
+            <Label htmlFor="garProjectId" className="text-caption uppercase tracking-widest text-muted-foreground/60">Project ID <span className="text-red-400">*</span></Label>
             <Input
               id="garProjectId"
               value={config.garProjectId || ''}
               onChange={(e) => onConfigChange(prev => ({ ...prev, garProjectId: e.target.value, username: e.target.value }))}
               placeholder="my-gcp-project"
+              className="rounded-none border-white/10 bg-transparent text-body-sm"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption uppercase tracking-widest text-muted-foreground/40">
               Your Google Cloud project ID.
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="garLocation">Location <span className="text-red-500">*</span></Label>
+            <Label htmlFor="garLocation" className="text-caption uppercase tracking-widest text-muted-foreground/60">Location <span className="text-red-400">*</span></Label>
             <Select
               value={config.garLocation || 'us'}
               onValueChange={(value) => onConfigChange(prev => ({ ...prev, garLocation: value }))}
             >
-              <SelectTrigger id="garLocation">
+              <SelectTrigger id="garLocation" className="rounded-none border-white/10 text-caption uppercase tracking-widest">
                 <SelectValue placeholder="Select a location" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-overlay border-white/10 rounded-none">
                 <SelectItem value="us">us (United States multi-region)</SelectItem>
                 <SelectItem value="us-central1">us-central1 (Iowa)</SelectItem>
                 <SelectItem value="us-east1">us-east1 (South Carolina)</SelectItem>
@@ -179,13 +181,13 @@ export function RegistryConfigForm({
                 <SelectItem value="australia-southeast1">australia-southeast1 (Sydney)</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption uppercase tracking-widest text-muted-foreground/40">
               The Artifact Registry region where your repository is hosted.
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="garRepositoryName">Repository Name <span className="text-red-500">*</span></Label>
+            <Label htmlFor="garRepositoryName" className="text-caption uppercase tracking-widest text-muted-foreground/60">Repository Name <span className="text-red-400">*</span></Label>
             <Input
               id="garRepositoryName"
               value={config.garRepositoryName || ''}
@@ -195,23 +197,24 @@ export function RegistryConfigForm({
                 organization: `${prev.garLocation || 'us'}/${e.target.value}`
               }))}
               placeholder="my-docker-repo"
+              className="rounded-none border-white/10 bg-transparent text-body-sm"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption uppercase tracking-widest text-muted-foreground/40">
               The name of your Docker repository in Artifact Registry.
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="garServiceAccountKey">Service Account Key (JSON) <span className="text-red-500">*</span></Label>
+            <Label htmlFor="garServiceAccountKey" className="text-caption uppercase tracking-widest text-muted-foreground/60">Service Account Key (JSON) <span className="text-red-400">*</span></Label>
             <Textarea
               id="garServiceAccountKey"
               value={config.password}
               onChange={(e) => onConfigChange(prev => ({ ...prev, password: e.target.value }))}
               placeholder='Paste your service account JSON key here...'
               rows={6}
-              className="font-mono text-xs"
+              className="font-mono text-caption rounded-none border-white/10 bg-transparent"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption uppercase tracking-widest text-muted-foreground/40">
               Paste the full JSON key file for a service account with Artifact Registry Reader (or broader) permissions.
             </p>
           </div>
@@ -221,7 +224,7 @@ export function RegistryConfigForm({
       {config.type !== 'gcr' && (
         <>
           <div className="space-y-2">
-            <Label htmlFor="username">
+            <Label htmlFor="username" className="text-caption uppercase tracking-widest text-muted-foreground/60">
               {config.type === 'dockerhub' ? 'Docker Hub Username' :
                config.type === 'ghcr' ? 'GitHub Username' :
                config.type === 'gitlab' ? 'GitLab Username' :
@@ -237,11 +240,12 @@ export function RegistryConfigForm({
                 config.type === 'acr' ? 'Admin username or service principal client ID' :
                 'Enter username'
               }
+              className="rounded-none border-white/10 bg-transparent text-body-sm"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">
+            <Label htmlFor="password" className="text-caption uppercase tracking-widest text-muted-foreground/60">
               {config.type === 'dockerhub' ? 'Personal Access Token' :
                config.type === 'ghcr' ? 'GitHub Personal Access Token' :
                config.type === 'gitlab' ? 'GitLab Password' :
@@ -263,6 +267,7 @@ export function RegistryConfigForm({
                 config.type === 'acr' ? 'Admin password or service principal client secret' :
                 'Enter password or token'
               }
+              className="rounded-none border-white/10 bg-transparent text-body-sm"
             />
           </div>
         </>
@@ -270,26 +275,28 @@ export function RegistryConfigForm({
 
       {config.type === 'ghcr' && (
         <div className="space-y-2">
-          <Label htmlFor="organization">Organization (optional)</Label>
+          <Label htmlFor="organization" className="text-caption uppercase tracking-widest text-muted-foreground/60">Organization (optional)</Label>
           <Input
             id="organization"
             value={config.organization}
             onChange={(e) => onConfigChange(prev => ({ ...prev, organization: e.target.value }))}
             placeholder="Enter organization name for org packages"
+            className="rounded-none border-white/10 bg-transparent text-body-sm"
           />
         </div>
       )}
 
       {config.type === 'gitea' && (
         <div className="space-y-2">
-          <Label htmlFor="organization">Package Owner <span className="text-red-500">*</span></Label>
+          <Label htmlFor="organization" className="text-caption uppercase tracking-widest text-muted-foreground/60">Package Owner <span className="text-red-400">*</span></Label>
           <Input
             id="organization"
             value={config.organization}
             onChange={(e) => onConfigChange(prev => ({ ...prev, organization: e.target.value }))}
             placeholder="Enter Gitea user or organization name"
+            className="rounded-none border-white/10 bg-transparent text-body-sm"
           />
-          <p className="text-xs text-muted-foreground">
+          <p className="text-caption uppercase tracking-widest text-muted-foreground/40">
             The Gitea/Forgejo user or organization that owns the container packages.
           </p>
         </div>
@@ -298,27 +305,29 @@ export function RegistryConfigForm({
       {config.type === 'nexus' && (
         <>
           <div className="space-y-2">
-            <Label htmlFor="organization">Repository Name (optional)</Label>
+            <Label htmlFor="organization" className="text-caption uppercase tracking-widest text-muted-foreground/60">Repository Name (optional)</Label>
             <Input
               id="organization"
               value={config.organization}
               onChange={(e) => onConfigChange(prev => ({ ...prev, organization: e.target.value }))}
               placeholder="docker-hosted"
+              className="rounded-none border-white/10 bg-transparent text-body-sm"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption uppercase tracking-widest text-muted-foreground/40">
               Nexus repository name (default: docker-hosted)
             </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="registryPort">Docker Registry Port (optional)</Label>
+            <Label htmlFor="registryPort" className="text-caption uppercase tracking-widest text-muted-foreground/60">Docker Registry Port (optional)</Label>
             <Input
               id="registryPort"
               type="number"
               value={config.registryPort || ''}
               onChange={(e) => onConfigChange(prev => ({ ...prev, registryPort: e.target.value ? parseInt(e.target.value) : undefined }))}
               placeholder="5000"
+              className="rounded-none border-white/10 bg-transparent text-body-sm"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption uppercase tracking-widest text-muted-foreground/40">
               Port for Docker push/pull operations (default: 5000)
             </p>
           </div>
@@ -328,50 +337,53 @@ export function RegistryConfigForm({
       {config.type === 'gitlab' && (
         <>
           <div className="space-y-2">
-            <Label htmlFor="registryPort">Registry Port</Label>
+            <Label htmlFor="registryPort" className="text-caption uppercase tracking-widest text-muted-foreground/60">Registry Port</Label>
             <Input
               id="registryPort"
               type="number"
               value={config.registryPort || ''}
               onChange={(e) => onConfigChange(prev => ({ ...prev, registryPort: e.target.value ? parseInt(e.target.value) : undefined }))}
               placeholder="5050"
+              className="rounded-none border-white/10 bg-transparent text-body-sm"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption uppercase tracking-widest text-muted-foreground/40">
               GitLab registry port (default: 5050). Uses HTTP protocol on this port.
             </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="authUrl">JWT Auth URL (optional)</Label>
+            <Label htmlFor="authUrl" className="text-caption uppercase tracking-widest text-muted-foreground/60">JWT Auth URL (optional)</Label>
             <Input
               id="authUrl"
               value={config.authUrl}
               onChange={(e) => onConfigChange(prev => ({ ...prev, authUrl: e.target.value }))}
               placeholder="https://gitlab.example.com/jwt/auth"
+              className="rounded-none border-white/10 bg-transparent text-body-sm"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption uppercase tracking-widest text-muted-foreground/40">
               Leave blank to auto-detect from registry URL
             </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="groupId">Group/Project ID (optional)</Label>
+            <Label htmlFor="groupId" className="text-caption uppercase tracking-widest text-muted-foreground/60">Group/Project ID (optional)</Label>
             <Input
               id="groupId"
               value={config.groupId}
               onChange={(e) => onConfigChange(prev => ({ ...prev, groupId: e.target.value }))}
               placeholder="e.g., mygroup/myproject"
+              className="rounded-none border-white/10 bg-transparent text-body-sm"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption uppercase tracking-widest text-muted-foreground/40">
               Limit access to specific GitLab group or project
             </p>
           </div>
         </>
       )}
 
-      <div className="bg-blue-50 p-4 rounded-lg">
-        <div className="text-sm text-blue-800">
-          <strong>Important:</strong> You must test the connection before adding the repository.
+      <div className="border border-amber-500/20 bg-amber-500/5 p-4">
+        <p className="text-caption uppercase tracking-widest text-amber-400/80">
+          Important: you must test the connection before adding the repository.
           This ensures your credentials are valid and we can access your repositories.
-        </div>
+        </p>
       </div>
     </div>
   )

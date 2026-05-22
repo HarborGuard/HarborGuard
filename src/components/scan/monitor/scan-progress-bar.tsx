@@ -3,7 +3,7 @@
 import { useScanning } from '@/contexts/ScanningContext';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import { IconLoader2, IconCheck, IconX, IconWifi } from '@tabler/icons-react';
+import { Loader2, Check, X, Wifi } from 'lucide-react';
 
 interface ScanProgressBarProps {
   requestId?: string;
@@ -36,30 +36,30 @@ export function ScanProgressBar({
   const getStatusIcon = (status?: string) => {
     switch (status) {
       case 'RUNNING':
-        return <IconLoader2 className="h-4 w-4 animate-spin text-blue-500" />;
+        return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
       case 'SUCCESS':
-        return <IconCheck className="h-4 w-4 text-green-500" />;
+        return <Check className="h-4 w-4 text-green-500" />;
       case 'FAILED':
-        return <IconX className="h-4 w-4 text-red-500" />;
+        return <X className="h-4 w-4 text-red-500" />;
       case 'CANCELLED':
-        return <IconX className="h-4 w-4 text-gray-500" />;
+        return <X className="h-4 w-4 text-gray-500" />;
       default:
-        return <IconLoader2 className="h-4 w-4 animate-spin text-gray-400" />;
+        return <Loader2 className="h-4 w-4 animate-spin text-gray-400" />;
     }
   };
 
   const getStatusColor = (status?: string) => {
     switch (status) {
       case 'RUNNING':
-        return 'text-blue-600';
+        return 'text-blue-400';
       case 'SUCCESS':
-        return 'text-green-600';
+        return 'text-green-400';
       case 'FAILED':
-        return 'text-red-600';
+        return 'text-red-400';
       case 'CANCELLED':
-        return 'text-gray-600';
+        return 'text-muted-foreground/60';
       default:
-        return 'text-gray-500';
+        return 'text-muted-foreground/40';
     }
   };
 
@@ -84,8 +84,8 @@ export function ScanProgressBar({
     <div className={cn("space-y-2", className)}>
       {/* Connection status (optional) */}
       {showConnection && (
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <IconWifi className="h-3 w-3 text-green-500" />
+        <div className="flex items-center gap-2 text-caption uppercase tracking-widest text-muted-foreground/50">
+          <Wifi className="h-3 w-3 text-green-500" />
           <span>Connected</span>
         </div>
       )}
@@ -98,14 +98,14 @@ export function ScanProgressBar({
           indicatorClassName={getProgressColor(status)}
         />
         
-        <div className="flex justify-between items-center text-xs">
-          <span className="text-gray-600">
+        <div className="flex justify-between items-center text-caption uppercase tracking-widest">
+          <span className="text-muted-foreground/60">
             {progress.toFixed(0)}%
           </span>
           {showStatus && (
             <div className="flex items-center gap-1">
               {getStatusIcon(status)}
-              <span className={cn("font-medium", getStatusColor(status))}>
+              <span className={cn(getStatusColor(status))}>
                 {status || 'Waiting...'}
               </span>
             </div>
@@ -115,15 +115,15 @@ export function ScanProgressBar({
 
       {/* Current step (optional) */}
       {showStep && step && (
-        <div className="text-xs text-gray-600 truncate">
+        <div className="text-caption uppercase tracking-widest text-muted-foreground/50 truncate">
           {step}
         </div>
       )}
 
       {/* Error message */}
       {progressData.error && (
-        <div className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">
-          <strong>Error:</strong> {progressData.error}
+        <div className="text-caption uppercase tracking-widest text-red-400 bg-red-950/20 p-2 border border-red-500/20">
+          Error: {progressData.error}
         </div>
       )}
     </div>

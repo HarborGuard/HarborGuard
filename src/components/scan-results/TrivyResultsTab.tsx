@@ -2,13 +2,13 @@
 
 import * as React from "react";
 import {
-  IconBug,
-  IconSearch,
-  IconSortAscending,
-  IconSortDescending,
-  IconMessage,
-  IconX,
-} from "@tabler/icons-react";
+  Bug,
+  Search,
+  ArrowUpAZ,
+  ArrowDownAZ,
+  MessageSquare,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { VulnerabilityUrlMenu } from "@/components/shared/vulnerability-url-menu";
@@ -139,13 +139,13 @@ export function TrivyResultsTab({
   };
 
   return (
-    <Card>
+    <Card className="bg-surface-1 border-white/10 rounded-none">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <IconBug className="h-5 w-5" />
+        <CardTitle className="flex items-center gap-2 text-body-sm uppercase tracking-caps text-foreground">
+          <Bug className="h-4 w-4 text-accent" />
           Trivy Vulnerability Scan
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-caption uppercase tracking-widest text-muted-foreground/50">
           Comprehensive vulnerability scanner for containers
         </CardDescription>
       </CardHeader>
@@ -154,19 +154,19 @@ export function TrivyResultsTab({
           {/* Search and Filter Bar */}
           <div className="flex items-center gap-4">
             <div className="relative flex-1">
-              <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground/40 h-4 w-4" />
               <Input
                 placeholder="Search vulnerabilities, packages, or CVE IDs..."
                 value={trivySearch}
                 onChange={(e) => setTrivySearch(e.target.value)}
-                className="pl-10"
+                className="pl-10 rounded-none border-white/10 bg-transparent text-body-sm placeholder:text-muted-foreground/30 placeholder:uppercase placeholder:tracking-caps"
               />
             </div>
             <Button
               variant={showFalsePositives ? "outline" : "secondary"}
               size="sm"
               onClick={() => setShowFalsePositives(!showFalsePositives)}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 rounded-none border-white/10 hover:bg-white/5 uppercase tracking-widest text-caption"
               disabled={classificationsLoading}
             >
               {classificationsLoading && (
@@ -174,7 +174,7 @@ export function TrivyResultsTab({
               )}
               {showFalsePositives ? "Hide" : "Show"} False Positives
             </Button>
-            <div className="text-sm text-muted-foreground">
+            <div className="text-caption uppercase tracking-widest text-muted-foreground/50">
               {filteredTrivyVulns.length} of{" "}
               {trivyResults?.Results?.reduce(
                 (count, result) =>
@@ -186,73 +186,73 @@ export function TrivyResultsTab({
           </div>
 
           {/* Vulnerabilities Table */}
-          <div className="border rounded-lg">
+          <div className="border border-white/10 overflow-hidden rounded-none">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Actions</TableHead>
-                  <TableHead>
+                <TableRow className="border-white/10 hover:bg-transparent">
+                  <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">Actions</TableHead>
+                  <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">
                     <Button
                       variant="ghost"
-                      className="h-auto p-0 font-medium"
+                      className="h-auto p-0 text-caption uppercase tracking-widest hover:bg-transparent hover:text-foreground"
                       onClick={() => handleTrivySort("severity")}
                     >
                       Severity
                       {trivySortField === "severity" &&
                         (trivySortOrder === "asc" ? (
-                          <IconSortAscending className="ml-1 h-4 w-4" />
+                          <ArrowUpAZ className="ml-1 h-4 w-4" />
                         ) : (
-                          <IconSortDescending className="ml-1 h-4 w-4" />
+                          <ArrowDownAZ className="ml-1 h-4 w-4" />
                         ))}
                     </Button>
                   </TableHead>
-                  <TableHead>
+                  <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">
                     <Button
                       variant="ghost"
-                      className="h-auto p-0 font-medium"
+                      className="h-auto p-0 text-caption uppercase tracking-widest hover:bg-transparent hover:text-foreground"
                       onClick={() => handleTrivySort("vulnerability")}
                     >
                       Vulnerability
                       {trivySortField === "vulnerability" &&
                         (trivySortOrder === "asc" ? (
-                          <IconSortAscending className="ml-1 h-4 w-4" />
+                          <ArrowUpAZ className="ml-1 h-4 w-4" />
                         ) : (
-                          <IconSortDescending className="ml-1 h-4 w-4" />
+                          <ArrowDownAZ className="ml-1 h-4 w-4" />
                         ))}
                     </Button>
                   </TableHead>
-                  <TableHead>
+                  <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">
                     <Button
                       variant="ghost"
-                      className="h-auto p-0 font-medium"
+                      className="h-auto p-0 text-caption uppercase tracking-widest hover:bg-transparent hover:text-foreground"
                       onClick={() => handleTrivySort("package")}
                     >
                       Package
                       {trivySortField === "package" &&
                         (trivySortOrder === "asc" ? (
-                          <IconSortAscending className="ml-1 h-4 w-4" />
+                          <ArrowUpAZ className="ml-1 h-4 w-4" />
                         ) : (
-                          <IconSortDescending className="ml-1 h-4 w-4" />
+                          <ArrowDownAZ className="ml-1 h-4 w-4" />
                         ))}
                     </Button>
                   </TableHead>
-                  <TableHead>
+                  <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">
                     <Button
                       variant="ghost"
-                      className="h-auto p-0 font-medium"
+                      className="h-auto p-0 text-caption uppercase tracking-widest hover:bg-transparent hover:text-foreground"
                       onClick={() => handleTrivySort("cvss")}
                     >
                       CVSS Score
                       {trivySortField === "cvss" &&
                         (trivySortOrder === "asc" ? (
-                          <IconSortAscending className="ml-1 h-4 w-4" />
+                          <ArrowUpAZ className="ml-1 h-4 w-4" />
                         ) : (
-                          <IconSortDescending className="ml-1 h-4 w-4" />
+                          <ArrowDownAZ className="ml-1 h-4 w-4" />
                         ))}
                     </Button>
                   </TableHead>
-                  <TableHead>Fixed Version</TableHead>
-                  <TableHead>Published</TableHead>
+                  <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">Fixed Version</TableHead>
+                  <TableHead className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">Published</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -268,9 +268,9 @@ export function TrivyResultsTab({
                   return (
                     <TableRow
                       key={index}
-                      className={`${
-                        isMarkedFalsePositive ? "opacity-50" : ""
-                      } hover:bg-muted/50 cursor-pointer`}
+                      className={`border-white/10 hover:bg-white/5 cursor-pointer${
+                        isMarkedFalsePositive ? " opacity-50" : ""
+                      }`}
                       onClick={() => onVulnerabilityClick(vuln, "trivy")}
                     >
                       <TableCell onClick={(e) => e.stopPropagation()}>
@@ -283,9 +283,9 @@ export function TrivyResultsTab({
                                 vuln.VulnerabilityID
                               )
                             }
-                            className="flex items-center gap-1"
+                            className="flex items-center gap-1 rounded-none border-white/10 hover:bg-white/5 uppercase tracking-widest text-caption"
                           >
-                            <IconMessage className="h-4 w-4" />
+                            <MessageSquare className="h-4 w-4" />
                             {classification ? "Edit" : "Classify"}
                           </Button>
                           {classification && (
@@ -297,9 +297,9 @@ export function TrivyResultsTab({
                                   vuln.VulnerabilityID
                                 )
                               }
-                              className="text-red-500 hover:text-red-700"
+                              className="text-red-400 hover:text-red-300 hover:bg-red-950/20"
                             >
-                              <IconX className="h-4 w-4" />
+                              <X className="h-4 w-4" />
                             </Button>
                           )}
                           <VulnerabilityUrlMenu
@@ -318,13 +318,14 @@ export function TrivyResultsTab({
                                 vuln.Severity || ""
                               ) as any
                             }
+                            className="rounded-none uppercase tracking-widest text-caption"
                           >
                             {vuln.Severity}
                           </Badge>
                           {isMarkedFalsePositive && (
                             <Badge
                               variant="outline"
-                              className="text-xs"
+                              className="rounded-none uppercase tracking-widest text-caption border-white/10"
                             >
                               False Positive
                             </Badge>
@@ -334,22 +335,22 @@ export function TrivyResultsTab({
                       <TableCell>
                         <div>
                           <div className="flex items-center gap-2">
-                            <p className="font-medium">
+                            <p className="text-body-sm text-foreground">
                               {vuln.VulnerabilityID}
                             </p>
                             {comment && (
-                              <IconMessage
-                                className="h-4 w-4 text-muted-foreground"
+                              <MessageSquare
+                                className="h-4 w-4 text-muted-foreground/40"
                                 title={comment}
                               />
                             )}
                           </div>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-caption text-muted-foreground/60 mt-0.5">
                             {vuln.Title || vuln.Description}
                           </p>
                           {comment && (
-                            <p className="text-xs text-blue-600 mt-1">
-                              {"\uD83D\uDCAC"} {comment.slice(0, 50)}
+                            <p className="text-caption text-accent mt-1">
+                              {comment.slice(0, 50)}
                               {comment.length > 50 ? "..." : ""}
                             </p>
                           )}
@@ -357,14 +358,14 @@ export function TrivyResultsTab({
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{vuln.PkgName}</p>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-body-sm text-foreground">{vuln.PkgName}</p>
+                          <p className="text-caption text-muted-foreground/60">
                             {vuln.InstalledVersion}
                           </p>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">
+                        <Badge variant="outline" className="rounded-none uppercase tracking-widest text-caption border-white/10">
                           {vuln.CVSS?.nvd?.V3Score ||
                             vuln.CVSS?.redhat?.V3Score ||
                             "N/A"}
@@ -372,14 +373,14 @@ export function TrivyResultsTab({
                       </TableCell>
                       <TableCell>
                         {vuln.FixedVersion ? (
-                          <Badge variant="default">
+                          <Badge className="rounded-none uppercase tracking-widest text-caption bg-green-900/30 text-green-400 border-green-500/30">
                             {vuln.FixedVersion}
                           </Badge>
                         ) : (
-                          <Badge variant="secondary">No fix</Badge>
+                          <Badge variant="secondary" className="rounded-none uppercase tracking-widest text-caption">No fix</Badge>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-caption uppercase tracking-widest text-muted-foreground/60">
                         {vuln.publishedDate
                           ? new Date(
                               vuln.publishedDate

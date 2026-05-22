@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useScanning } from "@/contexts/ScanningContext";
 import { DeleteImageDialog } from "@/components/dialogs/delete-image-dialog";
-import { IconRefresh, IconTrash } from "@tabler/icons-react";
+import { RefreshCw, Trash2, Database } from "lucide-react";
 import * as React from "react";
 import { useScans } from "@/hooks/useScans";
 import { useApp } from "@/contexts/AppContext";
@@ -38,19 +38,33 @@ export default function ImageRepositoryPage() {
 
   return (
     <div className="flex flex-1 flex-col">
+      {/* Page header: eyebrow + h1 + description */}
+      <div className="px-6 pt-8 pb-6 space-y-2">
+        <p className="text-caption uppercase tracking-caps text-muted-foreground/50 flex items-center gap-1.5">
+          <Database className="h-3 w-3" />
+          Container Registry
+        </p>
+        <h1 className="text-2xl tracking-tight text-foreground">Image Repository</h1>
+        <p className="text-muted-foreground text-body-sm uppercase tracking-wide-caps leading-relaxed max-w-xl">
+          Centralized management of container images. Monitor risk scores,
+          multi-tool findings, and compliance status.
+        </p>
+      </div>
+
       <div className="@container/main flex flex-1 flex-col gap-2 overflow-auto">
         <div className="flex flex-col gap-4 p-4 lg:p-6 md:gap-6">
           {selectedImages.length > 0 && (
-            <div className="flex items-center justify-between bg-muted/50 rounded-lg p-4">
-              <span className="text-sm font-medium">
+            <div className="flex items-center justify-between bg-surface-1 border border-white/10 p-4">
+              <span className="text-body-sm uppercase tracking-caps text-foreground">
                 {selectedImages.length} {selectedImages.length === 1 ? 'image' : 'images'} selected
               </span>
               <Button
                 variant="destructive"
                 size="sm"
                 onClick={() => setBulkDeleteDialogOpen(true)}
+                className="rounded-none uppercase tracking-widest text-caption"
               >
-                <IconTrash className="mr-2 h-4 w-4" />
+                <Trash2 className="mr-2 h-4 w-4" />
                 Delete Selected
               </Button>
             </div>
@@ -77,7 +91,7 @@ export default function ImageRepositoryPage() {
             onRowClick={handleRowClick}
             onSelectionChange={setSelectedImages}
             contextMenuItems={getContextMenuItems}
-            className="bg-card rounded-lg border shadow-xs p-6"
+            className="bg-surface-1 border border-white/10 p-6"
           />
 
           {/* Dialogs */}
@@ -168,25 +182,25 @@ export default function ImageRepositoryPage() {
     if (tagCount > 1) {
       items.push({
         label: 'Rescan Image',
-        icon: <IconRefresh className="mr-2 h-4 w-4" />,
+        icon: <RefreshCw className="mr-2 h-4 w-4" />,
         action: () => {}, // No-op for parent with subItems
         subItems: tags.map((tag: string) => ({
           label: `Scan :${tag}`,
-          icon: <IconRefresh className="mr-2 h-4 w-4" />,
+          icon: <RefreshCw className="mr-2 h-4 w-4" />,
           action: () => handleRescan(row.imageName, row.imageId, tag),
         })),
       })
     } else {
       items.push({
         label: 'Rescan Image',
-        icon: <IconRefresh className="mr-2 h-4 w-4" />,
+        icon: <RefreshCw className="mr-2 h-4 w-4" />,
         action: () => handleRescan(row.imageName, row.imageId),
       })
     }
 
     items.push({
       label: 'Delete Image',
-      icon: <IconTrash className="mr-2 h-4 w-4" />,
+      icon: <Trash2 className="mr-2 h-4 w-4" />,
       action: () => handleDelete(row.imageName),
       variant: 'destructive',
       separator: true,

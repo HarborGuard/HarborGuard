@@ -265,25 +265,30 @@ export function ExportImageDialogEnhanced({
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>Export Image to Registry</DialogTitle>
-          <DialogDescription>
-            Push {imageName}:{imageTag} to a container registry
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="space-y-4 py-4">
+      <DialogContent className="sm:max-w-[600px] border-white/10 rounded-none shadow-2xl p-0 overflow-hidden">
+        <div className="p-8 border-b border-white/10 bg-surface-1">
+          <DialogHeader className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Upload className="h-4 w-4 text-accent" />
+              <DialogTitle className="text-sm uppercase tracking-wide-caps text-foreground">Export Image to Registry</DialogTitle>
+            </div>
+            <DialogDescription className="text-body-sm text-muted-foreground uppercase tracking-widest">
+              Push {imageName}:{imageTag} to a container registry
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+
+        <div className="p-8 space-y-4">
           <div className="space-y-2">
-            <Label>Target Registry</Label>
-            <Select 
-              value={selectedRepository} 
+            <Label className="text-caption uppercase tracking-widest text-muted-foreground/60">Target Registry</Label>
+            <Select
+              value={selectedRepository}
               onValueChange={(value) => {
                 setSelectedRepository(value);
                 setUseCustomRegistry(value === 'custom');
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className="rounded-none border-white/10 bg-transparent">
                 <SelectValue placeholder="Select a registry" />
               </SelectTrigger>
               <SelectContent>
@@ -311,13 +316,14 @@ export function ExportImageDialogEnhanced({
           
           {(useCustomRegistry || selectedRepository === 'custom') && (
             <div className="space-y-2">
-              <Label>Custom Registry URL</Label>
+              <Label className="text-caption uppercase tracking-widest text-muted-foreground/60">Custom Registry URL</Label>
               <Input
                 placeholder="e.g., 172.17.0.3:5000 or localhost:5000"
                 value={customRegistry}
                 onChange={(e) => setCustomRegistry(e.target.value)}
+                className="rounded-none border-white/10 bg-transparent"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-caption uppercase tracking-widest text-muted-foreground/40">
                 Enter the registry URL without protocol (HTTP will be used for insecure registries)
               </p>
             </div>
@@ -327,21 +333,21 @@ export function ExportImageDialogEnhanced({
           {selectedRepository && repositories.find(r => r.id === selectedRepository)?.type === 'GITLAB' ? (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Target Image</Label>
+                <Label className="text-caption uppercase tracking-widest text-muted-foreground/60">Target Image</Label>
                 {loadingImages ? (
-                  <div className="flex items-center justify-center p-2 border rounded">
+                  <div className="flex items-center justify-center p-2 border border-white/10">
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Loading images...
+                    <span className="text-caption uppercase tracking-widest text-muted-foreground/60">Loading images...</span>
                   </div>
                 ) : repositoryImages.length > 0 ? (
-                  <Select 
+                  <Select
                     value={selectedTargetImage}
                     onValueChange={(value) => {
                       setSelectedTargetImage(value);
                       setTargetImageName(value);
                     }}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="rounded-none border-white/10 bg-transparent">
                       <SelectValue placeholder="Select target image" />
                     </SelectTrigger>
                     <SelectContent>
@@ -350,7 +356,7 @@ export function ExportImageDialogEnhanced({
                           <div className="flex flex-col">
                             <span>{image.fullName}</span>
                             {image.namespace && (
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-caption uppercase tracking-widest text-muted-foreground/60">
                                 Namespace: {image.namespace}
                               </span>
                             )}
@@ -360,41 +366,44 @@ export function ExportImageDialogEnhanced({
                     </SelectContent>
                   </Select>
                 ) : (
-                  <div className="p-2 border rounded text-muted-foreground text-sm">
+                  <div className="p-2 border border-white/10 text-caption uppercase tracking-widest text-muted-foreground/40">
                     No images found in this repository
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground">
+                <p className="text-caption uppercase tracking-widest text-muted-foreground/40">
                   Select an existing project image to overwrite it with the patched version
                 </p>
               </div>
-              
+
               <div className="space-y-2">
-                <Label>Target Image Tag</Label>
+                <Label className="text-caption uppercase tracking-widest text-muted-foreground/60">Target Image Tag</Label>
                 <Input
                   value={targetImageTag}
                   onChange={(e) => setTargetImageTag(e.target.value)}
                   placeholder="Tag"
+                  className="rounded-none border-white/10 bg-transparent"
                 />
               </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Target Image Name</Label>
+                <Label className="text-caption uppercase tracking-widest text-muted-foreground/60">Target Image Name</Label>
                 <Input
                   value={targetImageName}
                   onChange={(e) => setTargetImageName(e.target.value)}
                   placeholder="Image name"
+                  className="rounded-none border-white/10 bg-transparent"
                 />
               </div>
-              
+
               <div className="space-y-2">
-                <Label>Target Image Tag</Label>
+                <Label className="text-caption uppercase tracking-widest text-muted-foreground/60">Target Image Tag</Label>
                 <Input
                   value={targetImageTag}
                   onChange={(e) => setTargetImageTag(e.target.value)}
                   placeholder="Tag"
+                  className="rounded-none border-white/10 bg-transparent"
                 />
               </div>
             </div>
@@ -429,14 +438,15 @@ export function ExportImageDialogEnhanced({
             </Alert>
           )}
         </div>
-        
-        <DialogFooter>
-          <Button onClick={() => onOpenChange(false)} variant="ghost">
+
+        <div className="p-8 pt-0 flex justify-end gap-2">
+          <Button onClick={() => onOpenChange(false)} variant="ghost" className="rounded-none hover:bg-white/5 text-muted-foreground uppercase tracking-widest text-caption">
             Cancel
           </Button>
-          <Button 
-            onClick={handleExport} 
+          <Button
+            onClick={handleExport}
             disabled={loading || (!selectedRepository && !customRegistry)}
+            className="rounded-none uppercase tracking-widest text-caption"
           >
             {loading ? (
               <>
@@ -450,7 +460,7 @@ export function ExportImageDialogEnhanced({
               </>
             )}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

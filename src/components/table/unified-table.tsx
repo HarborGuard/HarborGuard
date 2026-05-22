@@ -16,14 +16,14 @@ import {
   useReactTable,
 } from "@tanstack/react-table"
 import {
-  IconChevronDown,
-  IconChevronLeft,
-  IconChevronRight,
-  IconChevronsLeft,
-  IconChevronsRight,
-  IconLayoutColumns,
-  IconSearch,
-} from "@tabler/icons-react"
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  LayoutList,
+  Search,
+} from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -302,12 +302,12 @@ export function UnifiedTable<T extends Record<string, any>>({
         {/* Search */}
         {features.search && (
           <div className="flex items-center space-x-2">
-            <IconSearch className="h-4 w-4 text-muted-foreground" />
+            <Search className="h-4 w-4 text-muted-foreground/40" />
             <Input
-              placeholder="Search..."
+              placeholder="SEARCH..."
               value={globalFilter}
               onChange={(e) => setGlobalFilter(e.target.value)}
-              className="w-64"
+              className="w-64 uppercase placeholder:text-muted-foreground/30 placeholder:tracking-caps bg-transparent border-white/10 rounded-none focus:border-white/20 text-body-sm tracking-caps"
             />
           </div>
         )}
@@ -316,20 +316,20 @@ export function UnifiedTable<T extends Record<string, any>>({
         {features.columnVisibility && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <IconLayoutColumns className="mr-2 h-4 w-4" />
+              <Button variant="outline" size="sm" className="border-white/10 rounded-none text-caption uppercase tracking-widest hover:bg-white/5">
+                <LayoutList className="mr-2 h-4 w-4" />
                 Columns
-                <IconChevronDown className="ml-2 h-4 w-4" />
+                <ChevronDown className="ml-2 h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="bg-overlay border-white/10 rounded-none">
               {table
                 .getAllColumns()
                 .filter(column => column.getCanHide())
                 .map(column => (
                   <DropdownMenuCheckboxItem
                     key={column.id}
-                    className="capitalize"
+                    className="capitalize text-body-sm uppercase tracking-widest"
                     checked={column.getIsVisible()}
                     onCheckedChange={(value) => column.toggleVisibility(!!value)}
                   >
@@ -342,14 +342,14 @@ export function UnifiedTable<T extends Record<string, any>>({
       </div>
 
       {/* Table */}
-      <div className="rounded-md border overflow-hidden">
+      <div className="border border-white/10 overflow-hidden rounded-none">
         <Table className={tableClassName}>
           {showHeader && (
-            <TableHeader className={stickyHeader ? "sticky top-0 z-10 bg-background" : ""}>
+            <TableHeader className={stickyHeader ? "sticky top-0 z-10 bg-overlay" : ""}>
               {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
+                <TableRow key={headerGroup.id} className="border-white/10 hover:bg-transparent">
                   {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} colSpan={header.colSpan}>
+                    <TableHead key={header.id} colSpan={header.colSpan} className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">
                       {header.isPlaceholder
                         ? null
                         : flexRender(header.column.columnDef.header, header.getContext())}
@@ -361,8 +361,8 @@ export function UnifiedTable<T extends Record<string, any>>({
           )}
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={tableColumns.length} className="h-24 text-center">
+              <TableRow className="border-white/10">
+                <TableCell colSpan={tableColumns.length} className="h-24 text-center text-caption uppercase tracking-widest text-muted-foreground/40">
                   Loading...
                 </TableCell>
               </TableRow>
@@ -373,7 +373,7 @@ export function UnifiedTable<T extends Record<string, any>>({
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
                     onClick={() => handleRowClick(row)}
-                    className={onRowClick ? "cursor-pointer hover:bg-muted/50" : ""}
+                    className={`border-white/10 ${onRowClick ? "cursor-pointer hover:bg-white/5" : "hover:bg-white/5"}`}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id}>
@@ -395,8 +395,8 @@ export function UnifiedTable<T extends Record<string, any>>({
                 return rowContent
               })
             ) : (
-              <TableRow>
-                <TableCell colSpan={tableColumns.length} className="h-24 text-center">
+              <TableRow className="border-white/10">
+                <TableCell colSpan={tableColumns.length} className="h-24 text-center text-caption uppercase tracking-widest text-muted-foreground/40">
                   {emptyMessage}
                 </TableCell>
               </TableRow>
@@ -408,7 +408,7 @@ export function UnifiedTable<T extends Record<string, any>>({
       {/* Pagination */}
       {features.pagination && (
         <div className="flex items-center justify-between px-2">
-          <div className="text-sm text-muted-foreground">
+          <div className="text-caption uppercase tracking-widest text-muted-foreground/40">
             {features.selection && (
               <>
                 {table.getFilteredSelectedRowModel().rows.length} of{" "}
@@ -419,17 +419,17 @@ export function UnifiedTable<T extends Record<string, any>>({
           <div className="flex items-center space-x-6">
             {!serverPagination && (
               <div className="flex items-center space-x-2">
-                <Label htmlFor="rows-per-page" className="text-sm">
+                <Label htmlFor="rows-per-page" className="text-caption uppercase tracking-widest text-muted-foreground/60">
                   Rows per page
                 </Label>
                 <Select
                   value={`${pagination.pageSize}`}
                   onValueChange={(value) => setPagination(prev => ({ ...prev, pageSize: Number(value) }))}
                 >
-                  <SelectTrigger className="w-20" id="rows-per-page">
+                  <SelectTrigger className="w-20 border-white/10 rounded-none text-caption" id="rows-per-page">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-overlay border-white/10 rounded-none">
                     {[10, 20, 30, 40, 50, 100].map((pageSize) => (
                       <SelectItem key={pageSize} value={`${pageSize}`}>
                         {pageSize}
@@ -440,7 +440,7 @@ export function UnifiedTable<T extends Record<string, any>>({
               </div>
             )}
             <div className="flex items-center space-x-2">
-              <div className="text-sm">
+              <div className="text-caption uppercase tracking-widest text-muted-foreground/60">
                 Page {serverPagination ? serverPagination.currentPage : (pagination.pageIndex + 1)} of{" "}
                 {serverPagination ? serverPagination.totalPages : table.getPageCount()}
               </div>
@@ -448,7 +448,7 @@ export function UnifiedTable<T extends Record<string, any>>({
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 border-white/10 rounded-none hover:bg-white/5"
                   onClick={() => {
                     if (serverPagination) {
                       serverPagination.onPageChange(1)
@@ -458,12 +458,12 @@ export function UnifiedTable<T extends Record<string, any>>({
                   }}
                   disabled={serverPagination ? serverPagination.currentPage === 1 : !table.getCanPreviousPage()}
                 >
-                  <IconChevronsLeft className="h-4 w-4" />
+                  <ChevronsLeft className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 border-white/10 rounded-none hover:bg-white/5"
                   onClick={() => {
                     if (serverPagination) {
                       serverPagination.onPageChange(serverPagination.currentPage - 1)
@@ -473,12 +473,12 @@ export function UnifiedTable<T extends Record<string, any>>({
                   }}
                   disabled={serverPagination ? serverPagination.currentPage === 1 : !table.getCanPreviousPage()}
                 >
-                  <IconChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 border-white/10 rounded-none hover:bg-white/5"
                   onClick={() => {
                     if (serverPagination) {
                       serverPagination.onPageChange(serverPagination.currentPage + 1)
@@ -488,12 +488,12 @@ export function UnifiedTable<T extends Record<string, any>>({
                   }}
                   disabled={serverPagination ? serverPagination.currentPage === serverPagination.totalPages : !table.getCanNextPage()}
                 >
-                  <IconChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 border-white/10 rounded-none hover:bg-white/5"
                   onClick={() => {
                     if (serverPagination) {
                       serverPagination.onPageChange(serverPagination.totalPages)
@@ -503,7 +503,7 @@ export function UnifiedTable<T extends Record<string, any>>({
                   }}
                   disabled={serverPagination ? serverPagination.currentPage === serverPagination.totalPages : !table.getCanNextPage()}
                 >
-                  <IconChevronsRight className="h-4 w-4" />
+                  <ChevronsRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>
