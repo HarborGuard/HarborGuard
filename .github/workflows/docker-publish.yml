@@ -103,7 +103,9 @@ jobs:
       DATABASE_URL: postgresql://harborguard:harborguard_dev@localhost:5432/harborguard
       HEALTH_CHECK_ENABLED: "true"
       ENABLED_SCANNERS: trivy,grype,syft,dockle,osv,dive
-      NODE_ENV: production
+      # NODE_ENV is set only on the "Start app" step — at job scope it
+      # makes `npm ci` skip devDependencies, breaking `next build`
+      # which needs @tailwindcss/postcss + typescript at compile time.
     steps:
       - uses: actions/checkout@v4
         with:
@@ -113,7 +115,11 @@ jobs:
           node-version: "20"
           cache: npm
       - name: Install dependencies
-        run: npm ci --ignore-scripts --legacy-peer-deps
+        # --include=dev is a belt-and-suspenders guard in case NODE_ENV
+        # is ever set back at the job level; --legacy-peer-deps dropped
+        # to match Dockerfile semantics now that the lockfile has been
+        # reconciled without it.
+        run: npm ci --ignore-scripts --include=dev
       - name: Generate Prisma client
         run: npx prisma generate
       - name: Apply database schema
@@ -125,6 +131,8 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
       - name: Start app
+        env:
+          NODE_ENV: production
         run: |
           (npx next start -p 3000 > /tmp/app.log 2>&1 &)
           echo "Started Next.js on :3000"
