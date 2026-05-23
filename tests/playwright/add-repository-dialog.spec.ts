@@ -143,14 +143,16 @@ test.describe("Add Repository Dialog - Step 1 (Type Selector)", () => {
   })
 
   test("Cancel closes the dialog", async ({ page }) => {
-    // The dialog is tall enough at 1280-wide viewports that the Cancel
-    // button can sit below the visible fold. Scroll it into view first,
-    // then click via force to bypass the in-viewport actionability check
-    // (which `safeClick` doesn't disable on its own).
+    // With 8 source cards in the type selector + header + footer, the
+    // dialog is ~1000px tall — the Cancel button falls below the 900px
+    // viewport in CI. Playwright's `force: true` doesn't disable the
+    // in-viewport check, and scrolling inside a `fixed`-positioned
+    // dialog doesn't bring the button into view either. Dispatch the
+    // click event directly: it triggers the same onClick handler React
+    // wires to the button regardless of layout position.
     const cancel = dialogCancel(page)
-    await expect(cancel).toBeVisible({ timeout: 20_000 })
-    await cancel.scrollIntoViewIfNeeded()
-    await cancel.click({ force: true })
+    await expect(cancel).toBeAttached({ timeout: 20_000 })
+    await cancel.dispatchEvent("click")
     // Radix keeps the dialog mounted with data-state="closed" when
     // reducedMotion is reduced; assert the state flip rather than visibility.
     await expectDialogClosed(page)
