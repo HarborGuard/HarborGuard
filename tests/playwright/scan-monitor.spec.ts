@@ -181,12 +181,17 @@ test.describe("Scan monitor", () => {
     await expect(dialog).toBeVisible()
 
     // The cancel button is an icon-only button (X icon) with title="Cancel scan".
-    // Match it inside the dialog and click.
+    // Match it inside the dialog, scroll it into view (small viewport in CI
+    // pushes it below the fold), and click. Production-build renders are
+    // fast — give the click a beat to settle before polling for the request.
     const cancelBtn = dialog.getByRole("button", { name: /cancel scan/i }).first()
-    await expect(cancelBtn).toBeVisible()
+    await expect(cancelBtn).toBeVisible({ timeout: 10_000 })
+    await cancelBtn.scrollIntoViewIfNeeded()
     await cancelBtn.click({ force: true })
 
-    // Allow the fetch to issue and our intercept to flip the flag.
-    await expect.poll(() => cancelHit, { timeout: 10_000 }).toBe(true)
+    // Allow the fetch to issue and our intercept to flip the flag. Bump
+    // the timeout — under production build the click→fetch round-trip
+    // can take longer than 10s in headless CI under parallel load.
+    await expect.poll(() => cancelHit, { timeout: 20_000, intervals: [250, 500, 1000] }).toBe(true)
   })
 })

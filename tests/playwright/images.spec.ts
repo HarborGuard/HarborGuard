@@ -263,10 +263,37 @@ test.describe("Images - row context menu", () => {
 
 test.describe("Images - loading state", () => {
   test('"Loading Image Repository" message visible while data pending', async ({ page }) => {
-    // Hold the response open for ~4s so we can catch the loading text
-    await mockAggregatedScans(page, [], { delayMs: 4000 })
-    await gotoAndWait(page, "/images")
+    // Hold the response indefinitely so the loading state is observable.
+    // gotoAndWait waits for the sidebar shell, which races with the
+    // initial fetch; bypass it and assert the loading text directly.
+    let releaseResponse: (() => void) | null = null
+    const responseHeld = new Promise<void>((resolve) => {
+      releaseResponse = resolve
+    })
+    await page.route("**/api/scans/aggregated**", async (route) => {
+      await responseHeld
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          scans: [],
+          pagination: {
+            total: 0,
+            limit: 100,
+            offset: 0,
+            hasMore: false,
+            completedCount: 0,
+          },
+        }),
+      })
+    })
+    await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort())
 
-    await expect(page.getByText(/loading image repository/i)).toBeVisible({ timeout: 10_000 })
+    await page.goto("/images", { waitUntil: "domcontentloaded" })
+    await expect(
+      page.getByText(/loading image repository/i),
+    ).toBeVisible({ timeout: 15_000 })
+
+    releaseResponse?.()
   })
 })

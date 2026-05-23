@@ -143,7 +143,14 @@ test.describe("Add Repository Dialog - Step 1 (Type Selector)", () => {
   })
 
   test("Cancel closes the dialog", async ({ page }) => {
-    await safeClick(page, dialogCancel(page))
+    // The dialog is tall enough at 1280-wide viewports that the Cancel
+    // button can sit below the visible fold. Scroll it into view first,
+    // then click via force to bypass the in-viewport actionability check
+    // (which `safeClick` doesn't disable on its own).
+    const cancel = dialogCancel(page)
+    await expect(cancel).toBeVisible({ timeout: 20_000 })
+    await cancel.scrollIntoViewIfNeeded()
+    await cancel.click({ force: true })
     // Radix keeps the dialog mounted with data-state="closed" when
     // reducedMotion is reduced; assert the state flip rather than visibility.
     await expectDialogClosed(page)

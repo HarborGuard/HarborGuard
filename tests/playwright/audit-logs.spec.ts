@@ -117,14 +117,16 @@ test.describe("Audit Logs — filters and table", () => {
     await expect(page.getByText(/filter audit logs/i).first()).toBeVisible({
       timeout: 20_000,
     })
-    await page.waitForResponse(
-      (resp) => resp.url().includes("/api/audit-logs") && resp.ok(),
-      { timeout: 20_000 },
-    )
+    // The initial /api/audit-logs response usually completes before we
+    // reach this assertion, so a waitForResponse here would block
+    // forever. The filter-card visibility is signal enough; wait for the
+    // input to be ready, then set up the refetch watcher and trigger it.
+    await expect(page.locator("#search")).toBeVisible({ timeout: 10_000 })
 
     const refetch = page.waitForRequest(
       (req) =>
         req.url().includes("/api/audit-logs") && req.url().includes("search="),
+      { timeout: 15_000 },
     )
 
     await page.locator("#search").fill("hello")
