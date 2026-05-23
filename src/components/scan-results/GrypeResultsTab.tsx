@@ -226,10 +226,9 @@ export function GrypeResultsTab({
                             {match.vulnerability.id}
                           </p>
                           {comment && (
-                            <MessageSquare
-                              className="h-4 w-4 text-muted-foreground/40"
-                              title={comment}
-                            />
+                            <span title={comment}>
+                              <MessageSquare className="h-4 w-4 text-muted-foreground/40" />
+                            </span>
                           )}
                         </div>
                         <p className="text-caption text-muted-foreground/60 mt-0.5">

@@ -24,7 +24,10 @@ export default function SettingsPage() {
 
   React.useEffect(() => {
     fetch("/api/settings")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data) => setSettings(data))
       .catch(() => toast.error("Failed to load settings"));
   }, []);

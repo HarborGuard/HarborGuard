@@ -120,12 +120,29 @@ export default function ImageRepositoryPage() {
       {
         key: 'image',
         header: 'Image',
-        type: 'multi-text',
+        type: 'custom',
         sortable: true,
-        accessorFn: (row: any) => ({
-          primary: row.imageName || getImageName(row.image),
-          secondary: row._tagCount > 1 ? `${row._tagCount} tags: ${row._allTags}` : undefined
-        })
+        // Accessor returns a plain string so global filter/sort behave on a
+        // meaningful scalar (primary image name). Secondary text is rendered
+        // off row.original below.
+        accessorFn: (row: any) => row.imageName || getImageName(row.image) || '',
+        cellProps: {
+          render: (row: any) => {
+            const primary = row.imageName || getImageName(row.image)
+            const secondary =
+              row._tagCount > 1 ? `${row._tagCount} tags: ${row._allTags}` : undefined
+            return (
+              <div className="flex flex-col">
+                <span>{primary}</span>
+                {secondary && (
+                  <span className="text-caption uppercase tracking-widest text-muted-foreground/60">
+                    {secondary}
+                  </span>
+                )}
+              </div>
+            )
+          },
+        },
       },
       {
         key: 'status',

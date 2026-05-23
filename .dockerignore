@@ -9,3 +9,7 @@ specs
 coverage
 harborguard-sensor/.git
 harborguard-sensor/harborguard-sensor
+tests
+playwright.config.ts
+playwright-report
+test-results

@@ -355,8 +355,29 @@
   .animate-marquee {
     animation: none !important;
   }
-  * {
+  /* Clamp animation/transition durations to near-zero, but exclude Radix
+     Presence consumers (anything with data-state, plus the data-slot
+     primitives we ship in src/components/ui). Sub-millisecond animations on
+     these nodes don't fire animationend reliably in Chromium, which leaves
+     overlays mounted with data-state="closed" and blocks pointer events on
+     the page beneath. */
+  *:not([data-state]):not([data-slot*="dialog"]):not([data-slot*="popover"]):not([data-slot*="dropdown"]):not([data-slot*="select"]):not([data-slot*="sheet"]):not([data-slot*="tooltip"]) {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+  }
+  /* Hard unmount path for Radix Presence consumers when their state flips
+     to closed — Radix Presence explicitly checks styles.display === "none"
+     and takes the UNMOUNT branch immediately, bypassing the animation-end
+     race entirely. */
+  [data-state="closed"][data-slot="dialog-overlay"],
+  [data-state="closed"][data-slot="dialog-content"],
+  [data-state="closed"][data-slot="popover-content"],
+  [data-state="closed"][data-slot="dropdown-menu-content"],
+  [data-state="closed"][data-slot="dropdown-menu-sub-content"],
+  [data-state="closed"][data-slot="select-content"],
+  [data-state="closed"][data-slot="sheet-overlay"],
+  [data-state="closed"][data-slot="sheet-content"],
+  [data-state="closed"][data-slot="tooltip-content"] {
+    display: none !important;
   }
 }

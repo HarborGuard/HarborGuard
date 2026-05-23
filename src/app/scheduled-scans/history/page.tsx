@@ -92,6 +92,7 @@ function ScheduledScansHistoryContent() {
     try {
       setLoading(true);
       const response = await fetch("/api/scheduled-scans/history?limit=100");
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       setHistory(data.history || []);
     } catch (error) {

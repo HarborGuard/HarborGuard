@@ -82,10 +82,98 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: harborguard
+          POSTGRES_PASSWORD: harborguard_dev
+          POSTGRES_DB: harborguard
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U harborguard"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://harborguard:harborguard_dev@localhost:5432/harborguard
+      HEALTH_CHECK_ENABLED: "true"
+      ENABLED_SCANNERS: trivy,grype,syft,dockle,osv,dive
+      NODE_ENV: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --legacy-peer-deps
+      - name: Generate Prisma client
+        run: npx prisma generate
+      - name: Apply database schema
+        run: npx prisma db push --skip-generate
+      - name: Build Next.js
+        # Reuse build:docker to skip the OpenAPI step's `tsx` requirement —
+        # the runtime API still serves /api/openapi.json dynamically.
+        run: npm run build:docker
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: Start app
+        run: |
+          (npx next start -p 3000 > /tmp/app.log 2>&1 &)
+          echo "Started Next.js on :3000"
+      - name: Wait for app health
+        run: |
+          for i in {1..40}; do
+            status=$(curl -sS -o /dev/null -w "%{http_code}" http://localhost:3000/api/health || echo "000")
+            if [ "$status" = "200" ] || [ "$status" = "503" ]; then
+              echo "App responded with $status after $((i * 3))s"
+              [ "$status" = "200" ] && exit 0
+              echo "App is up but health=503 — check DB connectivity:"
+              curl -sS http://localhost:3000/api/health | head -200
+              exit 1
+            fi
+            echo "Attempt $i: HTTP $status"
+            sleep 3
+          done
+          echo "App never responded after 120s"
+          tail -200 /tmp/app.log || true
+          exit 1
+      - name: Run Playwright
+        env:
+          CI: "1"
+          FORCE_COLOR: "1"
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+        run: npm run test:e2e
+      - name: Dump app logs on failure
+        if: failure()
+        run: |
+          echo "=== app log (tail 300) ==="
+          tail -300 /tmp/app.log || true
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: |
+            tests/outputs/playwright/
+            tests/outputs/playwright-html-report/
+            tests/outputs/playwright-report.json
+          retention-days: 14
+          if-no-files-found: ignore
+
   merge:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
-    needs: build
+    # Gate :latest (and tag) on E2E passing — if Playwright fails, we don't
+    # publish the manifest, so a regression can't clobber the canonical tag.
+    needs: [build, e2e]
     permissions:
       contents: read
       packages: write

@@ -4,6 +4,8 @@ import * as React from "react"
 import {
   ColumnDef,
   ColumnFiltersState,
+  FilterFn,
+  Row,
   SortingState,
   VisibilityState,
   flexRender,
@@ -21,6 +23,8 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  ChevronsUpDown,
+  ChevronUp,
   LayoutList,
   Search,
 } from "lucide-react"
@@ -180,6 +184,27 @@ export function UnifiedTable<T extends Record<string, any>>({
     return cols
   }, [columns, features.selection, rowActions, allCellRenderers])
 
+  // Deep-walking global filter that traverses object/array accessor values so
+  // columns whose accessorFn returns shapes like {primary, secondary} still
+  // contribute their leaf strings/numbers to the search haystack. The default
+  // TanStack `includesString` stringifies objects to "[object Object]" and
+  // never matches user input.
+  const globalFilterFn = React.useMemo<FilterFn<T>>(
+    () => (row: Row<T>, columnId: string, filterValue: unknown) => {
+      const collect = (v: unknown): string[] => {
+        if (v == null) return []
+        if (typeof v === "string" || typeof v === "number") return [String(v)]
+        if (Array.isArray(v)) return v.flatMap(collect)
+        if (typeof v === "object") return Object.values(v as Record<string, unknown>).flatMap(collect)
+        return []
+      }
+      const value = row.getValue(columnId)
+      const haystack = collect(value).join(" ").toLowerCase()
+      return haystack.includes(String(filterValue ?? "").toLowerCase())
+    },
+    []
+  )
+
   // Create table instance
   const table = useReactTable({
     data,
@@ -200,6 +225,7 @@ export function UnifiedTable<T extends Record<string, any>>({
     onColumnVisibilityChange: setColumnVisibility,
     onGlobalFilterChange: setGlobalFilter,
     onPaginationChange: serverPagination ? undefined : setPagination,
+    globalFilterFn,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: features.filtering ? getFilteredRowModel() : undefined,
     getPaginationRowModel: features.pagination && !serverPagination ? getPaginationRowModel() : undefined,
@@ -348,13 +374,46 @@ export function UnifiedTable<T extends Record<string, any>>({
             <TableHeader className={stickyHeader ? "sticky top-0 z-10 bg-overlay" : ""}>
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="border-white/10 hover:bg-transparent">
-                  {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} colSpan={header.colSpan} className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1">
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
-                    </TableHead>
-                  ))}
+                  {headerGroup.headers.map((header) => {
+                    const canSort = header.column.getCanSort()
+                    const sorted = header.column.getIsSorted()
+                    const SortIcon = canSort
+                      ? sorted === "asc"
+                        ? ChevronUp
+                        : sorted === "desc"
+                          ? ChevronDown
+                          : ChevronsUpDown
+                      : null
+                    const ariaSort: React.AriaAttributes["aria-sort"] =
+                      sorted === "asc"
+                        ? "ascending"
+                        : sorted === "desc"
+                          ? "descending"
+                          : canSort
+                            ? "none"
+                            : undefined
+                    return (
+                      <TableHead
+                        key={header.id}
+                        colSpan={header.colSpan}
+                        aria-sort={ariaSort}
+                        className="uppercase tracking-widest text-caption text-muted-foreground/60 bg-surface-1"
+                      >
+                        {header.isPlaceholder ? null : canSort ? (
+                          <button
+                            type="button"
+                            onClick={header.column.getToggleSortingHandler()}
+                            className="flex items-center gap-1 cursor-pointer select-none uppercase tracking-widest text-caption text-muted-foreground/60"
+                          >
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                            {SortIcon && <SortIcon className="h-3 w-3 opacity-60" />}
+                          </button>
+                        ) : (
+                          flexRender(header.column.columnDef.header, header.getContext())
+                        )}
+                      </TableHead>
+                    )
+                  })}
                 </TableRow>
               ))}
             </TableHeader>

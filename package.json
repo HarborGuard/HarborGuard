@@ -18,7 +18,10 @@
     "db:push": "npx prisma db push",
     "db:reset": "npx prisma migrate reset --force && npx prisma generate",
     "fresh": "rm -rf src/generated/prisma node_modules/.prisma && npx prisma generate",
-    "db:generate": "npx prisma generate"
+    "db:generate": "npx prisma generate",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:install": "playwright install --with-deps chromium"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1014.0",
@@ -75,6 +78,7 @@
     "zod": "^4.0.17"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
