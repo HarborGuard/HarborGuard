@@ -27,6 +27,15 @@ export interface AppConfig {
   appriseApiUrl?: string;
   appriseConfigKey?: string;
   appriseUrls?: string;
+  // Discord webhook URL — typically https://discord.com/api/webhooks/<channel_id>/<token>.
+  // POSTed with a JSON body containing an `embeds` array. See HarborGuard issue #155.
+  discordWebhookUrl?: string;
+  // ntfy server URL (e.g. "https://ntfy.sh") plus a topic. Either both
+  // or just `ntfyServerUrl` if the URL itself includes the topic path.
+  ntfyServerUrl?: string;
+  ntfyTopic?: string;
+  // Optional bearer token for ntfy access-controlled topics.
+  ntfyAccessToken?: string;
   notifyOnHighSeverity: boolean;
   
   // Monitoring
@@ -67,6 +76,10 @@ function parseEnvConfig(): AppConfig {
     appriseApiUrl: process.env.APPRISE_API_URL,
     appriseConfigKey: process.env.APPRISE_CONFIG_KEY,
     appriseUrls: process.env.APPRISE_URLS,
+    discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL,
+    ntfyServerUrl: process.env.NTFY_SERVER_URL,
+    ntfyTopic: process.env.NTFY_TOPIC,
+    ntfyAccessToken: process.env.NTFY_ACCESS_TOKEN,
     notifyOnHighSeverity: process.env.NOTIFY_ON_HIGH_SEVERITY?.toLowerCase() === 'true',
     
     // Monitoring
