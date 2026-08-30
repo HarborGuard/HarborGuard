@@ -311,7 +311,7 @@ export class GHCRProvider extends EnhancedRegistryProvider {
           if (error.message.includes('rate limit')) {
             throw new Error('GitHub API rate limit exceeded. Please try again later.');
           }
-          throw new Error('Access forbidden. Your token may not have the required "packages:read" scope.');
+          throw new Error('Access forbidden. Your token may not have the required "read:packages" scope.');
         }
         
         if (error.message.includes('404')) {

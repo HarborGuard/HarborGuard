@@ -260,7 +260,7 @@ export function RegistryConfigForm({
               onChange={(e) => onConfigChange(prev => ({ ...prev, password: e.target.value }))}
               placeholder={
                 config.type === 'dockerhub' ? 'Enter Docker Hub PAT' :
-                config.type === 'ghcr' ? 'Enter GitHub PAT with packages:read scope' :
+                config.type === 'ghcr' ? 'Enter GitHub PAT with read:packages scope' :
                 config.type === 'gitlab' ? 'Enter GitLab admin password' :
                 config.type === 'nexus' ? 'Enter Nexus password' :
                 config.type === 'gitea' ? 'Enter Gitea/Forgejo PAT with package:read scope' :

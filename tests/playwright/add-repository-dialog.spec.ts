@@ -239,6 +239,13 @@ test.describe("Add Repository Dialog - GHCR type", () => {
     // No TLS checkbox
     await expect(page.getByLabel("Skip TLS Verification")).toHaveCount(0)
   })
+
+  test("GHCR documents the correct package read scope", async ({ page }) => {
+    await openDialogOn(page, "GitHub Container Registry")
+
+    await expect(page.getByPlaceholder("Enter GitHub PAT with read:packages scope")).toBeVisible()
+    await expect(page.getByText("packages:read", { exact: false })).toHaveCount(0)
+  })
 })
 
 test.describe("Add Repository Dialog - GENERIC type", () => {
