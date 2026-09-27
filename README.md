@@ -88,6 +88,8 @@ Harbor Guard supports comprehensive configuration through environment variables.
 | **Network & Deployment** |
 | `PORT` | Server listening port | `3000` | `1000-65535` | `PORT=8080` |
 | `HOSTNAME` | Server bind address | `0.0.0.0` | Valid IP address | `HOSTNAME=127.0.0.1` |
+| `HARBORGUARD_AUTH_USERNAME` | Optional HTTP Basic username; set together with password | *none* | Username without `:` | `HARBORGUARD_AUTH_USERNAME=admin` |
+| `HARBORGUARD_AUTH_PASSWORD` | Optional HTTP Basic password; set together with username | *none* | Long, unique secret | Set through your deployment secret settings |
 | **Notifications** |
 | `TEAMS_WEBHOOK_URL` | Microsoft Teams webhook URL for notifications | *none* | Valid HTTPS URL | `TEAMS_WEBHOOK_URL=https://outlook.office.com/webhook/...` |
 | `SLACK_WEBHOOK_URL` | Slack webhook URL for notifications | *none* | Valid HTTPS URL | `SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...` |
@@ -198,6 +200,22 @@ docker run -p 8080:8080 \
 ```
 
 </details>
+
+### Protecting the dashboard and API
+
+Set both `HARBORGUARD_AUTH_USERNAME` and `HARBORGUARD_AUTH_PASSWORD` as server-side
+environment variables to require HTTP Basic authentication for the UI and API.
+For example, configure them as secrets in your deployment platform. An incomplete
+pair returns HTTP 503 instead of leaving the app open. The Docker health check's
+`GET`/`HEAD /api/health` remains accessible without credentials; all other API
+routes, including `/api/ready` and `/api-docs`, require authentication.
+
+Serve HarborGuard over HTTPS, keep its container port private, and use a long,
+unique password. Basic authentication sends credentials with every request;
+TLS is required to keep them confidential. Without these variables, HarborGuard
+retains its previous unauthenticated behavior, so protect public deployments
+with this option or an external access proxy. This feature controls access to
+the app; it does not encrypt registry credentials stored in the database.
 
 ### Development Setup
 

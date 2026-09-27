@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { basicAuthHeader, getBasicAuthConfig, isBasicAuthValid, type BasicAuthConfig } from '@/lib/basic-auth';
 
 
 // Define routes that should be logged
@@ -61,7 +62,7 @@ function getUserIp(request: NextRequest): string {
   return 'unknown';
 }
 
-async function logPageView(request: NextRequest, pathname: string) {
+async function logPageView(request: NextRequest, pathname: string, auth: BasicAuthConfig) {
   try {
     const userIp = getUserIp(request);
     const userAgent = request.headers.get('user-agent') || '';
@@ -75,6 +76,7 @@ async function logPageView(request: NextRequest, pathname: string) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(auth && auth !== 'invalid' ? { Authorization: basicAuthHeader(auth) } : {}),
       },
       body: JSON.stringify({
         eventType: 'SYSTEM_EVENT',
@@ -102,6 +104,20 @@ async function logPageView(request: NextRequest, pathname: string) {
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const method = request.method;
+  const auth = getBasicAuthConfig();
+
+  // Docker's built-in health check calls this endpoint without credentials.
+  // Keep the exception narrow: all other UI and API routes require auth.
+  const isHealthCheck = pathname === '/api/health' && (method === 'GET' || method === 'HEAD');
+  if (auth === 'invalid') {
+    return new NextResponse('Authentication is misconfigured', { status: 503 });
+  }
+  if (auth && !isHealthCheck && !isBasicAuthValid(request.headers.get('authorization'), auth)) {
+    return new NextResponse('Unauthorized', {
+      status: 401,
+      headers: { 'WWW-Authenticate': 'Basic realm="HarborGuard", charset="UTF-8"', 'Cache-Control': 'no-store' }
+    });
+  }
   
   // Skip audit-logs to avoid infinite loops
   if (pathname.startsWith('/api/audit-logs')) {
@@ -133,7 +149,7 @@ export function middleware(request: NextRequest) {
   // Log page views for relevant routes
   if (shouldLogRoute(pathname)) {
     // Don't await this to avoid slowing down the request
-    logPageView(request, pathname);
+    logPageView(request, pathname, auth);
   }
   
   return NextResponse.next();
